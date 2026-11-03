@@ -11,24 +11,19 @@ import { POST as startService } from "@/app/api/services/[id]/start/route";
 import { POST as completeService } from "@/app/api/services/[id]/complete/route";
 import { POST as suspendService } from "@/app/api/services/[id]/suspend/route";
 import { POST as resumeService } from "@/app/api/services/[id]/resume/route";
-import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
+import { AUTH_COOKIE_NAME, sealSession } from "@/lib/session";
+import { createTestSession } from "@/test/session";
 
 afterEach(() => {
   vi.restoreAllMocks();
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
 });
 
 function fieldCookie(crewId = "crew-own") {
-  process.env.M6_AUTH_MODE = "backend-development";
-  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+  process.env.M6_AUTH_MODE = "real-m1";
   process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-  const session = createSession("field-crew-leader-route", {
-    mode: "backend-development",
-    devJwt: process.env.M6_DEV_JWT,
-    backendOrigin: process.env.M6_BACKEND_ORIGIN,
-  });
+  const session = createTestSession("field-crew-leader-route");
   session.crew = { id: crewId, name: "Cuadrilla de la sesión" };
   return `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
 }

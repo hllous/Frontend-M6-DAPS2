@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 
-import { demoSigningConfigured, signDemoJwt } from "@/lib/demo-jwt";
 import { M1AccountBlockedError, M1CredentialsRejectedError, M1InvalidResponseError, M1LoginTimeoutError, M1ServiceUnavailableError, loginWithM1 } from "@/lib/m1-auth";
 import { fetchMeWithToken, sessionFromMe } from "@/lib/me";
 import { getSessionMutationRejection } from "@/lib/session-request";
@@ -13,10 +12,10 @@ import {
   BackendUnavailableError,
   CitizenForbiddenError,
   InvalidSessionError,
-  createSession,
   createM1Session,
+  createSession,
   getAuthMode,
-  isProductionDemoModeMisconfigured,
+  isDeployedAuthModeMisconfigured,
   publicSession,
   SESSION_MARKER_COOKIE_NAME,
   sessionMarkerCookieOptions,
@@ -48,7 +47,7 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
 }
 
 export async function POST(request: Request) {
-  if (isProductionDemoModeMisconfigured()) {
+  if (isDeployedAuthModeMisconfigured()) {
     console.error("[m6-auth-mode-misconfigured]", process.env.M6_AUTH_MODE);
     return loginFailure(503, "El ingreso no está disponible por una configuración del servidor.");
   }
@@ -131,27 +130,11 @@ async function handleLoginRequest(request: Request, body: Record<string, unknown
   }
 
   try {
-    const backendOrigin = process.env.M6_BACKEND_ORIGIN;
-    if (mode === "mock" && getScenario(body.scenarioId).subType === "CIUDADANO") throw new CitizenForbiddenError();
-    const demoSigning = mode === "backend-development" && demoSigningConfigured();
-    const devJwt = demoSigning ? undefined : process.env.M6_DEV_JWT;
-    const loginToken = demoSigning ? signDemoJwt(body.scenarioId) : devJwt;
-    // En modo backend los roles de M6 salen de GET /me, no del escenario elegido ni del token.
-    const me = mode === "backend-development" && backendOrigin && loginToken
-      ? await fetchMeWithToken(backendOrigin, loginToken)
-      : undefined;
-    const created = createSession(body.scenarioId, { mode, devJwt, backendOrigin, roles: me?.roles, demoSigning });
-    const session = me ? sessionFromMe(created, me) : created;
-    return sessionResponse(request, session);
+    if (getScenario(body.scenarioId).subType === "CIUDADANO") throw new CitizenForbiddenError();
+    return sessionResponse(request, createSession(body.scenarioId, { mode }));
   } catch (error) {
     if (error instanceof CitizenForbiddenError) {
       return loginFailure(403, error.message);
-    }
-    if (error instanceof InvalidSessionError) {
-      return loginFailure(401, "El servicio rechazó la sesión de desarrollo. Renueve el token.");
-    }
-    if (error instanceof AuthUnavailableError || error instanceof BackendUnavailableError) {
-      return loginFailure(503, error.message);
     }
     return loginFailure(500, "No se pudo iniciar la sesión.");
   }

@@ -24,7 +24,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
   resetServiceFixtures();
@@ -59,8 +58,8 @@ function sizedMultipartRequest(cookie: string, fileBytes: number, contentLength:
 }
 
 const backendSessionSettings = {
-  mode: "backend-development" as const,
-  devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+  mode: "real-m1" as const,
+  accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
   backendOrigin: "https://backend.internal",
 };
 
@@ -110,7 +109,7 @@ describe("POST /api/evidence BFF route", () => {
     expect((await POST(evidenceRequest(cookie, "SERVICE", ownerId, "owner-key"))).status).toBe(400);
   });
 
-  it("requires Idempotency-Key in backend-development without contacting the backend", async () => {
+  it("requires Idempotency-Key in real-m1 without contacting the backend", async () => {
     const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
     const backendFetch = vi.spyOn(globalThis, "fetch");
 
@@ -246,7 +245,7 @@ describe("POST /api/evidence BFF route", () => {
       expect(backendFetch).not.toHaveBeenCalled();
     });
 
-    it("never reuses a stale mock cache entry in backend-development", async () => {
+    it("never reuses a stale mock cache entry in real-m1", async () => {
       const cookie = createSessionCookie("field-crew-leader-route", backendFieldSession);
       evidenceCache.set(`SERVICE:${serviceId}:stale-key`, {
         id: "mock-attachment", url: "/mock/evidence/photo.jpg", filename: "photo.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-05T10:00:00Z",
@@ -570,7 +569,7 @@ describe("POST /api/evidence BFF route", () => {
 
   it("forwards only the UploadEvidenceDto fields to the backend (no fileName or fileSize)", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch");
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "crew-real", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "crew-real", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     backendFetch.mockClear();
     let sentKeys: string[] = [];
     backendFetch.mockImplementation(async (input, init) => {

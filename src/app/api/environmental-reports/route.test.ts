@@ -9,7 +9,7 @@ afterEach(() => { restoreEnv?.(); vi.restoreAllMocks(); });
 describe("environmental report date range BFF forwarding", () => {
   it.each(["office-duty-queue", "field-crew-leader-route"] as const)("forwards from/to unchanged for %s", async (scenario) => {
     restoreEnv = backendEnv();
-    const cookie = createSessionCookie(scenario, { mode: "backend-development", crew: { id: "crew-b", name: "Cuadrilla B" } });
+    const cookie = createSessionCookie(scenario, { mode: "real-m1", crew: { id: "crew-b", name: "Cuadrilla B" } });
     const backend = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({
       data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 },
     }));
@@ -25,7 +25,7 @@ describe("environmental report date range BFF forwarding", () => {
 describe("environmental report status BFF forwarding", () => {
   it("forwards several statuses as repeated query parameters", async () => {
     restoreEnv = backendEnv();
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     const backend = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({
       data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 },
     }));
@@ -47,7 +47,7 @@ describe("environmental report status BFF forwarding", () => {
 
   it("rejects a status outside the report status enum", async () => {
     restoreEnv = backendEnv();
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     const backend = vi.spyOn(globalThis, "fetch");
 
     const response = await GET(new Request("http://localhost/api/environmental-reports?status=NOT_A_STATUS", { headers: { cookie } }));
@@ -58,7 +58,7 @@ describe("environmental report status BFF forwarding", () => {
 
   it("keeps Backend pagination defaults when the client omits page parameters", async () => {
     restoreEnv = backendEnv();
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     const backend = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({
       data: [], meta: { total: 0, page: 1, pageSize: 25, totalPages: 1 },
     }));
@@ -78,7 +78,7 @@ describe("environmental reports in Field scope (#651)", () => {
   it("reports through meta.dropped the records it had to drop for an unknown enum value", async () => {
     restoreEnv = backendEnv();
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const cookie = createSessionCookie("field-crew-leader-route", { mode: "backend-development", crew: { id: "crew-b", name: "Cuadrilla B" } });
+    const cookie = createSessionCookie("field-crew-leader-route", { mode: "real-m1", crew: { id: "crew-b", name: "Cuadrilla B" } });
     const { environmentalReportFixtures } = await import("@/lib/environmental-report-fixtures");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({
       data: [{ ...environmentalReportFixtures[0], assignedCrewId: "crew-b" }, { ...environmentalReportFixtures[1], status: "FUTURE_STATUS" }],

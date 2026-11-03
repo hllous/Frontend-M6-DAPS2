@@ -15,7 +15,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
   resetEnvironmentalInspectionFixtures();
@@ -115,10 +114,10 @@ describe("repair request BFF detail and recovery routes", () => {
 
   it("forwards an authenticated backend repair request detail with its id and GET method", async () => {
     const id = "RR-encoded_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
     const cookie = await loginAs("office-duty-queue", {
-      mode: "backend-development",
-      devJwt,
+      mode: "real-m1",
+      accessToken: devJwt,
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "REQUESTED" }));
@@ -139,10 +138,10 @@ describe("repair request BFF detail and recovery routes", () => {
     ["close", close],
   ] as const)("forwards the backend repair request %s action using POST", async (action, handler) => {
     const id = "RR-encoded_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
     const cookie = await loginAs("office-duty-queue", {
-      mode: "backend-development",
-      devJwt,
+      mode: "real-m1",
+      accessToken: devJwt,
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "IN_PROGRESS" }));

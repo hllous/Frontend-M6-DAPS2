@@ -1,41 +1,54 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loginWithMe as login } from "@/test/session";
-import { POST as loginRoute } from "./login/route";
-import { getSessionFromCookieValue, getSessionFromRequest } from "@/lib/session";
-import { getScenario } from "@/lib/scenarios";
+import { TEST_ACCESS_TOKEN, loginWithMe as login } from "@/test/session";
+import { POST as realLogin } from "./login/route";
+import { fetchMeWithToken, sessionFromMe } from "@/lib/me";
+import { CitizenForbiddenError, InvalidSessionError, createM1Session, publicSession, sealSession } from "@/lib/session";
+import { getSessionFromRequest } from "@/lib/session";
+import { getScenario, type ScenarioId } from "@/lib/scenarios";
 import { GET as session } from "./route";
 import { POST as logout } from "./logout/route";
-import { GET as listServices } from "../services/route";
 import { GET as scenarioRoute } from "../mock/scenarios/[scenarioId]/route";
 
 const originalEnvironment = {
   authMode: process.env.M6_AUTH_MODE,
-  devJwt: process.env.M6_DEV_JWT,
 };
 
 afterEach(() => {
   if (originalEnvironment.authMode === undefined) delete process.env.M6_AUTH_MODE;
   else process.env.M6_AUTH_MODE = originalEnvironment.authMode;
-  if (originalEnvironment.devJwt === undefined) delete process.env.M6_DEV_JWT;
-  else process.env.M6_DEV_JWT = originalEnvironment.devJwt;
   delete process.env.M6_BACKEND_ORIGIN;
   delete process.env.M1_BASE_URL;
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
-function sessionCookieMaxAge(setCookie: string) {
-  return Number(/Max-Age=(\d+)/i.exec(setCookie)?.[1]);
-}
-
 function meResponse(roles: string[], init: { subType?: string } = {}) {
   return Response.json({ userId: "42", subType: init.subType ?? "EMPLEADO", m1Role: "ADMINISTRATIVO", roles });
 }
 
+/** Login real de M1 ya resuelto (el POST a M1 está probado en login/route.test.ts): el GET /me que sigue lo sirve el mock de fetch del test. */
+async function loginRoute(request: Request): Promise<Response> {
+  const { scenarioId } = (await request.clone().json()) as { scenarioId: ScenarioId };
+  try {
+    const me = await fetchMeWithToken(process.env.M6_BACKEND_ORIGIN ?? "", TEST_ACCESS_TOKEN);
+    const created = createM1Session({
+      accessToken: TEST_ACCESS_TOKEN,
+      refreshToken: "refresh-test",
+      jwtExpiresAt: Date.now() + 15 * 60 * 1000,
+      identity: { userId: me.userId, subType: "EMPLEADO", m1Role: me.m1Role },
+    });
+    const session = sessionFromMe({ ...created, scenarioId }, me);
+    return Response.json({ session: publicSession(session) }, { headers: { "set-cookie": `m6_session=${sealSession(session)}; Path=/; HttpOnly` } });
+  } catch (error) {
+    if (error instanceof CitizenForbiddenError) return Response.json({ message: error.message }, { status: 403 });
+    if (error instanceof InvalidSessionError) return Response.json({ message: error.message }, { status: 401 });
+    throw error;
+  }
+}
+
 function backendSessionEnv() {
-  process.env.M6_AUTH_MODE = "backend-development";
-  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+  process.env.M6_AUTH_MODE = "real-m1";
   process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
 }
 
@@ -137,36 +150,6 @@ describe("session route handlers", () => {
     expect(response.headers.get("set-cookie") ?? "").not.toMatch(/Secure/i);
   });
 
-  it("forwards the server-provided development JWT without returning it", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
-    const token = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    process.env.M6_DEV_JWT = token;
-    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const response = await login(loginRequest("field-crew-leader-route"));
-    const cookie = response.headers.get("set-cookie") ?? "";
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(cookie).not.toContain(token);
-    expect(JSON.stringify(body)).not.toContain(token);
-  });
-
-  it("does not expose the missing development JWT name in the BFF response", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    delete process.env.M6_DEV_JWT;
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-
-    const response = await login(loginRequest("office-duty-queue"));
-    const body = await response.json();
-
-    expect(response.status).toBe(503);
-    expect(body.message).toBe("La autenticación solicitada no está disponible.");
-    expect(JSON.stringify(body)).not.toContain("M6_DEV_JWT");
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
   describe("Crew from GET /me (#469)", () => {
     it.each([
       [[{ id: "a", name: "Otra", role: "MEMBER" }, { id: "b", name: "Cuadrilla Belgrano — Recolección", role: "MEMBER" }], "b", "CREW_MEMBER"],
@@ -180,7 +163,7 @@ describe("session route handlers", () => {
       const value = (await response.json()).session;
       expect(value.crew?.id).toBe(id);
       expect(value.fieldRole).toBe(fieldRole);
-      const scenario = getScenario({ ...value, mode: "backend-development" });
+      const scenario = getScenario({ ...value, mode: "real-m1" });
       expect(scenario.capabilities.includes("service:execute")).toBe(fieldRole !== "CREW_MEMBER");
     });
 
@@ -231,7 +214,7 @@ describe("session route handlers", () => {
   it("does not fall back when real M1 mode is requested", async () => {
     process.env.M6_AUTH_MODE = "real-m1";
     delete process.env.M1_BASE_URL;
-    const response = await login(realM1LoginRequest("persona@example.test", "clave"));
+    const response = await realLogin(realM1LoginRequest("persona@example.test", "clave"));
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ message: "El servicio de ingreso no está disponible. Intente nuevamente en unos minutos." });
@@ -268,7 +251,7 @@ describe("session route handlers", () => {
       expect(response.headers.get("set-cookie")).toBeNull();
     });
 
-    it("does not open a session when the backend rejects the development token", async () => {
+    it("does not open a session when the backend rejects the M1 token", async () => {
       backendSessionEnv();
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ statusCode: 401, message: "Unauthorized" }, { status: 401 }));
 
@@ -350,97 +333,6 @@ describe("session route handlers", () => {
 
       expect(pulse.status).toBe(200);
       expect((await pulse.json()).session.roles).toEqual(["M6_ADMIN"]);
-    });
-  });
-  describe("signed demo session: the session outlives the token (#745, #740)", () => {
-    function signingEnv() {
-      process.env.M6_AUTH_MODE = "backend-development";
-      process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-      delete process.env.M6_DEV_JWT;
-      vi.stubEnv("M6_JWT_SECRET", Buffer.alloc(32, 9).toString("base64"));
-    }
-    const claims = (call: unknown[]) => {
-      const bearer = new Headers((call[1] as RequestInit).headers).get("authorization") ?? "";
-      return JSON.parse(Buffer.from(bearer.replace("Bearer ", "").split(".")[1], "base64url").toString());
-    };
-
-    it("logs in as the seed person of the profile, keeps no token in the cookie and signs a fresh one per request", async () => {
-      signingEnv();
-      vi.useFakeTimers({ toFake: ["Date"] });
-      try {
-        const start = Date.now();
-        const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => String(input).endsWith("/me")
-          ? meResponse(["M6_OFICINA_OPERACIONES"])
-          : Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 0 } }));
-        const loginResponse = await loginRoute(loginRequest("office-operations"));
-        const cookie = loginResponse.headers.get("set-cookie") ?? "";
-
-        expect(loginResponse.status).toBe(200);
-        expect(claims(backendFetch.mock.calls[0])).toMatchObject({ sub: "10002", rol: "ADMINISTRATIVO", sub_type: "EMPLEADO", typ: "access" });
-        const sealed = getSessionFromRequest(new Request("http://localhost", { headers: { cookie } }));
-        expect(sealed).toMatchObject({ source: "demo", scenarioId: "office-operations" });
-        expect(sealed).not.toHaveProperty("accessToken");
-        expect(JSON.stringify(await loginResponse.json())).not.toMatch(/eyJ/);
-
-        // 20 minutos después (el token del login ya habría vencido) la sesión sigue viva y el pedido lleva un token nuevo.
-        vi.setSystemTime(start + 20 * 60 * 1000);
-        const later = await listServices(new Request("http://localhost/api/services", { headers: { cookie } }));
-        expect(later.status).toBe(200);
-        const servicesCall = backendFetch.mock.calls.at(-1) as unknown[];
-        expect(claims(servicesCall).exp).toBeGreaterThan(Math.floor((start + 20 * 60 * 1000) / 1000));
-        expect(claims(servicesCall).exp).toBeGreaterThan(claims(backendFetch.mock.calls[0]).exp);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    it("ends a signed demo session only at the 8 hour cap: no 15 minute token expiry and no 30 minute idle cut", async () => {
-      signingEnv();
-      vi.spyOn(globalThis, "fetch").mockImplementation(async () => meResponse(["M6_ADMIN"]));
-      const cookie = (await loginRoute(loginRequest("office-duty-queue"))).headers.get("set-cookie") ?? "";
-      const value = cookie.split(";")[0].replace("m6_session=", "");
-      const now = Date.now();
-
-      expect(getSessionFromCookieValue(value, undefined, now + 20 * 60 * 1000)).toBeDefined();
-      expect(getSessionFromCookieValue(value, undefined, now + 7 * 60 * 60 * 1000)).toBeDefined();
-      expect(getSessionFromCookieValue(value, undefined, now + 8 * 60 * 60 * 1000 + 1000)).toBeUndefined();
-      expect(sessionCookieMaxAge(cookie)).toBeGreaterThan(7 * 60 * 60);
-      expect(cookie).toMatch(/m6_signed_in=1/);
-    });
-
-    it("treats a live demo session as ended (401) when the signing secret was removed", async () => {
-      signingEnv();
-      vi.spyOn(globalThis, "fetch").mockImplementation(async () => meResponse(["M6_ADMIN"]));
-      const cookie = (await loginRoute(loginRequest("office-duty-queue"))).headers.get("set-cookie") ?? "";
-
-      vi.stubEnv("M6_JWT_SECRET", "");
-      const response = await listServices(new Request("http://localhost/api/services", { headers: { cookie } }));
-
-      expect(response.status).toBe(401);
-    });
-
-    it("sends the citizen profile with a CIUDADANO token and opens no session when the backend rejects it", async () => {
-      signingEnv();
-      const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        Response.json({ statusCode: 403, message: "Este sistema es solo para personal municipal" }, { status: 403 }),
-      );
-
-      const response = await loginRoute(loginRequest("citizen"));
-
-      expect(claims(backendFetch.mock.calls[0])).toMatchObject({ sub: "901", sub_type: "CIUDADANO" });
-      expect(response.status).toBe(403);
-      expect(response.headers.get("set-cookie")).toBeNull();
-    });
-
-    it("opens the employee without a role with roles [] so the UI shows the no-access screen", async () => {
-      signingEnv();
-      vi.spyOn(globalThis, "fetch").mockImplementation(async () => meResponse([]));
-
-      const response = await loginRoute(loginRequest("employee-no-role"));
-      const cookie = response.headers.get("set-cookie") ?? "";
-
-      expect(response.status).toBe(200);
-      expect(getSessionFromRequest(new Request("http://localhost", { headers: { cookie } }))).toMatchObject({ roles: [], source: "demo" });
     });
   });
 });

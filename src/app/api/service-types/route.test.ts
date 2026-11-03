@@ -7,7 +7,6 @@ import { loginAs } from "@/test/session";
 beforeEach(() => resetServiceTypeFixtures());
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -53,8 +52,8 @@ describe("/api/service-types", () => {
   });
 
   it("forwards an authenticated backend service-type list with GET", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
 
     const response = await GET(new Request("http://localhost/api/service-types", { headers: { cookie } }));

@@ -159,8 +159,8 @@ const mutationCases: MutationCase[] = [
     // La evidencia de un contenedor solo la sube la cuadrilla (Backend #161): el Admin de `backendCookie` no puede.
     invoke: async () => {
       const cookie = createSessionCookie("field-crew-leader-route", {
-        mode: "backend-development",
-        devJwt: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+        mode: "real-m1",
+        accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
         backendOrigin: "https://backend.internal",
       });
       delete process.env.M6_BACKEND_ORIGIN;
@@ -182,8 +182,8 @@ let backendCookie = "";
 beforeEach(() => {
   delete process.env.M6_BACKEND_ORIGIN;
   backendCookie = createSessionCookie("office-duty-queue", {
-    mode: "backend-development",
-    devJwt: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+    mode: "real-m1",
+    accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
     backendOrigin: "https://backend.internal",
   });
   delete process.env.M6_BACKEND_ORIGIN;
@@ -191,7 +191,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -209,9 +208,8 @@ describe("backend origin fail-closed behavior", () => {
     expect(fixtureSnapshot()).toBe(before);
   });
 
-  it("fails backend-development login with 503 when the origin is missing", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+  it("fails real-m1 login with 503 when the origin is missing", async () => {
+    process.env.M6_AUTH_MODE = "real-m1";
 
     const response = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
