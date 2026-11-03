@@ -14,6 +14,7 @@ import {
   Map,
   Settings2,
   Sprout,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -54,7 +55,7 @@ const MapaOperativo = dynamic(
   { ssr: false },
 );
 
-type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards" | "integration-monitor";
+type Destination = "work" | "services" | "referrals" | "inventory" | "environment" | "map" | "catalog" | "dashboards" | "access" | "integration-monitor";
 type LogoutAction = (formData: FormData) => void | Promise<void>;
 
 type NavigationItem = {
@@ -73,14 +74,17 @@ const navigation: NavigationItem[] = [
   { id: "map", label: "Mapa", capability: "map:view", icon: Map },
   { id: "catalog", label: "Catálogo", capability: "catalog:view", icon: Settings2 },
   { id: "dashboards", label: "Tableros", capability: "indicator:view", icon: BarChart3 },
+  { id: "access", label: "Accesos", capability: "role:manage", icon: ShieldCheck },
   { id: "integration-monitor", label: "Monitor de integración", capability: "integrationMonitor:view", icon: Activity },
 ];
 
 // Una sola URL por pantalla: cada destino vive en /app?destination=<id>. Las rutas
 // /app/dashboard y /app/catalog quedan como alias que redirigen aca.
-const destinationHref = (id: Destination) => id === "integration-monitor"
-  ? "/app/admin/integration-monitor"
-  : `/app?destination=${id}`;
+const destinationHref = (id: Destination) => {
+  if (id === "access") return "/app/access";
+  if (id === "integration-monitor") return "/app/admin/integration-monitor";
+  return `/app?destination=${id}`;
+};
 
 const mobileDestinations: Destination[] = ["work", "services", "map"];
 const tabletNavigationQuery = "(min-width: 761px) and (max-width: 1023px)";
@@ -131,14 +135,13 @@ export function AppShell({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedDestination = searchParams.get("destination") as Destination | null;
-  const destination = pathname.startsWith("/app/admin/integration-monitor")
-    ? "integration-monitor"
-    : pathname.startsWith("/app/catalog")
-    ? "catalog"
-    : requestedDestination === "inventory" ? "catalog"
-    : requestedDestination && navigation.some((item) => item.id === requestedDestination)
-      ? requestedDestination
-      : "work";
+  const destination = pathname.startsWith("/app/access") ? "access"
+    : pathname.startsWith("/app/admin/integration-monitor") ? "integration-monitor"
+      : pathname.startsWith("/app/catalog") ? "catalog"
+        : requestedDestination === "inventory" ? "catalog"
+          : requestedDestination && navigation.some((item) => item.id === requestedDestination)
+            ? requestedDestination
+            : "work";
   const mainRef = useRef<HTMLElement>(null);
   const previousDestination = useRef(destination);
   const [isCollapsed, setIsCollapsed] = useState(false);

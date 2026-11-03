@@ -3,6 +3,7 @@ import { DEMO_IDENTITIES } from "./demo-identities";
 import { actorKindForRoles, capabilitiesForRoles, type M6Role } from "./m6-roles";
 
 export type Capability =
+  | "role:manage"
   | "integrationMonitor:view"
   | "integrationMonitor:manage"
   | "service:view"
