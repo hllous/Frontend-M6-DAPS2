@@ -8,7 +8,7 @@ test.describe("ServiceType catalog management #102", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
     await page.getByRole("link", { name: "Catálogo" }).click();
-    await page.getByRole("link", { name: "Abrir catálogo" }).first().click();
+    await page.getByRole("link", { name: /^Abrir/ }).first().click();
     await expect(page).toHaveURL(/\/app\/catalog\/service-types$/);
 
     const code = `E2E-102-${Date.now()}`;

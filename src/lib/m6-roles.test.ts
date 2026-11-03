@@ -33,6 +33,14 @@ describe("M6 roles", () => {
     expect(environmental).not.toContain("service:schedule");
   });
 
+  it("reserves authorizing a removal for the Administrator while Operations keeps the route-level authorize", () => {
+    expect(capabilitiesForRoles(["M6_ADMIN"])).toEqual(expect.arrayContaining(["treeIntervention:authorize", "treeIntervention:authorizeRemoval"]));
+    const operations = capabilitiesForRoles(["M6_OFICINA_OPERACIONES"]);
+    expect(operations).toContain("treeIntervention:authorize");
+    expect(operations).toContain("treeIntervention:request");
+    expect(operations).not.toContain("treeIntervention:authorizeRemoval");
+  });
+
   it("keeps the Administrator out of Field work and the Auditor read-only", () => {
     const admin = capabilitiesForRoles(["M6_ADMIN"]);
     expect(admin).toContain("referral:reconcile");

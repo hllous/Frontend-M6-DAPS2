@@ -67,8 +67,14 @@ describe("ReferralsWorkspace", () => {
     }} />);
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
-    await user.click(within(list).getByRole("button", { name: new RegExp(id) }));
-    const detail = await screen.findByRole("region", { name: `Detalle de ${id}` });
+    // #741: the row is named by what it is (kind, damage, address), never by its UUID.
+    const row = within(list).getByRole("button", { name: /Reparación · Vereda hundida o rota · Av\. Rivadavia 2200/ });
+    expect(row).toHaveAccessibleName(expect.stringContaining("#15c86465"));
+    expect(row).not.toHaveAccessibleName(expect.stringContaining(id));
+    await user.click(row);
+    const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Vereda hundida o rota · Av. Rivadavia 2200" });
+    expect(within(detail).getByText(id)).toBeVisible();
+    expect(within(detail).getByRole("button", { name: "Copiar identificador técnico de la derivación" })).toBeVisible();
     expect(within(detail).getByRole("link", { name: /Ver inspección/ })).toHaveAttribute(
       "href", `/app?destination=environment&inspectionId=${inspectionId}`,
     );
@@ -80,14 +86,19 @@ describe("ReferralsWorkspace", () => {
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     expect(within(list).getByRole("button", { name: /RR-1001/ })).toBeVisible();
+    // Literal copy (not derived from referralLabel): kind, damage, address, and the business id of the source.
+    expect(within(list).getByText("Reparación · Pavimento roto · Bulevar Costero y Calle 12")).toBeVisible();
+    expect(within(list).getAllByText(/SVC-1050 · /)[0]).toBeVisible();
     expect(within(list).getByRole("button", { name: /SCR-1001/ })).toBeVisible();
     expect(within(list).getByText("Obras Públicas · Reparación")).toBeVisible();
-    expect(within(list).getAllByText("Tránsito · Corte de calle")).toHaveLength(2);
+    expect(within(list).getAllByText("Tránsito · Corte de calle")).toHaveLength(4);
     expect(within(list).getByRole("button", { name: /SCR-1002/ })).toBeVisible();
 
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     expect(within(detail).getByRole("status", { name: "Estado: Solicitada" })).toBeVisible();
+    expect(within(detail).getByText("Inicio solicitado")).toBeVisible();
+    expect(within(detail).getByText("Fin solicitado")).toBeVisible();
     expect(within(detail).getByText("05/09/2026 08:00")).toBeVisible();
     expect(within(detail).getByText("05/09/2026 12:00")).toBeVisible();
     expect(within(detail).getByRole("link", { name: /Ver servicio/ })).toHaveAttribute(
@@ -95,6 +106,109 @@ describe("ReferralsWorkspace", () => {
       "/app?destination=services&detail=SVC-1050",
     );
     expect(within(detail).queryByText(/módulo de origen/)).not.toBeInTheDocument();
+  });
+
+  it("shows section directions in the list and detail, with final M7 response fields", async () => {
+    const base = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.id === "SCR-1001");
+    if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a StreetClosureRequest fixture");
+    const approved = {
+      ...base,
+      id: "SCR-APPROVED",
+      status: "APPROVED" as const,
+      request: {
+        ...base.request,
+        id: "SCR-APPROVED",
+        status: "APPROVED" as const,
+        affectedSections: [
+          { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12", direction: "FORWARD" as const },
+          { streetName: "Av. Independencia", fromCross: "Calle 1", toCross: "Calle 2" },
+        ],
+        approvedFrom: "2026-10-01T09:00:00.000Z",
+        approvedTo: "2026-10-01T12:00:00.000Z",
+      },
+    };
+    const rejected = {
+      ...base,
+      id: "SCR-REJECTED",
+      status: "REJECTED" as const,
+      request: {
+        ...base.request,
+        id: "SCR-REJECTED",
+        status: "REJECTED" as const,
+        rejectionReason: "Debe quedar libre el corredor durante el evento.",
+      },
+    };
+    server.use(http.get("*/api/referrals", () => HttpResponse.json({ data: [approved, rejected], meta: { total: 2 } })));
+
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    const approvedRow = within(list).getByRole("button", { name: /SCR-APPROVED/ });
+    expect(approvedRow).toHaveAccessibleName(expect.stringContaining("Bulevar Costero: Ascendente"));
+    expect(within(list).getByText(/Av\. Independencia: Sentido no informado/)).toBeVisible();
+    await user.click(approvedRow);
+
+    const approvedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
+    expect(within(approvedDetail).getByText("Sentido: Ascendente")).toBeVisible();
+    expect(within(approvedDetail).getByText("Sentido no informado")).toBeVisible();
+    expect(within(approvedDetail).getByText("Período autorizado")).toBeVisible();
+    expect(within(approvedDetail).getByText(/01\/10\/2026/)).toBeVisible();
+    expect(within(approvedDetail).getByText("Inicio solicitado")).toBeVisible();
+    expect(within(approvedDetail).getByText("Fin solicitado")).toBeVisible();
+    expect(within(approvedDetail).getByText("05/09/2026 08:00")).toBeVisible();
+
+    await user.click(within(approvedDetail).getByRole("button", { name: "Volver a derivaciones" }));
+    const returnedList = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(returnedList).getByRole("button", { name: /SCR-REJECTED/ }));
+
+    const rejectedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
+    expect(within(rejectedDetail).getByText("Motivo del rechazo")).toBeVisible();
+    expect(within(rejectedDetail).getByText("Debe quedar libre el corredor durante el evento.")).toBeVisible();
+  });
+
+  it("labels an approved closure without a window and a rejection without a reason", async () => {
+    const base = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.id === "SCR-1001");
+    if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a StreetClosureRequest fixture");
+    const approved = {
+      ...base,
+      id: "SCR-NO-APPROVED-WINDOW",
+      status: "APPROVED" as const,
+      request: {
+        ...base.request,
+        id: "SCR-NO-APPROVED-WINDOW",
+        status: "APPROVED" as const,
+        approvedFrom: null,
+        approvedTo: null,
+      },
+    };
+    const rejected = {
+      ...base,
+      id: "SCR-NO-REJECTION-REASON",
+      status: "REJECTED" as const,
+      request: {
+        ...base.request,
+        id: "SCR-NO-REJECTION-REASON",
+        status: "REJECTED" as const,
+        rejectionReason: null,
+      },
+    };
+    server.use(http.get("*/api/referrals", () => HttpResponse.json({ data: [approved, rejected], meta: { total: 2 } })));
+
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /SCR-NO-APPROVED-WINDOW/ }));
+    const approvedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
+    expect(within(approvedDetail).getByText("Sin informar")).toBeVisible();
+
+    await user.click(within(approvedDetail).getByRole("button", { name: "Volver a derivaciones" }));
+    const returnedList = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(returnedList).getByRole("button", { name: /SCR-NO-REJECTION-REASON/ }));
+    const rejectedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
+    expect(within(rejectedDetail).getByText("Motivo del rechazo")).toBeVisible();
+    expect(within(rejectedDetail).getByText("Sin informar")).toBeVisible();
   });
 
   it("exposes an EnvironmentalInspection source and keeps the RepairRequest pending", async () => {
@@ -120,7 +234,7 @@ describe("ReferralsWorkspace", () => {
     render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /RR-INS-1012/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de RR-INS-1012" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Sumidero obstruido · Av. Brasil 2450" });
     expect(within(detail).getByRole("heading", { name: "Inspección" })).toBeVisible();
     expect(within(detail).getByRole("link", { name: /Ver inspección/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
     expect(within(detail).getByRole("status", { name: "Estado: Pendiente" })).toBeVisible();
@@ -133,7 +247,7 @@ describe("ReferralsWorkspace", () => {
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /SCR-1002/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de SCR-1002" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Av. Mitre" });
 
     expect(within(detail).getByRole("heading", { name: "Intervención" })).toBeVisible();
     expect(within(detail).getByRole("link", { name: /Ver intervención/ })).toHaveAttribute(
@@ -162,14 +276,14 @@ describe("ReferralsWorkspace", () => {
     expect(screen.getByRole("region", { name: "Alertas" })).toHaveTextContent("2 vencidas");
 
     await user.click(within(list).getByRole("button", { name: /RR-118-STALE/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de RR-118-STALE" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" });
     expect(within(detail).getByRole("region", { name: "Alertas" })).toHaveTextContent("Vencida: Obras Públicas no respondió a tiempo.");
     expect(within(detail).getByRole("status", { name: "Estado: Pendiente" })).toBeVisible();
   });
 
   it("shows live source changes as reconciliation work and preserves the original context", async () => {
     const all = fixtureReferrals();
-    const base = all.find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "SERVICE");
+    const base = all.find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.id === "SCR-1001");
     if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a Service closure referral fixture");
     const changed = {
       ...base,
@@ -189,7 +303,7 @@ describe("ReferralsWorkspace", () => {
     expect(within(list).getByText("Cambió el servicio")).toBeVisible();
 
     await user.click(within(list).getByRole("button", { name: /SCR-118-CHANGED-SOURCE/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de SCR-118-CHANGED-SOURCE" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     expect(within(detail).getByText("El servicio cambió desde que se derivó.")).toBeVisible();
     expect(within(detail).getByText(/Antes: 2026-09-07/)).toBeVisible();
   });
@@ -213,7 +327,7 @@ describe("ReferralsWorkspace", () => {
     expect(within(list).queryByRole("button", { name: /RR-OTHER/ })).not.toBeInTheDocument();
 
     await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
-    expect(await screen.findByRole("region", { name: "Detalle de RR-1001" })).toBeVisible();
+    expect(await screen.findByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" })).toBeVisible();
   });
 
   it("supports keyboard opening and returns from detail to the list", async () => {
@@ -223,9 +337,9 @@ describe("ReferralsWorkspace", () => {
     const row = await screen.findByRole("button", { name: /RR-1001/ });
     row.focus();
     await user.keyboard("{Enter}");
-    const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" });
     expect(detail).toBeVisible();
-    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Detalle de RR-1001" })).toHaveFocus());
+    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" })).toHaveFocus());
 
     await user.click(screen.getByRole("button", { name: "Volver a derivaciones" }));
     await waitFor(() => expect(screen.getByRole("region", { name: "Lista de derivaciones" })).toBeVisible());
@@ -237,7 +351,7 @@ describe("ReferralsWorkspace", () => {
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" });
     await user.click(within(detail).getByRole("button", { name: "Registrar inicio" }));
 
     const dialog = screen.getByRole("dialog");
@@ -297,7 +411,7 @@ describe("ReferralsWorkspace", () => {
     render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" });
     await user.click(within(detail).getByRole("button", { name: "Registrar inicio" }));
 
     const dialog = screen.getByRole("dialog");
@@ -305,7 +419,8 @@ describe("ReferralsWorkspace", () => {
     await user.click(within(dialog).getByRole("button", { name: "Confirmar" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("status", { name: "Estado: Cerrada", hidden: true })).toBeVisible();
+      // By attribute: with the dialog open the detail is aria-hidden, which empties its computed accessible name.
+      expect(document.querySelector('[role="status"][aria-label="Estado: Cerrada"]')).not.toBeNull();
     });
     expect(screen.getByRole("dialog")).toBeVisible();
     expect(within(screen.getByRole("dialog")).getByRole("alert")).toHaveTextContent(
@@ -323,7 +438,7 @@ describe("ReferralsWorkspace", () => {
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /RR-1001/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de RR-1001" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" });
     expect(within(detail).queryByText("Registrar respuesta")).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: /Registrar/ })).not.toBeInTheDocument();
   });
@@ -334,7 +449,7 @@ describe("ReferralsWorkspace", () => {
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     await user.click(within(detail).getByRole("button", { name: "Registrar aprobación" }));
 
     const dialog = screen.getByRole("dialog");
@@ -360,7 +475,7 @@ describe("ReferralsWorkspace", () => {
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
-    const detail = await screen.findByRole("region", { name: "Detalle de SCR-1001" });
+    const detail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     await user.click(within(detail).getByRole("button", { name: "Registrar rechazo" }));
 
     const dialog = screen.getByRole("dialog");
@@ -392,8 +507,9 @@ describe("ReferralsWorkspace", () => {
 
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     expect(screen.getByRole("status", { name: /derivaciones sin mostrar/i })).toHaveTextContent("2");
-    await user.click(within(list).getByRole("button", { name: new RegExp(closure.id) }));
-    const detail = await screen.findByRole("region", { name: `Detalle de ${closure.id}` });
+    const street = closure.request.affectedSections[0].streetName;
+    await user.click(within(list).getByRole("button", { name: new RegExp(`Corte de calle · ${street}`) }));
+    const detail = await screen.findByRole("region", { name: `Detalle de Corte de calle · ${street}` });
     expect(within(detail).getByRole("status", { name: "Estado: Vencido" })).toBeVisible();
   });
 });

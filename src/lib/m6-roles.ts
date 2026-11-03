@@ -21,6 +21,8 @@ export const meSchema = z.object({
   subType: z.enum(["CIUDADANO", "EMPLEADO"]),
   m1Role: z.string(),
   roles: z.array(m6RoleSchema),
+  crews: z.array(z.object({ id: z.string(), name: z.string(), role: z.enum(["LEADER", "MEMBER"]) })).default([]),
+  isAssignedInspector: z.boolean().optional(),
 });
 export type Me = z.infer<typeof meSchema>;
 
@@ -32,6 +34,8 @@ const FIELD_ROLES: readonly M6Role[] = ["M6_CAMPO_CUADRILLA", "M6_CAMPO_INSPECTO
  * (docs/api/endpoints.md); `null` = cualquier rol de M6. Es solo optimista: el backend decide (ADR-0005).
  */
 const ROLES_BY_CAPABILITY: Record<Capability, readonly M6Role[] | null> = {
+  "integrationMonitor:view": ["M6_ADMIN", "M6_AUDITOR"],
+  "integrationMonitor:manage": ["M6_ADMIN"],
   "service:view": null,
   "inventory:view": null,
   "environmentalReport:view": null,
@@ -61,6 +65,7 @@ const ROLES_BY_CAPABILITY: Record<Capability, readonly M6Role[] | null> = {
   "tree:manage": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
   "treeIntervention:request": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
   "treeIntervention:authorize": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
+  "treeIntervention:authorizeRemoval": ["M6_ADMIN"],
   "repairRequest:create": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
   "streetClosureRequest:create": ["M6_ADMIN", "M6_OFICINA_OPERACIONES"],
   "referral:reconcile": ["M6_ADMIN"],
@@ -80,7 +85,6 @@ export function capabilitiesForRoles(roles: readonly M6Role[]): Capability[] {
     return allowed === null || roles.some((role) => allowed.includes(role));
   });
 }
-
 /** Oficina y Campo no conviven (ADR-0002); un auditor solo lee, sin alcance de cuadrilla, así que se trata como Oficina. */
 export function actorKindForRoles(roles: readonly M6Role[]): "OFFICE" | "FIELD" {
   return roles.some((role) => FIELD_ROLES.includes(role)) && !roles.some((role) => OFFICE_ROLES.includes(role))

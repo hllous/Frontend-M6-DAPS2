@@ -1,9 +1,11 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
 import { SessionShell } from "@/components/auth/session-shell";
+import { DESTINATION_HEADER, loginUrl } from "@/lib/login-return";
 import { getSession } from "@/lib/session";
-import { getScenario } from "@/lib/scenarios";
+import { sessionActor } from "@/lib/session-actor";
 import { leaveApplication } from "./actions";
 
 export default async function AppLayout({
@@ -11,10 +13,12 @@ export default async function AppLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   await connection();
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session) redirect(loginUrl({ expired: true, destination: (await headers()).get(DESTINATION_HEADER) ?? undefined }));
+  if (session.roles.length === 0) redirect("/no-role");
+  const actor = sessionActor(session);
 
   return (
-    <SessionShell actorId={getScenario(session).actor.userId} scenarioId={session.scenarioId} logoutAction={leaveApplication}>
+    <SessionShell actorId={actor.userId} scenarioId={actor.scenarioId} identity={actor.m1Identity} logoutAction={leaveApplication}>
       {children}
     </SessionShell>
   );

@@ -12,3 +12,4 @@ Estas guías amplían las instrucciones de [`AGENTS.md`](../../AGENTS.md), que s
 - [Domain docs](domain.md): cómo consultar y mantener contexto y decisiones del dominio.
 - [Componentes UI](ui-components.md): regla de pintado de overlays y dueños de las supresiones de ESLint.
 - [MSW y rutas BFF](msw-bff-tests.md): cómo probar rutas reales desde handlers Node y mantener el worker del navegador sin imports server-only.
+- [Ingreso real con M1 en desarrollo](real-m1-development.md): iniciar el M1 falso local y probar `real-m1`.

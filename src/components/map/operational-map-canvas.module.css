@@ -1,3 +1,13 @@
+.canvas {
+  position: relative;
+  /* Los panes de Leaflet usan z-index de hasta 1000: sin esto tapan el popover del control de capas. */
+  isolation: isolate;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
 .map {
   min-height: 0;
   flex: 1;

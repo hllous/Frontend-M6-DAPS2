@@ -41,13 +41,20 @@ test.describe("StreetClosureRequest from Service context", () => {
     await setFieldTime(dialog, "Fin solicitado *", "13:00");
     await dialog.getByLabel("Motivo *").fill("El Servicio requiere circulación reducida durante el operativo.");
 
-    // An empty structured collection is rejected before the request is created.
+    const directions = dialog.getByRole("combobox", { name: "Sentido *" });
+    await expect(directions.first()).toContainText("Seleccione un sentido");
+
+    // An incomplete section is rejected before the request is created.
     await dialog.getByRole("button", { name: "Enviar solicitud" }).click();
     await expect(dialog.getByText("Indique el nombre de la calle")).toBeVisible();
 
     await dialog.getByLabel("Calle *", { exact: true }).fill("Bulevar Costero");
     await dialog.getByLabel("Desde calle *").fill("Av. Belgrano");
     await dialog.getByLabel("Hasta calle *").fill("Calle 12");
+    await dialog.getByRole("button", { name: "Enviar solicitud" }).click();
+    await expect(dialog.getByText("Indique el sentido del tramo")).toBeVisible();
+    await directions.nth(0).click();
+    await page.getByRole("option", { name: "Ascendente" }).click();
 
     await dialog.getByRole("button", { name: "Agregar tramo" }).click();
     const streets = dialog.getByLabel("Calle *", { exact: true });
@@ -55,6 +62,11 @@ test.describe("StreetClosureRequest from Service context", () => {
     await dialog.getByLabel("Desde calle *").nth(1).fill("Bulevar Costero");
     await dialog.getByLabel("Hasta calle *").nth(1).fill("Av. Libertad");
     await expect(streets).toHaveCount(2);
+    await expect(directions.nth(1)).toContainText("Seleccione un sentido");
+    await dialog.getByRole("button", { name: "Enviar solicitud" }).click();
+    await expect(dialog.getByText("Indique el sentido del tramo")).toBeVisible();
+    await directions.nth(1).click();
+    await page.getByRole("option", { name: "Descendente" }).click();
 
     await dialog.getByRole("button", { name: "Enviar solicitud" }).click();
     await expect(dialog.getByRole("status")).toContainText("Solicitud enviada");

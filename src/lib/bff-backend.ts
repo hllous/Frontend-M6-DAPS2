@@ -5,6 +5,7 @@ import {
   getRequiredSession,
   getSessionFromRequest,
   rememberRenewedResponse,
+  sessionToken,
   requireCapability,
   wasSessionRenewed,
 } from "./session";
@@ -43,7 +44,8 @@ export async function fetchBackend(
   }
 
   const backendOrigin = process.env.M6_BACKEND_ORIGIN;
-  if (!backendOrigin || !session.accessToken) {
+  const sessionAccessToken = sessionToken(session);
+  if (!backendOrigin || !sessionAccessToken) {
     throw new AuthUnavailableError("El backend de desarrollo no está configurado.");
   }
 
@@ -63,7 +65,7 @@ export async function fetchBackend(
   }
 
   const headers = new Headers(init.headers);
-  let accessToken: string = session.accessToken;
+  let accessToken: string = sessionAccessToken;
   // Renovación preventiva contra M1: el access token vence a los 15 min y M6 solo acepta ese token.
   if (canRenew(session) && isNearExpiry(session)) {
     const renewed = await renewRequestSession(request, session, { tolerateUnavailable: true });
@@ -89,10 +91,11 @@ export async function fetchBackend(
     const replayable = !(init.body instanceof ReadableStream) && !(typeof init.body === "object" && init.body !== null && Symbol.asyncIterator in init.body);
     if (response.status === 401 && replayable && canRenew(session)) {
       const current = getSessionFromRequest(request);
-      if (current?.accessToken && current.accessToken !== accessToken) {
+      const currentToken = current ? sessionToken(current) : undefined;
+      if (currentToken && currentToken !== accessToken) {
         // Otra llamada del mismo pedido (Promise.all) ya renovó: se reintenta con su token, sin renovar de nuevo.
         void response.body?.cancel().catch(() => undefined);
-        accessToken = current.accessToken;
+        accessToken = currentToken;
         response = await send(accessToken);
       } else if (!wasSessionRenewed(request)) {
         void response.body?.cancel().catch(() => undefined);

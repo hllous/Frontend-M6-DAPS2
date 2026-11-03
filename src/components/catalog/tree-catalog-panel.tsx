@@ -9,15 +9,20 @@ import { Check, CircleOff, Eye, MapPinned, Pencil, Plus, Trash2 } from "lucide-r
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { TableCaption } from "@/components/ui/table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { DetailFieldsSkeleton, RecordCardSkeleton } from "./catalog-a-loading";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   treeCreateInputSchema,
@@ -106,6 +111,8 @@ function formatSurveyDate(value: string) {
     timeZone: "America/Argentina/Buenos_Aires",
   }).format(new Date(value));
 }
+
+const NO_TREES: Tree[] = [];
 
 export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }) {
   const canManage = scenario.actor.kind === "OFFICE" && scenario.capabilities.includes("tree:manage");
@@ -281,12 +288,26 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
     }
   };
 
+  const treeColumns: DataTableColumn<Tree>[] = [
+    { id: "surveyCode", header: "Código de relevamiento", accessorFn: (tree) => tree.surveyCode, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 font-mono text-xs" }, cell: ({ row }) => row.original.surveyCode },
+    { id: "species", header: "Especie", accessorFn: (tree) => tree.species, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 font-medium" }, cell: ({ row }) => row.original.species ?? "—" },
+    { id: "zone", header: "Zona", accessorFn: (tree) => tree.zoneId, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
+    { id: "address", header: "Ubicación", accessorFn: (tree) => tree.address, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "max-w-[230px] whitespace-normal px-4 py-3" }, cell: ({ row }) => row.original.address ?? "Sin dirección registrada" },
+    { id: "measures", header: "Medidas", accessorFn: (tree) => tree.heightM, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 tabular-nums" }, cell: ({ row }) => <>{formatMeasurement(row.original.heightM, "m")} · {formatMeasurement(row.original.diameterCm, "cm")}</> },
+    { id: "status", header: "Estado", accessorFn: (tree) => tree.active, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => { const tree = row.original; return <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold ${tree.active ? "bg-[var(--color-success-fill)] text-[var(--color-success)]" : "bg-muted text-muted-foreground"}`}>{tree.active ? <Check className="size-4" aria-hidden /> : <CircleOff className="size-4" aria-hidden />}{tree.active ? "Activo" : "Inactivo"}</span>; } },
+    { id: "actions", header: () => <span className="sr-only">Acciones</span>, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => { const tree = row.original; return <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => openDetail(tree)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => openEdit(tree)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{tree.active ? <Button type="button" size="sm" variant="destructive" onClick={() => setDeactivateTarget(tree)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</> : null}</div>; } },
+  ];
+  const treeTable = useDataTable({ data: state.status === "ready" ? state.items : NO_TREES, columns: treeColumns, getRowId: (tree) => tree.id });
+
   return (
     <section aria-labelledby="trees-title" className="flex flex-col gap-6">
       <CatalogPageHeader
         title="Árboles"
         titleId="trees-title"
-        actions={canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar árbol</Button> : null}
+        actions={<>
+          <Link className={buttonVariants({ variant: "outline" })} href={TREE_INTERVENTIONS_HREF}>Intervenciones de arbolado</Link>
+          {canManage ? <Button type="button" onClick={openCreate}><Plus data-icon="inline-start" aria-hidden />Registrar árbol</Button> : null}
+        </>}
       />
 
       {!canManage ? <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">Solo consulta</p> : null}
@@ -320,13 +341,22 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
         </Field>
       </FieldGroup>
 
-      {state.status === "loading" ? <div role="status" aria-label="Cargando árboles" className="flex flex-col gap-3"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div> : null}
+      {state.status === "loading" ? <LoadingRegion label="Árboles registrados" className="flex flex-col gap-6"><Skeleton className="h-5 w-36" />
+        <TableRowsSkeleton className="relative hidden overflow-x-auto rounded-xl border border-border bg-card md:block [&_th]:px-4 [&_th]:py-3 [&_th]:text-xs [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground [&_td]:px-4 [&_td]:py-3" rowCount={4} rowHeight="h-[65px]" actionsClassName="whitespace-nowrap text-right [&>*]:!inline-block [&>*]:!h-8 [&>*]:ml-2" actionColumn actionCount={3} columnLabels={["Código de relevamiento", "Especie", "Zona", "Ubicación", "Medidas", "Estado", "Acciones"]} columnWidths={["w-24", "w-28", "w-24", "w-40", "w-24", "w-16", "w-40"]} />
+        <div className="grid gap-3 md:hidden">{Array.from({ length: PAGE_SIZE }, (_, card) => <RecordCardSkeleton key={card} />)}</div>
+      </LoadingRegion> : null}
       {state.status === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{state.message}</span><Button type="button" variant="outline" onClick={() => setRequestVersion((version) => version + 1)}>Reintentar</Button></AlertDescription></Alert> : null}
       {state.status === "ready" && state.items.length === 0 ? <Empty><EmptyHeader><EmptyTitle>Sin árboles</EmptyTitle><EmptyDescription>No hay resultados para los filtros seleccionados.</EmptyDescription></EmptyHeader></Empty> : null}
       {state.status === "ready" && state.items.length > 0 ? <>
         <p className="text-sm text-muted-foreground" aria-live="polite">{state.total} {state.total === 1 ? "árbol encontrado" : "árboles encontrados"}</p>
         <div className="relative hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
-          <table className="w-full min-w-[980px] text-left text-sm"><caption className="sr-only">Catálogo de árboles</caption><thead className="border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-4 py-3">Código de relevamiento</th><th className="px-4 py-3">Especie</th><th className="px-4 py-3">Zona</th><th className="px-4 py-3">Ubicación</th><th className="px-4 py-3">Medidas</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3"><span className="sr-only">Acciones</span></th></tr></thead><tbody>{state.items.map((tree) => <tr key={tree.id} aria-current={tree.id === surveyTreeSelection ? "true" : undefined} className={`border-b border-border last:border-0 ${tree.id === surveyTreeSelection ? "bg-[var(--color-info-fill)]" : ""}`}><td className="px-4 py-3 font-mono text-xs">{tree.surveyCode}</td><td className="px-4 py-3 font-medium">{tree.species ?? "—"}</td><td className="px-4 py-3">{zoneLabel(zones, tree.zoneId, zonesLoaded)}</td><td className="max-w-[230px] px-4 py-3">{tree.address ?? "Sin dirección registrada"}</td><td className="px-4 py-3 tabular-nums">{formatMeasurement(tree.heightM, "m")} · {formatMeasurement(tree.diameterCm, "cm")}</td><td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold ${tree.active ? "bg-[var(--color-success-fill)] text-[var(--color-success)]" : "bg-muted text-muted-foreground"}`}>{tree.active ? <Check className="size-4" aria-hidden /> : <CircleOff className="size-4" aria-hidden />}{tree.active ? "Activo" : "Inactivo"}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => openDetail(tree)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => openEdit(tree)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{tree.active ? <Button type="button" size="sm" variant="destructive" onClick={() => setDeactivateTarget(tree)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</> : null}</div></td></tr>)}</tbody></table>
+          <DataTable
+            table={treeTable}
+            container={false}
+            className="w-full min-w-[980px] text-left text-sm"
+            headerClassName="border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground"
+            rowProps={(row) => { const selected = row.original.id === surveyTreeSelection; return { "aria-current": selected ? "true" : undefined, className: `border-border last:border-0 ${selected ? "bg-[var(--color-info-fill)] hover:bg-[var(--color-info-fill)]" : "hover:bg-transparent"}` }; }}
+          ><TableCaption className="sr-only">Catálogo de árboles</TableCaption></DataTable>
         </div>
         <div className="grid gap-3 md:hidden">{state.items.map((tree) => <article key={tree.id} aria-current={tree.id === surveyTreeSelection ? "true" : undefined} className={`rounded-xl border p-4 ${tree.id === surveyTreeSelection ? "border-[var(--color-accent)] bg-[var(--color-info-fill)]" : "border-border bg-card"}`}><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs text-muted-foreground">{tree.surveyCode}</p><h2 className="mt-1 font-semibold">{tree.species ?? "—"}</h2></div><span className="inline-flex items-center gap-1 text-sm">{tree.active ? <Check className="size-4 text-[var(--color-success)]" aria-hidden /> : <CircleOff className="size-4 text-muted-foreground" aria-hidden />}{tree.active ? "Activo" : "Inactivo"}</span></div><dl className="mt-4 grid gap-3 text-sm"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Zona</dt><dd className="mt-0.5">{zoneLabel(zones, tree.zoneId, zonesLoaded)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ubicación</dt><dd className="mt-0.5">{tree.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Medidas</dt><dd className="mt-0.5 tabular-nums">{formatMeasurement(tree.heightM, "m")} · {formatMeasurement(tree.diameterCm, "cm")}</dd></div></dl><div className="mt-4 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => openDetail(tree)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => openEdit(tree)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{tree.active ? <Button type="button" size="sm" variant="destructive" onClick={() => setDeactivateTarget(tree)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</> : null}</div></article>)}</div>
       </> : null}
@@ -414,7 +444,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
       <Dialog open={Boolean(detailId)} onOpenChange={(open) => !open && closeDetail()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle del árbol {detailTree?.surveyCode ?? ""}</DialogTitle></DialogHeader>
-          {detail.status === "loading" ? <Alert role="status"><AlertDescription>Cargando detalle…</AlertDescription></Alert> : null}
+          {detail.status === "loading" ? <LoadingRegion label="Detalle del árbol"><DetailFieldsSkeleton fieldCount={9} /></LoadingRegion> : null}
           {detail.status === "error" ? <Alert variant="destructive"><AlertDescription>{detail.message}</AlertDescription></Alert> : null}
           {detail.status === "ready" ? <TreeDetailBody tree={detail.tree} surveys={detail.surveys} zoneText={zoneLabel(zones, detail.tree.zoneId, zonesLoaded)} onOpenSurveys={() => openSurveyHistory(detail.tree)} /> : null}
           <DialogFooter><Button type="button" variant="outline" onClick={closeDetail}>Cerrar detalle</Button></DialogFooter>

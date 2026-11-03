@@ -1,0 +1,59 @@
+.canvas {
+  position: relative;
+  isolation: isolate;
+  height: 100%;
+}
+
+.map {
+  height: 100%;
+  min-height: 320px;
+  background: var(--color-surface-subtle);
+  font-family: inherit;
+}
+
+.map :global(.leaflet-popup-content-wrapper),
+.map :global(.leaflet-popup-tip) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.map :global(.leaflet-control-attribution) {
+  padding-block: 4px;
+}
+
+.marker {
+  border: 0;
+  background: transparent;
+}
+
+.markerPin {
+  display: block;
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-surface);
+  border-radius: 50% 50% 50% 6px;
+  outline: 2px solid var(--color-success);
+  background: var(--color-success);
+  transform: rotate(-45deg);
+  transition: outline-width 160ms ease-out, transform 160ms ease-out;
+}
+
+.popupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.popupDescription {
+  display: block;
+  max-width: 28ch;
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markerPin {
+    transition: none;
+  }
+}

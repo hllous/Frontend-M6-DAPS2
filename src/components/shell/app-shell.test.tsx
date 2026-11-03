@@ -1,13 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { AppShell } from "./app-shell";
 import { scenarios } from "@/lib/scenarios";
 import { handlers } from "@/mocks/handlers";
-import { resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { resetTreeInterventionFixtures } from "@/lib/tree-intervention-fixtures";
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
@@ -32,11 +31,11 @@ describe("AppShell", () => {
       ["Mi trabajo", "/app?destination=work"],
       ["Servicios", "/app?destination=services"],
       ["Derivaciones", "/app?destination=referrals"],
-      ["Inventario", "/app?destination=inventory"],
       ["Control Ambiental", "/app?destination=environment"],
       ["Mapa", "/app?destination=map"],
       ["Catálogo", "/app?destination=catalog"],
       ["Tableros", "/app?destination=dashboards"],
+      ["Monitor de integración", "/app/admin/integration-monitor"],
     ]);
     expect(within(moduleNavigation).queryAllByRole("button")).toHaveLength(0);
   });
@@ -50,6 +49,23 @@ describe("AppShell", () => {
     expect(within(moduleNavigation).getByRole("link", { name: "Mi trabajo" })).not.toHaveAttribute("aria-current");
   });
 
+  it("shows the monitor to auditors and marks its route active", () => {
+    window.history.replaceState(null, "", "/app/admin/integration-monitor");
+    render(<AppShell scenario={scenarios.officeLimited} />);
+
+    const auditorNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    expect(within(auditorNavigation).getByRole("link", { name: "Monitor de integración" }))
+      .toHaveAttribute("href", "/app/admin/integration-monitor");
+    expect(within(auditorNavigation).getByRole("link", { name: "Monitor de integración" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("hides the monitor from roles without its capability", () => {
+    render(<AppShell scenario={scenarios.fieldCrewLeader} />);
+    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    expect(within(moduleNavigation).queryByRole("link", { name: "Monitor de integración" })).not.toBeInTheDocument();
+  });
+
   it("moves focus to main after a module change", async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, "", "/app?destination=work");
@@ -61,12 +77,22 @@ describe("AppShell", () => {
     await waitFor(() => expect(main).toHaveFocus());
   });
 
-  it("keeps the catalog destination active on nested catalog routes", () => {
-    window.history.replaceState(null, "", "/app/catalog/containers");
-    render(<AppShell scenario={scenarios.officeDutyQueue} routeContent={<p>Contenedores</p>} />);
+  it.each(["zones", "trees"])("keeps Catálogo active on the %s catalog route", (route) => {
+    window.history.replaceState(null, "", `/app/catalog/${route}`);
+    render(<AppShell scenario={scenarios.officeDutyQueue} routeContent={<p>Zonas</p>} />);
 
     const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
     expect(within(moduleNavigation).getByRole("link", { name: "Catálogo" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it.each(["catalog", "inventory"])("shows all catalog cards from %s", (destination) => {
+    window.history.replaceState(null, "", `/app?destination=${destination}`);
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Catálogo" })).toBeVisible();
+    for (const name of ["Cuadrillas", "Espacios verdes", "Contenedores", "Puntos verdes", "Árboles", "Intervenciones de arbolado"]) {
+      expect(screen.getByRole("link", { name: `Abrir ${name}` })).toBeVisible();
+    }
+    expect(screen.getByRole("link", { name: "Abrir Intervenciones de arbolado" })).toHaveAttribute("href", "/app/catalog/tree-interventions");
   });
 
   it("navigates client-side on a plain click but leaves modified clicks to the browser", async () => {
@@ -107,6 +133,7 @@ describe("AppShell", () => {
     expect(within(sheet).getByRole("button", { name: "Cerrar" })).toBeVisible();
     expect(within(sheet).queryByText("Seleccione un módulo disponible para su sesión.")).not.toBeInTheDocument();
     expect(within(sheet).getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
+    expect(within(sheet).queryByRole("link", { name: "Inventario urbano" })).not.toBeInTheDocument();
     expect(within(sheet).getByRole("link", { name: "Tableros" })).toHaveAttribute("href", "/app?destination=dashboards");
   });
 
@@ -117,7 +144,6 @@ describe("AppShell", () => {
     expect(moduleNavigation).toBeVisible();
     expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
-    expect(screen.getByText("Revisar reprogramación de barrido")).toBeVisible();
     expect(screen.queryByText("Sesión operativa")).not.toBeInTheDocument();
     expect(screen.queryByText("Priorice y coordine")).not.toBeInTheDocument();
     expect(screen.queryByText("Requiere revisión")).not.toBeInTheDocument();
@@ -130,31 +156,6 @@ describe("AppShell", () => {
     expect(screen.getByText("Integrante de cuadrilla")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
     expect(screen.queryByText("Requiere revisión")).not.toBeInTheDocument();
-  });
-
-  it("adds requested and pending tree interventions to the Office My Work queue", async () => {
-    updateTreeInterventionFixture("intervention-3", { status: "PENDING_AUTHORIZATION" });
-    render(<AppShell scenario={scenarios.officeDutyQueue} />);
-
-    expect(await screen.findByText(/Poda de seguridad · Parque del Bicentenario/)).toBeVisible();
-    expect(screen.getAllByText("Solicitada")).toHaveLength(1);
-    expect(screen.getByText("Pendiente de autorización")).toBeVisible();
-    expect(screen.getByText(/Extracción · Paseo de la Costa 220/)).toBeVisible();
-  });
-
-  it("keeps the queue loading and error messages outside the work item list", async () => {
-    server.use(http.get("*/tree-interventions*", () => HttpResponse.json({ message: "boom" }, { status: 500 })));
-    render(<AppShell scenario={scenarios.officeDutyQueue} />);
-
-    const list = screen.getByRole("list");
-    const loading = screen.getByText("Cargando intervenciones de arbolado…");
-    expect(list).not.toContainElement(loading);
-    expect(within(list).getAllByRole("listitem")).toHaveLength(scenarios.officeDutyQueue.work.items.length);
-
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("No se pudieron cargar las autorizaciones pendientes. Intente nuevamente.");
-    expect(list).not.toContainElement(alert);
-    expect(within(list).getAllByRole("listitem")).toHaveLength(scenarios.officeDutyQueue.work.items.length);
   });
 
   it("hides a module an actor is not optimistically permitted to see", () => {

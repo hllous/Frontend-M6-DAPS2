@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { authenticatedFetch, NetworkFailureError, ROLES_STALE_EVENT } from "@/lib/authenticated-fetch";
 import { loadRoles, loadScenario, ScenarioRequestError } from "@/lib/scenario-client";
 import { scenarioForRoles, type OperationalScenario, type ScenarioId } from "@/lib/scenarios";
+import type { PublicSession } from "@/lib/session";
 import { onRemoteLogout } from "@/lib/session-client";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
 
@@ -29,11 +30,13 @@ function errorDescription(caught: unknown): string | undefined {
 
 export function FoundationDemo({
   scenarioId,
+  identity,
   logoutAction,
   children,
   contentReady = true,
 }: {
   scenarioId: ScenarioId;
+  identity?: { userId: string; label: string };
   logoutAction?: (formData: FormData) => void | Promise<void>;
   children?: ReactNode;
   contentReady?: boolean;
@@ -68,7 +71,19 @@ export function FoundationDemo({
       const now = Date.now();
       if (now - lastRefreshAt < 60_000) return;
       lastRefreshAt = now;
-      void authenticatedFetch("/api/session").catch(() => undefined);
+      void authenticatedFetch("/api/session").then(async (response) => {
+        if (!response.ok) return;
+        const body = await response.json() as { session?: PublicSession };
+        const session = body.session;
+        if (!session || session.mode === "mock" || !Array.isArray(session.roles)) return;
+        setState((current) => {
+          if (current.status !== "ready") return current;
+          const actor = current.scenario.actor;
+          if (current.scenario.roles.length === session.roles.length && current.scenario.roles.every((role, index) => role === session.roles[index]) && actor.crewId === session.crew?.id && actor.crewName === session.crew?.name && actor.fieldRole === session.fieldRole) return current;
+          const scenario = { ...current.scenario, actor: { ...actor, crewId: session.crew?.id, crewName: session.crew?.name, fieldRole: session.fieldRole } };
+          return { status: "ready", scenario: scenarioForRoles(scenario, session.roles) };
+        });
+      }).catch(() => undefined);
     };
     window.addEventListener("pointerdown", refreshActivity);
     window.addEventListener("keydown", refreshActivity);
@@ -117,6 +132,6 @@ export function FoundationDemo({
   if (state.status === "ready" && state.scenario.roles.length === 0) return <ShellNoRole logoutAction={logoutAction} />;
   if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} description={state.description} /></main>;
   return (
-    <AppShell scenario={state.status === "ready" ? state.scenario : undefined} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />
+    <AppShell scenario={state.status === "ready" ? state.scenario : undefined} identity={identity} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />
   );
 }

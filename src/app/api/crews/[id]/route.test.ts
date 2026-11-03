@@ -42,3 +42,17 @@ describe("crew detail BFF route", () => {
     expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
   });
 });
+
+it("permite quitar la zona base de una cuadrilla (homeZoneId null)", async () => {
+  const { crewFixtures, resetCrewFixtures } = await import("@/lib/crew-fixtures");
+  const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+  const crew = crewFixtures.find((item) => item.id === "crew-a")!;
+  crew.homeZoneId = "zone-1";
+  crew.effectiveZoneId = "zone-1";
+  const input = { name: crew.name, leaderUserId: "user-maria", organizationId: "org-municipal", defaultShift: "MORNING", active: true, homeZoneId: null };
+  try {
+    const update = await PATCH(new Request("http://localhost/api/crews/crew-a", { method: "PATCH", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(input) }), { params: Promise.resolve({ id: "crew-a" }) });
+    expect(update.status).toBe(200);
+    expect(await update.json()).toMatchObject({ homeZoneId: null, effectiveZoneId: null });
+  } finally { resetCrewFixtures(); }
+});

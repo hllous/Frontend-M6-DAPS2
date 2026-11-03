@@ -44,6 +44,17 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(territory.getByRole("table").first()).toBeVisible();
   });
 
+  test("Coverage distinguishes upcoming work and flags low samples", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app?destination=dashboards");
+    await expect(page.getByRole("button", { name: "Cobertura: seleccionar familia" })).toContainText("82,2 %", { timeout: 15_000 });
+    const detail = page.locator("section[aria-labelledby='indicator-detail-title']");
+    await expect(detail.getByText("Programado a futuro").first()).toBeVisible();
+    const small = detail.getByRole("row").filter({ hasText: "Intervención puntual" });
+    await expect(small).toContainText("Muestra baja");
+    await expect(small).toContainText("1");
+  });
+
   test("Office sees the four families, filters, and the visual table companion", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=dashboards");
@@ -62,14 +73,16 @@ test.describe("operational indicator dashboard #138", () => {
 
     await page.getByRole("button", { name: "Tabla", exact: true }).click();
     await expect(page.getByRole("table").first()).toBeVisible();
-    await expect(page.getByText("Valores exactos de cobertura por zona")).toBeVisible();
+    await expect(page.getByText("Objetivos atendidos sobre objetivos programados.")).toBeVisible();
+    await expect(page.getByText("Bajo la meta").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Exportar CSV" }).last()).toBeVisible();
   });
 
   test("the dashboard alias opens the same gated Office surface", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/dashboard");
-    await expect(page).toHaveURL(/\/app\?destination=dashboards(&|$)/);
     await expect(page.getByRole("heading", { name: "Indicadores operativos" })).toBeVisible();
+    await expect(page).toHaveURL(/\/app\?destination=dashboards(&|$)/, { timeout: 15_000 });
   });
 
   test("Office can inspect exact Cobertura and Cumplimiento details", async ({ page }) => {
@@ -77,13 +90,22 @@ test.describe("operational indicator dashboard #138", () => {
     await page.goto("/app?destination=dashboards");
 
     await expect(page.getByText(/Unidad de análisis/)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Centro.*89,7.*140.*156/i })).toBeVisible();
+    // La cobertura por zona es una tabla: el nombre es el encabezado de la fila y los conteos están en sus celdas.
+    const centroRow = page.getByRole("row").filter({ has: page.getByRole("rowheader", { name: "Centro" }) });
+    await expect(centroRow).toBeVisible();
+    await expect(centroRow).toContainText("156");
+    await expect(centroRow).toContainText("140");
+    await expect(centroRow).toContainText("89,7 %");
 
     await page.getByRole("button", { name: "Tabla" }).click();
     const coverageTable = page.getByRole("region", { name: "Tabla de datos de Cobertura" });
     await expect(coverageTable).toBeVisible();
     await expect(coverageTable.getByRole("columnheader", { name: "Atendidos" }).first()).toBeVisible();
-    await expect(coverageTable.getByText("140 objetivos").first()).toBeVisible();
+    const zoneTable = coverageTable.getByRole("table", { name: /Cobertura por zona/ });
+    const centroCoverageRow = zoneTable.getByRole("row", { name: /Centro/ });
+    await expect(centroCoverageRow).toContainText("156");
+    await expect(centroCoverageRow).toContainText("140");
+    await expect(centroCoverageRow).toContainText("89,7 %");
 
     await page.getByRole("button", { name: /Cumplimiento/ }).click();
     await expect(page.getByText("Cuadrilla no disponible").first()).toBeVisible();
@@ -96,7 +118,7 @@ test.describe("operational indicator dashboard #138", () => {
 
     await page.getByRole("button", { name: /Incidencias/ }).click();
     await expect(page.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
-    await expect(page.getByText("Contenedores y arbolado: situación actual.")).toBeVisible();
+    await expect(page.getByText(/Estados de contenedores y riesgo de arbolado: situación actual/)).toBeVisible();
     await expect(page.getByText(/reportes consideran el período/i)).toHaveCount(0);
 
     await page.getByRole("button", { name: "Tabla", exact: true }).click();

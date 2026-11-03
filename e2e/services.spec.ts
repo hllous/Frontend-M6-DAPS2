@@ -10,7 +10,7 @@ const WIDE_VIEWPORT = { width: 1280, height: 900 };
 async function openServices(page: import("@playwright/test").Page) {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app?destination=services");
-  await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 }
 
 async function expectTablePaneScrollingToKeepPageAndOrdinalVisible(
@@ -87,11 +87,13 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     const firstRowOrdinal = (await firstServiceRow.locator("td").first().innerText()).trim();
     await expect(marker1).toHaveText(firstRowOrdinal);
     await expect(map.locator('.leaflet-marker-icon[aria-pressed="true"]')).toHaveAttribute("data-service-id", "SVC-1043");
-    const marker18Id = await table.locator('tr[data-service-ordinal="18"]').getAttribute("data-service-id");
-    const marker18 = map.locator(`.leaflet-marker-icon[data-service-id="${marker18Id}"]`);
+    // El orden por defecto es cronológico: no todo servicio de la página tiene marcador, así que se compara con todos los demás.
     const selectedMarkerZIndex = await marker1.evaluate((element) => Number(getComputedStyle(element).zIndex));
-    const marker18ZIndex = await marker18.evaluate((element) => Number(getComputedStyle(element).zIndex));
-    expect(selectedMarkerZIndex).toBeGreaterThan(marker18ZIndex);
+    const otherMarkerZIndexes = await map
+      .locator('.leaflet-marker-icon[data-service-id]:not([data-service-id="SVC-1043"])')
+      .evaluateAll((elements) => elements.map((element) => Number(getComputedStyle(element).zIndex)));
+    expect(otherMarkerZIndexes.length).toBeGreaterThan(0);
+    for (const zIndex of otherMarkerZIndexes) expect(selectedMarkerZIndex).toBeGreaterThan(zIndex);
 
     // Close preview to test map interaction directly
     await preview.getByRole("button", { name: "Cerrar", exact: true }).click();
@@ -215,7 +217,7 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     // Return back to services workspace
     await page.getByRole("button", { name: "Volver a Servicios" }).click();
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
     await expect(table).toBeVisible();
     await expect(page.locator("main")).toHaveCount(1);
     await expect(row.locator("button[data-service-select]")).toBeFocused();
@@ -366,7 +368,10 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "Programar servicio" })).toBeVisible();
 
-    // Verify derived mode indication is present
+    // El tipo de servicio ya no viene preseleccionado: se elige y recién entonces aparece el modo derivado.
+    await expect(dialog.getByRole("combobox", { name: /Tipo de servicio/ })).toContainText("Seleccione un tipo");
+    await dialog.getByRole("combobox", { name: /Tipo de servicio/ }).click();
+    await page.getByRole("option", { name: /Recolección domiciliaria/ }).click();
     await expect(dialog.getByText("Recorrido", { exact: true }).first()).toBeVisible();
 
     // Enter notes (inside the "Más datos" disclosure)
@@ -450,7 +455,8 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
 
     // Select a crew with no other service that day (crew catalog, not a fixture list)
     await chooseDialogOption(dialog, /Cuadrilla asignada/i, "Cuadrilla E - Membresia");
-    await expect(dialog.getByLabel(/Justificación del solapamiento/i)).toHaveCount(0);
+    await expect(dialog.getByText(/especialidad distinta/i)).toBeVisible();
+    await dialog.getByLabel(/Justificación de la asignación/i).fill("Refuerzo coordinado para esta tarea.");
 
     // Submit assignment
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
@@ -498,11 +504,11 @@ test.describe("Servicios workspace responsive & interactive journeys @smoke", ()
     await chooseDialogOption(dialog, /Vehículo operativo/i, "AA 123 AA");
 
     // Double-booking warning appears and asks for a justification (backend: overrideNote)
-    await expect(dialog.getByText(/^Se superpone con otro servicio$/i)).toBeVisible();
+    await expect(dialog.getByText(/^Revise la asignación$/i)).toBeVisible();
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
     await expect(dialog.getByText(/Escriba al menos 10 caracteres/i)).toBeVisible();
 
-    await dialog.getByLabel(/Justificación del solapamiento/i).fill("SVC-1042 libera el camión antes de las 11:30.");
+    await dialog.getByLabel(/Justificación de la asignación/i).fill("SVC-1042 libera el camión antes de las 11:30.");
     await dialog.getByRole("button", { name: "Confirmar asignación" }).click();
 
     // Dialog closes upon successful assignment
@@ -598,7 +604,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=services");
 
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
     const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
 
     // Select row for SVC-1096 in table

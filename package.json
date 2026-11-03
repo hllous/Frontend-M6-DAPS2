@@ -8,11 +8,13 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:fake-m1": "node scripts/fake-m1.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --cache",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:full": "vitest run --maxWorkers=2",
     "test:e2e": "playwright test"
   },
   "dependencies": {

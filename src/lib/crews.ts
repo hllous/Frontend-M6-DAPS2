@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { withFlatIds } from "./backend-shape";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
 import { externalIdInput, externalIdListInput } from "@/lib/input-limits";
@@ -11,23 +10,39 @@ export const shiftSchema = z.enum(["MORNING", "AFTERNOON", "NIGHT"]);
 export type CrewType = z.infer<typeof crewTypeSchema>;
 export type Shift = z.infer<typeof shiftSchema>;
 
-// El listado no trae miembros y el detalle los trae como members: [{ userId }].
+export const crewSpecialtySchema = z.enum(["COLLECTION", "SWEEPING", "CLEANING", "RECYCLING", "TREES", "GREEN_SPACES", "INSPECTION"]);
+export type CrewSpecialty = z.infer<typeof crewSpecialtySchema>;
+export const crewSpecialtyLabels: Record<CrewSpecialty, string> = {
+  COLLECTION: "Recolección", SWEEPING: "Barrido", CLEANING: "Limpieza", RECYCLING: "Reciclaje", TREES: "Arbolado", GREEN_SPACES: "Espacios verdes", INSPECTION: "Inspección",
+};
+export function crewSpecialtyLabel(specialty: CrewSpecialty | null) { return specialty ? crewSpecialtyLabels[specialty] : "Sin especialidad"; }
+const crewMemberSchema = z.object({ userId: z.string(), displayName: z.string().nullable().default(null) });
 export const crewSchema = z.object({
-  id: z.string(), name: z.string(), crewType: crewTypeSchema, leaderUserId: z.string().nullable(), memberUserIds: z.array(z.string()).default([]), organizationId: z.string().nullable().default(null), defaultShift: shiftSchema, active: z.boolean(),
+  id: z.string(), name: z.string(), crewType: crewTypeSchema, leaderUserId: z.string().nullable(), leaderName: z.string().nullable().default(null),
+  members: z.array(crewMemberSchema).default([]), memberUserIds: z.array(z.string()).default([]), organizationId: z.string().nullable().default(null), organizationName: z.string().nullable().default(null),
+  specialty: crewSpecialtySchema.nullable().default(null), homeZoneId: z.string().nullable().default(null), effectiveZoneId: z.string().nullable().default(null), membersCount: z.number().nullable().default(null), defaultShift: shiftSchema, active: z.boolean(),
+}).transform((crew) => {
+  const members = crew.members.length ? crew.members : crew.memberUserIds.map((userId) => ({ userId, displayName: null }));
+  return { ...crew, members, memberUserIds: members.map((member) => member.userId) };
 });
-const crewWireSchema = z.preprocess(withFlatIds("members", "userId", "memberUserIds"), crewSchema);
+const crewWireSchema = crewSchema;
 export type Crew = z.infer<typeof crewSchema>;
-export type CrewQuery = { active?: boolean; crewType?: CrewType; defaultShift?: Shift; page?: number; pageSize?: number };
+export type CrewQuery = { active?: boolean; crewType?: CrewType; defaultShift?: Shift; zoneId?: string; specialty?: CrewSpecialty; page?: number; pageSize?: number };
 export type CrewsPage = { crews: Crew[]; page: number; pageSize: number; total: number; totalPages: number };
 
 export const createCrewInputSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio."), crewType: crewTypeSchema, leaderUserId: externalIdInput(), organizationId: externalIdInput(), defaultShift: shiftSchema,
+  specialty: z.enum(crewSpecialtySchema.options, { error: "La especialidad es obligatoria." }), homeZoneId: z.string().trim().min(1).nullish(),
 });
 export type CreateCrewInput = z.infer<typeof createCrewInputSchema>;
 // crewType is immutable in the backend (UpdateCrewDto has no such field), so an edit never carries it.
-export const updateCrewInputSchema = createCrewInputSchema.omit({ crewType: true }).extend({ active: z.boolean() }).strict();
+export const updateCrewInputSchema = createCrewInputSchema.omit({ crewType: true, specialty: true }).extend({ active: z.boolean(), specialty: crewSpecialtySchema.optional() }).strict();
 export type UpdateCrewInput = z.infer<typeof updateCrewInputSchema>;
-export const addCrewMembersInputSchema = z.object({ memberUserIds: externalIdListInput({ emptyMessage: "Seleccione al menos un integrante." }) }).strict();
+export const addCrewMembersInputSchema = z.object({
+  memberUserIds: externalIdListInput({ emptyMessage: "Seleccione al menos un integrante." }).optional(),
+  userIds: externalIdListInput({ emptyMessage: "Seleccione al menos un integrante." }).optional(),
+  members: z.array(z.object({ userId: externalIdInput(), displayName: z.string().trim().min(1).optional() }).strict()).min(1).max(100).optional(),
+}).strict().refine((value) => Boolean(value.memberUserIds?.length || value.userIds?.length || value.members?.length), "Seleccione al menos un integrante.");
 export type AddCrewMembersInput = z.infer<typeof addCrewMembersInputSchema>;
 
 export class CrewContractError extends Error { constructor(message: string, options?: { cause?: unknown }) { super(message, options); this.name = "CrewContractError"; } }
@@ -41,6 +56,8 @@ function queryString(query: CrewQuery) {
   if (query.active !== undefined) params.set("active", String(query.active));
   if (query.crewType) params.set("crewType", query.crewType);
   if (query.defaultShift) params.set("defaultShift", query.defaultShift);
+  if (query.zoneId) params.set("zoneId", query.zoneId);
+  if (query.specialty) params.set("specialty", query.specialty);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
   const value = params.toString(); return value ? `?${value}` : "";
@@ -64,6 +81,6 @@ export const crewsAdapter = {
   async create(input: CreateCrewInput) { const parsed = createCrewInputSchema.safeParse(input); if (!parsed.success) throw new CrewContractError("Los datos de la cuadrilla son inválidos.", { cause: parsed.error }); return resource(await requestJson("/api/crews", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }), "La respuesta de creación de cuadrilla no respeta el contrato esperado."); },
   async update(id: string, input: UpdateCrewInput) { const parsed = updateCrewInputSchema.safeParse(input); if (!parsed.success) throw new CrewContractError("Los datos editables de la cuadrilla son inválidos.", { cause: parsed.error }); return resource(await requestJson(`/api/crews/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }), "La respuesta de actualización de cuadrilla no respeta el contrato esperado."); },
   async remove(id: string) { return resource(await requestJson(`/api/crews/${id}`, { method: "DELETE" }), "La respuesta de baja de cuadrilla no respeta el contrato esperado."); },
-  async addMembers(id: string, memberUserIds: string[]) { const parsed = addCrewMembersInputSchema.safeParse({ memberUserIds }); if (!parsed.success) throw new CrewContractError("Los integrantes de la cuadrilla son inválidos.", { cause: parsed.error }); return resource(await requestJson(`/api/crews/${id}/members`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }), "La respuesta de alta de integrantes no respeta el contrato esperado."); },
+  async addMembers(id: string, members: string[] | { userId: string; displayName?: string }[]) { const parsed = addCrewMembersInputSchema.safeParse(typeof members[0] === "string" ? { memberUserIds: members } : { members }); if (!parsed.success) throw new CrewContractError("Los integrantes de la cuadrilla son inválidos.", { cause: parsed.error }); return resource(await requestJson(`/api/crews/${id}/members`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }), "La respuesta de alta de integrantes no respeta el contrato esperado."); },
   async removeMember(id: string, userId: string) { return resource(await requestJson(`/api/crews/${id}/members/${encodeURIComponent(userId)}`, { method: "DELETE" }), "La respuesta de baja del integrante no respeta el contrato esperado."); },
 };

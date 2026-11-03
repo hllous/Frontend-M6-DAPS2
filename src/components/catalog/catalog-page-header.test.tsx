@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { CatalogPageHeader } from "./catalog-page-header";
 
 describe("CatalogPageHeader", () => {
-  it("renders a breadcrumb back to the catalog, the page title and its actions", () => {
+  it("renders a breadcrumb back to Catálogo, the page title and its actions", () => {
     render(
       <CatalogPageHeader
         title="Vehículos"
@@ -22,6 +22,12 @@ describe("CatalogPageHeader", () => {
     expect(title).toHaveClass("text-[28px]", "leading-[34px]", "max-[760px]:text-[26px]", "max-[760px]:leading-[32px]");
     expect(screen.getByText("Registre los vehículos.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Registrar vehículo" })).toBeVisible();
+  });
+
+  it("points the breadcrumb to Catálogo for urban-asset screens", () => {
+    render(<CatalogPageHeader title="Árboles" />);
+
+    expect(screen.getByRole("link", { name: "Catálogo" })).toHaveAttribute("href", "/app?destination=catalog");
   });
 
   it("omits the description and the actions slot when they are not provided", () => {

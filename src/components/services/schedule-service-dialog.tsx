@@ -25,9 +25,11 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
-import { servicesAdapter, type CreateServiceInput, type Service, type ServiceMode, type ServiceOrigin } from "@/lib/services";
+import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_MAX, type CreateServiceInput, type Service, type ServiceMode, type ServiceOrigin } from "@/lib/services";
 import { routesAdapter, type Route } from "@/lib/routes";
-import { serviceTypesAdapter, type ServiceType } from "@/lib/service-types";
+import { serviceTypesAdapter, type ServiceType, type ServiceTypeCategory } from "@/lib/service-types";
+import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
+import { crewsAdapter, type Crew } from "@/lib/crews";
 import { zonesAdapter, type Zone } from "@/lib/zones";
 import { containersAdapter } from "@/lib/containers";
 import { treesAdapter } from "@/lib/trees";
@@ -49,7 +51,7 @@ interface ScheduleServiceDialogProps {
 type Catalogs =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ready"; serviceTypes: ServiceType[]; routes: Route[]; zones: Zone[] };
+  | { status: "ready"; serviceTypes: ServiceType[]; routes: Route[]; zones: Zone[]; crews: Crew[]; crewsFailed: boolean };
 
 type InventoryTargetType = "CONTAINER" | "TREE" | "GREEN_SPACE" | "GREEN_POINT";
 type TargetKind = InventoryTargetType | "LOCATION";
@@ -65,6 +67,17 @@ const TARGET_KIND_LABELS: Record<TargetKind, string> = {
 };
 
 const TARGET_PAGE_SIZE = 20;
+const NO_CREW = "__none__";
+
+/** El tipo de objetivo sale de la categoría del tipo de servicio; ponytail: las inspecciones ambientales esperan el expediente (Backend #452). */
+const TARGET_KIND_BY_CATEGORY: Record<ServiceTypeCategory, TargetKind> = {
+  WASTE_COLLECTION: "CONTAINER",
+  STREET_CLEANING: "CONTAINER",
+  CONTAINERS: "CONTAINER",
+  TREES: "TREE",
+  GREEN_SPACES: "GREEN_SPACE",
+  ENVIRONMENTAL_CONTROL: "LOCATION",
+};
 const PAST_DATE_ERROR = "La fecha debe ser hoy o posterior.";
 
 /** Busca bienes del inventario del tipo pedido y los muestra por código o dirección, nunca por UUID. */
@@ -142,6 +155,9 @@ export function ScheduleServiceDialog({
   // Point mode state
   const [chosenZoneId, setPointZoneId] = useState("");
   const [targetType, setTargetType] = useState<TargetKind>("CONTAINER");
+  const [crewId, setCrewId] = useState("");
+  const [overrideNote, setOverrideNote] = useState("");
+  const [backendConflict, setBackendConflict] = useState(false);
   const [targetRef, setTargetRef] = useState<string>("");
   const [targetSearch, setTargetSearch] = useState("");
   const [targetOptions, setTargetOptions] = useState<TargetOptions>({ status: "idle" });
@@ -158,6 +174,11 @@ export function ScheduleServiceDialog({
       setTargetSearch("");
       setTargetOptions({ status: "idle" });
       setSelectedTarget(null);
+      setServiceTypeId("");
+      setPointZoneId("");
+      setCrewId("");
+      setOverrideNote("");
+      setBackendConflict(false);
     }
   }
 
@@ -195,9 +216,11 @@ export function ScheduleServiceDialog({
       serviceTypesAdapter.list({ active: true, pageSize: 100 }),
       routesAdapter.list({ active: true, pageSize: 100 }),
       zonesAdapter.list({ active: true, pageSize: 100 }),
+      // La cuadrilla es opcional: si su listado falla, el resto del formulario sigue funcionando.
+      crewsAdapter.list({ active: true, pageSize: 100 }).then((page) => ({ crews: page.crews, failed: false })).catch(() => ({ crews: [] as Crew[], failed: true })),
     ])
-      .then(([types, routeList, zoneList]) => {
-        if (!cancelled) setCatalogs({ status: "ready", serviceTypes: types.serviceTypes.filter((t) => t.active), routes: routeList.routes, zones: zoneList.zones });
+      .then(([types, routeList, zoneList, crewList]) => {
+        if (!cancelled) setCatalogs({ status: "ready", serviceTypes: types.serviceTypes.filter((t) => t.active), routes: routeList.routes, zones: zoneList.zones, crews: crewList.crews, crewsFailed: crewList.failed });
       })
       .catch(() => {
         if (!cancelled) setCatalogs({ status: "error" });
@@ -212,17 +235,21 @@ export function ScheduleServiceDialog({
     setTargetType(next);
     setSelectedTarget(null);
     setTargetSearch("");
-    setFieldErrors({});
+    setPointZoneId("");
+    setFieldErrors((prev) => ({ ...prev, target: undefined, targetRef: undefined, zone: undefined }));
   };
 
   const serviceTypes = useMemo(() => (catalogs.status === "ready" ? catalogs.serviceTypes : []), [catalogs]);
   const routes = useMemo(() => (catalogs.status === "ready" ? catalogs.routes : []), [catalogs]);
   const zones = useMemo(() => (catalogs.status === "ready" ? catalogs.zones : []), [catalogs]);
+  const crews = useMemo(() => (catalogs.status === "ready" ? catalogs.crews : []), [catalogs]);
+  const crewsFailed = catalogs.status === "ready" && catalogs.crewsFailed;
+  const crewItems = useMemo(() => ({ [NO_CREW]: "Sin asignar", ...Object.fromEntries(crews.map((crew) => [crew.id, crew.name])) }), [crews]);
 
-  // Sin elección explícita se toma la primera opción del catálogo.
-  const serviceTypeId = serviceTypes.some((t) => t.id === chosenServiceTypeId) ? chosenServiceTypeId : (serviceTypes[0]?.id ?? "");
+  // Tipo y zona arrancan sin elegir: un valor por defecto podía dar una combinación incoherente. El recorrido sí toma el primero.
+  const serviceTypeId = serviceTypes.some((t) => t.id === chosenServiceTypeId) ? chosenServiceTypeId : "";
   const routeId = routes.some((r) => r.id === chosenRouteId) ? chosenRouteId : (routes[0]?.id ?? "");
-  const pointZoneId = zones.some((z) => z.id === chosenZoneId) ? chosenZoneId : (zones[0]?.id ?? "");
+  const pointZoneId = zones.some((z) => z.id === chosenZoneId) ? chosenZoneId : "";
 
   // Selected Service Type determines Mode strictly
   const selectedServiceType = serviceTypes.find((t) => t.id === serviceTypeId);
@@ -257,10 +284,22 @@ export function ScheduleServiceDialog({
 
   // Selected Route for ROUTE mode
   const selectedRoute = routes.find((r) => r.id === routeId);
+  const [routeDetail, setRouteDetail] = useState<Route | null>(null);
+  useEffect(() => {
+    if (!open || !selectedRoute || selectedRoute.stops.length) return;
+    let active = true;
+    routesAdapter.get(selectedRoute.id).then((route) => { if (active) setRouteDetail(route); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [open, selectedRoute]);
+  const routeWithStops = selectedRoute?.stops.length ? selectedRoute : routeDetail?.id === routeId ? routeDetail : selectedRoute;
   const selectedRouteZones = useMemo(
-    () => [...(selectedRoute?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zoneName })),
-    [selectedRoute],
+    () => [...(routeWithStops?.stops ?? [])].sort((a, b) => a.sequence - b.sequence).map((stop) => ({ id: stop.zoneId, name: stop.zoneName })),
+    [routeWithStops],
   );
+
+  const fitZones = derivedMode === "ROUTE" ? selectedRouteZones.map((zone) => zone.id) : [inventoryType && selectedTarget ? selectedTarget.zoneId : pointZoneId].filter(Boolean);
+  const fit = crewFit(crews.find((crew) => crew.id === crewId), fitZones, selectedServiceType?.code);
+  const needsNote = fit.zone || fit.specialty || backendConflict;
 
   // Reset form when dialog opens
   const handleOpenChange = (nextOpen: boolean) => {
@@ -280,7 +319,7 @@ export function ScheduleServiceDialog({
     setScheduledDateError(null);
 
     if (catalogs.status !== "ready" || !selectedServiceType) {
-      const message = "No hay tipos de servicio activos. Active uno en Catálogo.";
+      const message = catalogs.status === "ready" && serviceTypes.length > 0 ? "Seleccione un tipo de servicio." : "No hay tipos de servicio activos. Active uno en Catálogo.";
       if (catalogs.status === "ready") setFieldErrors({ serviceType: message });
       else setErrorMessage(message);
       return;
@@ -288,6 +327,11 @@ export function ScheduleServiceDialog({
 
     if (scheduledDate < today) {
       setScheduledDateError(PAST_DATE_ERROR);
+      return;
+    }
+
+    if (derivedMode === "POINT" && selectedServiceType && targetType !== TARGET_KIND_BY_CATEGORY[selectedServiceType.category]) {
+      setFieldErrors({ serviceType: "El tipo de objetivo no corresponde al tipo de servicio elegido." });
       return;
     }
 
@@ -326,6 +370,7 @@ export function ScheduleServiceDialog({
       return;
     }
 
+    if (needsNote && overrideNote.trim().length < OVERRIDE_NOTE_MIN) { setErrorMessage(`Escriba al menos ${OVERRIDE_NOTE_MIN} caracteres de justificación.`); return; }
     setIsSubmitting(true);
 
     // Build zone snapshot. El listado de recorridos puede no traer las paradas: entonces se pide el detalle.
@@ -358,6 +403,8 @@ export function ScheduleServiceDialog({
       weatherAlertId: origin === "WEATHER_ALERT" ? referenceId.trim() : undefined,
       routeId: derivedMode === "ROUTE" ? routeId : undefined,
       zoneIds,
+      crewId: crewId || undefined,
+      overrideNote: needsNote ? overrideNote.trim() : undefined,
       targetType: inventoryType ?? undefined,
       targetId: inventoryType ? selectedTarget?.id : undefined,
       targetRef: derivedMode !== "POINT" ? undefined : inventoryType ? selectedTarget?.label : targetRef.trim(),
@@ -374,6 +421,7 @@ export function ScheduleServiceDialog({
       onCreated(createdService);
       handleOpenChange(false);
     } catch (cause) {
+      if (cause instanceof ServiceRequestError && cause.status === 409 && asksForOverrideNote(cause.message)) { setBackendConflict(true); return; }
       const msg =
         getErrorMessage(cause, "No se pudo programar el servicio. Verifique los datos ingresados.");
       setErrorMessage(msg);
@@ -414,6 +462,8 @@ export function ScheduleServiceDialog({
           )}
 
           <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4" aria-busy={catalogs.status === "loading"}>
+            <p className="text-xs text-muted-foreground">Los campos con * son obligatorios.</p>
+            <p role="status" className="sr-only">{selectedServiceType ? `Modo: ${derivedMode === "ROUTE" ? "recorrido" : "puntual"}.` : ""}</p>
             {isLinked && (
               <Item variant="muted">
                 <ItemContent>
@@ -426,6 +476,7 @@ export function ScheduleServiceDialog({
                       <FieldLabel htmlFor="linked-ticket-id">Nº de reclamo{" "}<span aria-hidden>*</span></FieldLabel>
                       <Input
                         id="linked-ticket-id"
+                        aria-required="true"
                         value={manualTicketId}
                         onChange={(event) => { setManualTicketId(event.target.value); setFieldErrors((prev) => ({ ...prev, reference: undefined })); }}
                         className="font-mono" placeholder="Pegue el Nº de reclamo"
@@ -444,14 +495,20 @@ export function ScheduleServiceDialog({
               <Select
                 value={serviceTypeId || null}
                 items={serviceTypeItems}
-                onValueChange={(value) => { setServiceTypeId(String(value)); setFieldErrors((prev) => ({ ...prev, serviceType: undefined })); }}
+                onValueChange={(value) => {
+                  setServiceTypeId(String(value));
+                  const category = serviceTypes.find((t) => t.id === value)?.category;
+                  if (category) handleTargetTypeChange(TARGET_KIND_BY_CATEGORY[category]);
+                  setFieldErrors((prev) => ({ ...prev, serviceType: undefined }));
+                }}
               >
                 <SelectTrigger
                   id="service-type"
+                  aria-required="true"
                   aria-invalid={Boolean(fieldErrors.serviceType) || undefined}
                   aria-describedby={fieldErrors.serviceType ? "service-type-error" : undefined}
                 >
-                  <SelectValue />
+                  <SelectValue placeholder="Seleccione un tipo" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -464,8 +521,7 @@ export function ScheduleServiceDialog({
                 </SelectContent>
               </Select>
               {fieldErrors.serviceType && <FieldError id="service-type-error">{fieldErrors.serviceType}</FieldError>}
-              <div className="flex flex-wrap items-center gap-2">
-                
+              {selectedServiceType ? <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="info">
                   {derivedMode === "ROUTE" ? (
                     <>
@@ -479,11 +535,33 @@ export function ScheduleServiceDialog({
                     </>
                   )}
                 </Badge>
-              </div>
+              </div> : null}
+              <FieldDescription>La zona sale del recorrido, del elemento elegido o de la zona que indique abajo.</FieldDescription>
             </Field>
 
-            {derivedMode === "ROUTE" ? (
-              <Card size="sm">
+            <Field>
+              <FieldLabel htmlFor="service-crew">Cuadrilla (opcional)</FieldLabel>
+              <Select
+                value={crewId || NO_CREW}
+                items={crewItems}
+                onValueChange={(value) => { setCrewId(value === NO_CREW ? "" : String(value)); setBackendConflict(false); }}
+              >
+                <SelectTrigger id="service-crew"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={NO_CREW}>Sin asignar</SelectItem>
+                    {crewsInZoneFirst(crews, fitZones).map((crew) => <SelectItem key={crew.id} value={crew.id}>{crew.name}</SelectItem>)}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {crewsFailed ? <FieldError role="status">No se pudo cargar el listado de cuadrillas; puede asignarla después.</FieldError> : null}
+            </Field>
+
+            {needsNote && <Field><FieldLabel htmlFor="service-override-note">Justificación de la asignación <span aria-hidden="true">*</span></FieldLabel><FieldDescription id="service-override-help" role="status">{crewFitWarnings(fit).join(" ")} {backendConflict && "La asignación presenta un conflicto de horario, zona o especialidad. "}Indique el motivo (mínimo {OVERRIDE_NOTE_MIN} caracteres).</FieldDescription><Textarea id="service-override-note" aria-required="true" aria-describedby="service-override-help" value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} maxLength={OVERRIDE_NOTE_MAX} /></Field>}
+
+            {!selectedServiceType ? null : derivedMode === "ROUTE" ? (
+              <Card size="sm" role="group" aria-labelledby="schedule-route-heading">
+                <span id="schedule-route-heading" className="sr-only">Datos del recorrido</span>
                 <CardContent className="flex flex-col gap-3">
                   <Field data-invalid={Boolean(fieldErrors.route) || undefined}>
                     <FieldLabel htmlFor="service-route">Recorrido asignado{" "}<span aria-hidden>*</span></FieldLabel>
@@ -494,6 +572,7 @@ export function ScheduleServiceDialog({
                     >
                       <SelectTrigger
                         id="service-route"
+                        aria-required="true"
                         aria-invalid={Boolean(fieldErrors.route) || undefined}
                         aria-describedby={fieldErrors.route ? "service-route-error" : undefined}
                       >
@@ -530,16 +609,18 @@ export function ScheduleServiceDialog({
                 </CardContent>
               </Card>
             ) : (
-              <Card size="sm">
+              <Card size="sm" role="group" aria-labelledby="schedule-point-heading">
+                <span id="schedule-point-heading" className="sr-only">Datos de la ubicación</span>
                 <CardContent className="flex flex-col gap-3">
                   <Field>
                     <FieldLabel htmlFor="target-type">Tipo de objetivo{" "}<span aria-hidden>*</span></FieldLabel>
                     <Select
                       value={targetType}
                       items={TARGET_KIND_LABELS}
+                      disabled
                       onValueChange={(value) => handleTargetTypeChange(value as TargetKind)}
                     >
-                      <SelectTrigger id="target-type">
+                      <SelectTrigger id="target-type" aria-required="true" aria-describedby="target-type-hint">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -552,6 +633,7 @@ export function ScheduleServiceDialog({
                         </SelectGroup>
                       </SelectContent>
                     </Select>
+                    <FieldDescription id="target-type-hint">Lo define el tipo de servicio elegido.</FieldDescription>
                   </Field>
 
                   {inventoryType ? (
@@ -620,10 +702,11 @@ export function ScheduleServiceDialog({
                         >
                           <SelectTrigger
                             id="point-zone"
+                            aria-required="true"
                             aria-invalid={Boolean(fieldErrors.zone) || undefined}
                             aria-describedby={fieldErrors.zone ? "point-zone-error" : undefined}
                           >
-                            <SelectValue />
+                            <SelectValue placeholder="Seleccione una zona" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
@@ -700,7 +783,7 @@ export function ScheduleServiceDialog({
                       items={originItems}
                       onValueChange={(value) => setGenericOrigin(value as ServiceOrigin)}
                     >
-                      <SelectTrigger id="service-origin">
+                      <SelectTrigger id="service-origin" aria-required="true">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

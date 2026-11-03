@@ -1,3 +1,5 @@
+import { crewFit } from "./crew-fit";
+import { serviceTypeFixtures } from "./service-type-fixtures";
 import { crewFixtures } from "./crew-fixtures";
 import {
   checkAssignmentConflicts,
@@ -8,6 +10,7 @@ import {
   type ServiceQuery,
   type ZoneResult,
 } from "./services";
+import { todayInArgentina } from "./argentina-date";
 import { vehicleFixtures } from "./vehicles-fixtures";
 
 const INITIAL_SERVICE_FIXTURES: Service[] = [
@@ -661,6 +664,30 @@ const INITIAL_SERVICE_FIXTURES: Service[] = [
   },
 ];
 
+// Programado para mañana y sin cuadrilla: siempre cae en la ventana de «Servicios sin cuadrilla» de Mi trabajo.
+const tomorrow = new Date(`${todayInArgentina()}T00:00:00Z`);
+tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+INITIAL_SERVICE_FIXTURES.push({
+  id: "SVC-1099",
+  serviceTypeId: "st-waste-route",
+  serviceTypeName: "Recolección de residuos",
+  title: "Recolección de residuos — Av. Cabildo 3100",
+  mode: "POINT",
+  status: "SCHEDULED",
+  statusReason: null,
+  origin: "MANUAL",
+  zoneIds: ["zone-1"],
+  zoneNames: ["Zona Norte"],
+  scheduledDate: tomorrow.toISOString().slice(0, 10),
+  windowFrom: "08:00",
+  windowTo: "11:00",
+  crewId: null,
+  crewName: null,
+  coordinates: { x: 30, y: 26 },
+  attachments: [],
+  history: [{ label: "Programado", at: "2026-09-05 08:00", done: true }],
+});
+
 INITIAL_SERVICE_FIXTURES.push({
   id: "SVC-1112",
   serviceTypeId: "st-env-inspection",
@@ -734,10 +761,11 @@ export function assignCrewFixture(
     allServices: serviceFixtures,
   });
   const overlapping = [crewConflict, vehicleConflict].filter((s): s is Service => Boolean(s));
-  if (overlapping.length > 0 && !input.overrideNote) {
+  const fit = crewFit(crew, service.zoneIds, serviceTypeFixtures.find((type) => type.id === service.serviceTypeId)?.code);
+  if ((overlapping.length > 0 || fit.zone || fit.specialty) && !input.overrideNote) {
     return {
       status: 409,
-      message: `La asignación se solapa con ${overlapping.map((s) => s.id).join(", ")}. Se puede asignar igual, pero hace falta una justificación.`,
+      message: overlapping.length ? `La asignación se solapa con ${overlapping.map((s) => s.id).join(", ")}. La asignacion tiene reparos: hace falta 'overrideNote' explicando por que.` : "La asignacion tiene reparos: la zona o especialidad de la cuadrilla no coincide; hace falta 'overrideNote' explicando por que.",
     };
   }
 

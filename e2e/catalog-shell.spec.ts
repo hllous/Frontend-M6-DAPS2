@@ -5,7 +5,7 @@ import { loginViaApi } from "./support/auth";
 test.describe("Catalog shell navigation regression #231", () => {
   test("keeps the application shell across catalog routes and browser history", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app?destination=catalog");
+    await page.goto("/app?destination=inventory");
 
     const sidebar = page.locator("aside[aria-label='Navegación principal']");
     await expect(page).toHaveTitle("Catálogo — Ambiente e Higiene");
@@ -18,18 +18,18 @@ test.describe("Catalog shell navigation regression #231", () => {
     await page.locator('a[href="/app/catalog/containers"]').click();
     await expect(page).toHaveURL(/\/app\/catalog\/containers$/);
     await expect(page).toHaveTitle("Catálogo — Ambiente e Higiene");
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     await expect(sidebar).toBeVisible();
     await expect(page.getByRole("button", { name: "Expandir navegación" })).toBeVisible();
 
     await page.goBack();
-    await expect(page).toHaveURL(/\/app\?destination=catalog$/);
+    await expect(page).toHaveURL(/\/app\?destination=inventory$/);
     await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
     await expect(sidebar).toBeVisible();
 
     await page.goForward();
     await expect(page).toHaveURL(/\/app\/catalog\/containers$/);
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
     await expect(sidebar).toBeVisible();
   });
 
@@ -38,19 +38,19 @@ test.describe("Catalog shell navigation regression #231", () => {
     await page.goto("/app/catalog/containers");
 
     const sidebar = page.locator("aside[aria-label='Navegación principal']");
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
 
     await sidebar.getByRole("link", { name: "Servicios" }).click();
     await expect(page).toHaveURL(/\/app\?destination=services$/);
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
     await page.goBack();
     await expect(page).toHaveURL(/\/app\/catalog\/containers$/);
-    await expect(page.getByRole("heading", { name: "Contenedores" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Contenedores", exact: true })).toBeVisible();
 
     await page.goForward();
     await expect(page).toHaveURL(/\/app\?destination=services$/);
-    await expect(page.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
   });
 
   test("sidebar destinations are real links that open in a new tab (#243)", async ({ page }) => {
@@ -67,7 +67,7 @@ test.describe("Catalog shell navigation regression #231", () => {
     ]);
     await newTab.waitForLoadState();
     await expect(newTab).toHaveURL(/\/app\?destination=services$/);
-    await expect(newTab.getByRole("heading", { name: "Servicios" })).toBeVisible();
+    await expect(newTab.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\/app$/);
   });
 

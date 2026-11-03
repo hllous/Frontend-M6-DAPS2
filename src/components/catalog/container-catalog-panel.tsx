@@ -1,5 +1,6 @@
 "use client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -24,19 +25,17 @@ import {
   Pencil,
   Plus,
   RotateCcw,
-  Upload,
   Wrench,
-  X,
 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import styles from "@/components/catalog/catalog-panel.module.css";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { TableCaption } from "@/components/ui/table";
 import { Empty, EmptyHeader, EmptyDescription } from "@/components/ui/empty";
 import {
   Item,
@@ -171,6 +170,10 @@ function StatusBadge({ status }: { status: ContainerStatus }) {
     </Badge>
   );
 }
+
+const CONT_HEAD = "h-auto whitespace-normal px-4 py-3 font-bold text-inherit";
+const CONT_CELL = "h-auto whitespace-normal px-4 py-3";
+const NO_CONTAINERS: Container[] = [];
 
 export function ContainerCatalogPanel({
   scenario,
@@ -503,6 +506,21 @@ export function ContainerCatalogPanel({
     ? findInFlightServiceForContainer(detailContainer, services)
     : undefined;
 
+  const containerColumns: DataTableColumn<Container>[] = [
+    { id: "code", header: "Código", accessorFn: (c) => c.code, enableSorting: false, meta: { rowHeader: true, headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => { const container = row.original; return (
+      <Button id={`container-detail-${container.id}`} type="button" variant="ghost" size="sm" aria-label={`Ver detalle de ${container.code}`} onClick={() => openDetail(container)} className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none">
+        {container.code}
+        <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
+      </Button>); } },
+    { id: "type", header: "Tipo", accessorFn: (c) => c.containerType, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => CONTAINER_TYPE_LABELS[row.original.containerType] },
+    { id: "zone", header: "Zona", accessorFn: (c) => c.zoneId, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => zones.find((z) => z.id === row.original.zoneId)?.name ?? row.original.zoneId },
+    { id: "address", header: "Dirección", accessorFn: (c) => c.address, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => row.original.address ?? "—" },
+    { id: "capacity", header: "Capacidad", accessorFn: (c) => c.capacityLiters, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => `${row.original.capacityLiters.toLocaleString("es-AR")} L` },
+    { id: "status", header: "Estado", accessorFn: (c) => c.status, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => <StatusBadge status={row.original.status} /> },
+    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: `${styles.rowChevron} ${CONT_CELL}` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
+  ];
+  const containerTable = useDataTable({ data: state.status === "ready" ? state.containers : NO_CONTAINERS, columns: containerColumns, getRowId: (c) => c.id });
+
   return (
     <section aria-labelledby="containers-title" className="flex flex-col gap-5">
       <CatalogPageHeader
@@ -633,12 +651,9 @@ export function ContainerCatalogPanel({
       </div>
 
       {state.status === "loading" && (
-        <p
-          aria-label="Cargando contenedores"
-          className="text-sm text-muted-foreground"
-        >
-          Cargando contenedores…
-        </p>
+        <LoadingRegion label="Contenedores registrados">
+          <TableRowsSkeleton className={`${styles.tableWrap} [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground`} tableClassName={styles.table} rowCount={6} rowHeight="h-[61px] max-[760px]:h-auto" actionColumn actionCount={1} actionsClassName={styles.rowChevron} columnLabels={["Código", "Tipo", "Zona", "Dirección", "Capacidad", "Estado", "Abrir detalle"]} columnWidths={["w-20", "w-24", "w-24", "w-40", "w-20", "w-20", "w-6"]} />
+        </LoadingRegion>
       )}
 
       {state.status === "error" && (
@@ -668,55 +683,14 @@ export function ContainerCatalogPanel({
 
       {state.status === "ready" && state.containers.length > 0 && (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <caption className="sr-only">Inventario de contenedores registrados</caption>
-            <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th scope="col" className="px-4 py-3">Código</th>
-                <th scope="col" className="px-4 py-3">Tipo</th>
-                <th scope="col" className="px-4 py-3">Zona</th>
-                <th scope="col" className="px-4 py-3">Dirección</th>
-                <th scope="col" className="px-4 py-3">Capacidad</th>
-                <th scope="col" className="px-4 py-3">Estado</th>
-                <th scope="col" className="sr-only">Abrir detalle</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {state.containers.map((container) => {
-                const zone = zones.find((z) => z.id === container.zoneId);
-                return (
-                  <tr key={container.id} className={styles.catalogRow}>
-                    <th scope="row" data-label="Código" className="px-4 py-3 font-semibold text-foreground">
-                      <Button
-                        id={`container-detail-${container.id}`}
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Ver detalle de ${container.code}`}
-                        onClick={() => openDetail(container)}
-                        className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none"
-                      >
-                        {container.code}
-                        <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
-                      </Button>
-                    </th>
-                    <td data-label="Tipo" className="px-4 py-3">{CONTAINER_TYPE_LABELS[container.containerType]}</td>
-                    <td data-label="Zona" className="px-4 py-3">
-                      {zone ? zone.name : container.zoneId}
-                    </td>
-                    <td data-label="Dirección" className="px-4 py-3">{container.address ?? "—"}</td>
-                    <td data-label="Capacidad" className="px-4 py-3">{container.capacityLiters.toLocaleString("es-AR")} L</td>
-                    <td data-label="Estado" className="px-4 py-3">
-                      <StatusBadge status={container.status} />
-                    </td>
-                    <td className={`${styles.rowChevron} px-4 py-3`} aria-hidden="true">
-                      <ChevronRight className="ml-auto size-4 text-muted-foreground" />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            table={containerTable}
+            container={false}
+            className={`${styles.table} leading-[inherit]`}
+            headerClassName="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground"
+            bodyClassName="divide-y divide-border"
+            rowProps={() => ({ className: `${styles.catalogRow} border-b-0 hover:bg-transparent` })}
+          ><TableCaption className="sr-only">Inventario de contenedores registrados</TableCaption></DataTable>
         </div>
       )}
 
@@ -1075,9 +1049,10 @@ export function ContainerCatalogPanel({
                 </dt>
                 <dd className="mt-1">
                   {isLoadingEvidence ? (
-                    <p className="text-xs text-muted-foreground">
-                      Cargando evidencias…
-                    </p>
+                    <LoadingRegion label="Evidencias adjuntas" className="flex flex-col gap-2">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </LoadingRegion>
                   ) : detailEvidence.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
                       No registra evidencias adjuntas.
@@ -1136,6 +1111,12 @@ export function ContainerCatalogPanel({
                     </Button>
                   </AlertDescription>
                 </Alert>
+              ) : null}
+              {(canManage || canEmpty) && servicesStatus === "loading" ? (
+                <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner aria-hidden="true" />
+                  Verificando servicios en curso…
+                </div>
               ) : null}
               {canManage ? (
                 <section aria-label="Gestión" className="flex flex-col gap-2">
@@ -1269,6 +1250,13 @@ export function ContainerCatalogPanel({
                   ) : null}
                 </section>
               )}
+
+              {(detailContainer.status === "ACTIVE" && !canReport) ||
+              (detailContainer.status === "OVERFLOWED" && !canEmpty) ? (
+                <p className="text-sm text-muted-foreground">
+                  El desborde, el daño y el vaciado los registra la cuadrilla de campo.
+                </p>
+              ) : null}
 
               {canManage &&
               (detailContainer.status === "DAMAGED" ||

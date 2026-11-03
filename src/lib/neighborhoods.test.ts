@@ -14,7 +14,7 @@ import {
 } from "./neighborhoods";
 import { neighborhoodFixtures } from "./neighborhoods-fixtures";
 import { zoneFixtures } from "./zones-fixtures";
-import { zoneLocationLabel, zoneSchema } from "./zones";
+import { zoneSchema } from "./zones";
 
 const server = setupServer(...handlers);
 
@@ -98,7 +98,5 @@ describe("zone shape", () => {
 
     expect(zoneSchema.safeParse({ ...base, commune: null, neighborhood: null }).success).toBe(true);
     expect(zoneSchema.safeParse({ ...base, commune: { id: "c", code: "comuna-14", name: "Comuna 14" }, neighborhood: { id: "n" } }).success).toBe(true);
-    expect(zoneLocationLabel({ commune: null, neighborhood: { id: "n" } })).toBe("");
-    expect(zoneLocationLabel({ commune: { id: "c", code: "comuna-14", name: "Comuna 14" }, neighborhood: { id: "n", nombre: "Palermo" } })).toBe("Palermo · Comuna 14");
   });
 });

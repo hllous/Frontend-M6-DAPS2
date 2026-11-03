@@ -37,7 +37,10 @@ export function m1BaseUrl(): URL | undefined {
   try {
     const url = new URL(raw.replace(/\/?$/, "/"));
     const protocolOk = url.protocol === "https:" || (url.protocol === "http:" && process.env.NODE_ENV !== "production");
-    if (protocolOk && !url.username && !url.password) return url;
+    const host = url.hostname.toLowerCase();
+    const localHost = host === "localhost" || host === "[::1]" || host === "::1" || host === "0.0.0.0" || /^127(?:\.\d{1,3}){3}$/.test(host);
+    const productionSafe = process.env.NODE_ENV !== "production" || (!localHost && process.env.M1_FAKE_ENABLED !== "true");
+    if (protocolOk && productionSafe && !url.username && !url.password) return url;
   } catch {
     // cae al aviso
   }
@@ -150,11 +153,11 @@ async function callM1(
  * el refresh, la sesión muere (InvalidSessionError → 401 → el cliente cierra y va al login). `tolerateUnavailable`: en
  * la renovación preventiva, si M1 no responde se sigue con el token vigente.
  */
-export async function renewRequestSession(
+export async function renewRequestSession<T extends RenewableSession>(
   request: Request,
-  session: RenewableSession,
+  session: T,
   options: { tolerateUnavailable: boolean },
-): Promise<RenewableSession> {
+): Promise<T> {
   let next: Session | null;
   try {
     next = await refreshSession(session, {
@@ -167,5 +170,5 @@ export async function renewRequestSession(
   if (!next) throw new InvalidSessionError("M1 rechazó la renovación de la sesión.");
   rememberRenewedSession(request, next);
   await persistRenewedSession(next);
-  return next as RenewableSession;
+  return next as T;
 }

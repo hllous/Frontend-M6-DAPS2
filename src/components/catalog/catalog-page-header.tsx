@@ -10,7 +10,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-export const CATALOG_HREF = "/app?destination=catalog";
+export const CONFIGURATION_HREF = "/app?destination=catalog";
 
 type CatalogPageHeaderProps = {
   title: string;
@@ -19,7 +19,7 @@ type CatalogPageHeaderProps = {
   actions?: ReactNode;
 };
 
-/** Shared header of every catalog screen: breadcrumb back to the catalog, page title, description and primary actions. */
+/** Shared header of every catalog screen. */
 export function CatalogPageHeader({ title, titleId, description, actions }: CatalogPageHeaderProps) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-4">
@@ -27,7 +27,7 @@ export function CatalogPageHeader({ title, titleId, description, actions }: Cata
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink render={<Link href={CATALOG_HREF} />}>Catálogo</BreadcrumbLink>
+              <BreadcrumbLink render={<Link href={CONFIGURATION_HREF} />}>Catálogo</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

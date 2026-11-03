@@ -1,6 +1,10 @@
+import type { Session } from "./session";
+import { DEMO_IDENTITIES } from "./demo-identities";
 import { actorKindForRoles, capabilitiesForRoles, type M6Role } from "./m6-roles";
 
 export type Capability =
+  | "integrationMonitor:view"
+  | "integrationMonitor:manage"
   | "service:view"
   | "service:execute"
   // Frontend hypothesis: #8 defines Office catalog configuration, but not per-resource names.
@@ -43,6 +47,7 @@ export type Capability =
   | "tree:survey"
   | "treeIntervention:request"
   | "treeIntervention:authorize"
+  | "treeIntervention:authorizeRemoval"
   | "service:assign"
   | "service:cancel"
   | "service:reschedule"
@@ -88,7 +93,6 @@ export type OperationalScenario = {
   work: {
     title: string;
     summary: string;
-    items: string[];
   };
 };
 
@@ -105,12 +109,7 @@ const scenarioFixtures: Record<
     roles: ["M6_ADMIN"],
     work: {
       title: "Acciones de la jornada",
-      summary: "Prioridades que requieren una decisión de Oficina.",
-      items: [
-        "Revisar reprogramación de barrido",
-        "Confirmar cuadrilla para plaza del Parque",
-        "Clasificar aviso ambiental recibido",
-      ],
+      summary: "Lo que espera una decisión de su parte, con lo más antiguo primero.",
     },
   },
   fieldCrewLeader: {
@@ -129,10 +128,6 @@ const scenarioFixtures: Record<
     work: {
       title: "Servicios asignados",
       summary: "Recorrido de higiene urbana para el turno actual.",
-      items: [
-        "Recorrido de higiene urbana — corredor costero",
-        "Revisión de punto verde — Plaza de las Artes",
-      ],
     },
   },
   fieldCrewMember: {
@@ -151,10 +146,6 @@ const scenarioFixtures: Record<
     work: {
       title: "Servicios asignados",
       summary: "Tareas del recorrido que integran su turno.",
-      items: [
-        "Recorrido de higiene urbana — corredor costero",
-        "Control de contenedores — avenida central",
-      ],
     },
   },
   officeLimited: {
@@ -164,8 +155,7 @@ const scenarioFixtures: Record<
     roles: ["M6_AUDITOR"],
     work: {
       title: "Acciones de la jornada",
-      summary: "Ingreso de avisos con permisos acotados para esta sesión.",
-      items: ["Clasificar aviso ambiental recibido"],
+      summary: "Su perfil consulta información y no tiene tareas asignadas.",
     },
   },
 };
@@ -184,7 +174,6 @@ export function scenarioForRoles(scenario: ScenarioFixture, roles: readonly M6Ro
     actor: { ...scenario.actor, kind: actorKindForRoles(roles) },
   };
 }
-
 function roleFixture(base: ScenarioFixture, id: ScenarioId, label: string, roles: M6Role[]): OperationalScenario {
   return scenarioForRoles({ ...base, id, label }, roles);
 }
@@ -207,11 +196,19 @@ export type ScenarioCrew = { id: string; name: string };
 
 /** Con una sesión, la cuadrilla resuelta contra el backend pisa la de fixture del escenario. */
 export function getScenario(
-  ref: ScenarioId | { scenarioId: ScenarioId; crew?: ScenarioCrew; roles?: readonly M6Role[] },
+  ref: ScenarioId | Pick<Session, "scenarioId" | "crew" | "roles" | "source" | "mode" | "fieldRole">,
 ): OperationalScenario {
   if (typeof ref === "string") return scenariosById[ref];
-  let scenario = scenariosById[ref.scenarioId];
+  let scenario = ref.scenarioId ? scenariosById[ref.scenarioId] : scenarios.employeeNoRole;
+  if (ref.mode === "backend-development" || ref.mode === "real-m1") {
+    scenario = { ...scenario, actor: { ...scenario.actor, crewId: ref.crew?.id, crewName: ref.crew?.name, fieldRole: ref.fieldRole } };
+  }
   if (ref.roles) scenario = scenarioForRoles(scenario, ref.roles);
+  // Sesión de demo firmada: el actor es la persona real del seed, no el nombre de fixture del escenario.
+  if (ref.source === "demo" && ref.scenarioId) {
+    const { sub, name } = DEMO_IDENTITIES[ref.scenarioId];
+    scenario = { ...scenario, actor: { ...scenario.actor, userId: sub, name } };
+  }
   if (!ref.crew) return scenario;
   return { ...scenario, actor: { ...scenario.actor, crewId: ref.crew.id, crewName: ref.crew.name } };
 }

@@ -17,9 +17,9 @@ test.describe("Referral workspace", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await list.getByRole("button", { name: /SCR-1001/ }).click();
-    const detail = page.getByRole("region", { name: "Detalle de SCR-1001" });
+    const detail = page.getByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     await expect(detail).toBeVisible();
-    await expect(detail.getByRole("heading", { name: "Detalle de SCR-1001" })).toBeFocused();
+    await expect(detail.getByRole("heading", { name: "Detalle de Corte de calle · Bulevar Costero" })).toBeFocused();
     const backButton = detail.getByRole("button", { name: "Volver a derivaciones" });
     await expect.poll(async () => (await backButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(48);
     await page.setViewportSize({ width: 760, height: 844 });
@@ -31,6 +31,33 @@ test.describe("Referral workspace", () => {
       "href",
       /destination=services&detail=SVC-1050/,
     );
+  });
+
+  test("Office sees M7's approved window and rejection reason from the REST response", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/app?destination=referrals");
+
+    const list = page.getByRole("region", { name: "Lista de derivaciones" });
+    await expect(list).toBeVisible();
+    await list.getByRole("button", { name: /SCR-1003/ }).click();
+
+    const approvedDetail = page.getByRole("region", { name: "Detalle de Corte de calle · Av. Independencia" });
+    await expect(approvedDetail).toBeVisible();
+    await expect(approvedDetail.getByText("Período autorizado")).toBeVisible();
+    await expect(approvedDetail.getByText("05/09/2026 11:30", { exact: false })).toBeVisible();
+    await expect(approvedDetail.getByText("Inicio solicitado")).toBeVisible();
+    await expect(approvedDetail.getByText("05/09/2026 08:00", { exact: false })).toBeVisible();
+
+    await approvedDetail.getByRole("button", { name: "Volver a derivaciones" }).click();
+    const returnedList = page.getByRole("region", { name: "Lista de derivaciones" });
+    await expect(returnedList).toBeVisible();
+    await returnedList.getByRole("button", { name: /SCR-1004/ }).click();
+
+    const rejectedDetail = page.getByRole("region", { name: "Detalle de Corte de calle · Bulevar Norte" });
+    await expect(rejectedDetail).toBeVisible();
+    await expect(rejectedDetail.getByText("Motivo del rechazo")).toBeVisible();
+    await expect(rejectedDetail.getByText("Debe permanecer libre la avenida durante el desfile.")).toBeVisible();
   });
 
   test("Field only discovers referrals attached to assigned Services", async ({ page }) => {
@@ -45,7 +72,7 @@ test.describe("Referral workspace", () => {
 
     await list.getByRole("button", { name: /RR-1001/ }).focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("region", { name: "Detalle de RR-1001" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" })).toBeVisible();
   });
 
   test("keeps the workspace usable on a narrow viewport and reports an empty result", async ({ page }) => {

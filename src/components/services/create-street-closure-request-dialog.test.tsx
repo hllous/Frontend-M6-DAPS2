@@ -27,13 +27,13 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-function renderDialog() {
+function renderDialog(onCreated = vi.fn()) {
   return render(
     <CreateStreetClosureRequestDialog
       open={true}
       onOpenChange={vi.fn()}
       service={service}
-      onCreated={vi.fn()}
+      onCreated={onCreated}
     />,
   );
 }
@@ -86,6 +86,7 @@ describe("CreateStreetClosureRequestDialog", () => {
     expect(within(fromTime).getByRole("combobox", { name: "Hora" })).toHaveTextContent("08");
     expect(within(fromTime).getByRole("combobox", { name: "Minutos" })).toHaveTextContent("00");
     expect(screen.getByRole("combobox", { name: /Tipo de corte/ })).toHaveAttribute("data-slot", "select-trigger");
+    expect(screen.getByRole("combobox", { name: "Sentido *" })).toHaveTextContent("Seleccione un sentido");
     expect(screen.getByRole("textbox", { name: /Motivo/ })).toHaveAttribute("data-slot", "textarea");
     expect(await screen.findByText(service.title)).toBeInTheDocument();
     expect(screen.getByText(new RegExp(service.id))).toBeInTheDocument();
@@ -97,7 +98,10 @@ describe("CreateStreetClosureRequestDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Agregar tramo" }));
     const sectionStreets = screen.getAllByLabelText("Calle *", { selector: "input" });
+    const directions = screen.getAllByRole("combobox", { name: "Sentido *" });
     expect(sectionStreets).toHaveLength(2);
+    expect(directions).toHaveLength(2);
+    expect(directions[1]).toHaveTextContent("Seleccione un sentido");
     expect(document.activeElement).toBe(sectionStreets[1]);
 
     await user.click(screen.getByRole("button", { name: "Quitar tramo 2" }));
@@ -120,7 +124,7 @@ describe("CreateStreetClosureRequestDialog", () => {
     );
   });
 
-  it("shows a successful creation as pending", async () => {
+  it("requires a direction for each section and announces the field-level error", async () => {
     const user = userEvent.setup();
     renderDialog();
 
@@ -130,8 +134,32 @@ describe("CreateStreetClosureRequestDialog", () => {
     await user.type(screen.getByLabelText("Hasta calle *"), "Calle 12");
     await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
+    const direction = screen.getByRole("combobox", { name: "Sentido *" });
+    expect(screen.getByText("Indique el sentido del tramo")).toBeInTheDocument();
+    expect(direction).toHaveAttribute("aria-invalid", "true");
+    expect(direction).toHaveAttribute("aria-describedby", "affected-section-0-direction-error");
+  });
+
+  it("shows a successful creation as pending", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    renderDialog(onCreated);
+
+    await user.type(screen.getByLabelText("Motivo *"), "Trabajo operativo con circulación reducida");
+    await user.type(screen.getByLabelText("Calle *", { selector: "input" }), "Bulevar Costero");
+    await user.type(screen.getByLabelText("Desde calle *"), "Av. Belgrano");
+    await user.type(screen.getByLabelText("Hasta calle *"), "Calle 12");
+    await user.click(screen.getByRole("combobox", { name: "Sentido *" }));
+    await user.click(await screen.findByRole("option", { name: "Ascendente" }));
+    expect(screen.getByRole("combobox", { name: "Sentido *" })).toHaveTextContent("Ascendente");
+    await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
+
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Solicitud enviada"));
     expect(screen.getByText("Tránsito debe responder.")).toBeInTheDocument();
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({
+      closureType: "PARTIAL",
+      affectedSections: [expect.objectContaining({ direction: "FORWARD" })],
+    }));
   });
 
   it("retains entered values and presents an unsent state after a network failure", async () => {
@@ -144,6 +172,8 @@ describe("CreateStreetClosureRequestDialog", () => {
     await user.type(screen.getByLabelText("Calle *", { selector: "input" }), "Calle 12");
     await user.type(screen.getByLabelText("Desde calle *"), "Av. Belgrano");
     await user.type(screen.getByLabelText("Hasta calle *"), "Av. Libertad");
+    await user.click(screen.getByRole("combobox", { name: "Sentido *" }));
+    await user.click(await screen.findByRole("option", { name: "Ascendente" }));
     await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Sin enviar"));
@@ -165,6 +195,8 @@ describe("CreateStreetClosureRequestDialog", () => {
     changeValue(screen.getByLabelText("Calle *", { selector: "input" }), "Av. Mitre");
     changeValue(screen.getByLabelText("Desde calle *"), "Calle 10");
     changeValue(screen.getByLabelText("Hasta calle *"), "Calle 12");
+    await user.click(screen.getByRole("combobox", { name: "Sentido *" }));
+    await user.click(await screen.findByRole("option", { name: "Ambos sentidos" }));
     await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Tránsito debe responder."));
@@ -172,6 +204,7 @@ describe("CreateStreetClosureRequestDialog", () => {
       sourceType: "TREE_INTERVENTION",
       sourceId: "intervention-2",
       status: "REQUESTED",
+      affectedSections: [expect.objectContaining({ direction: "BOTH" })],
       sourceContext: expect.objectContaining({ sourceType: "TREE_INTERVENTION", sourceId: "intervention-2" }),
     }));
   });
@@ -203,6 +236,8 @@ describe("CreateStreetClosureRequestDialog", () => {
     changeValue(screen.getByLabelText("Calle *", { selector: "input" }), "Av. Mitre");
     changeValue(screen.getByLabelText("Desde calle *"), "Calle 10");
     changeValue(screen.getByLabelText("Hasta calle *"), "Calle 12");
+    await user.click(screen.getByRole("combobox", { name: "Sentido *" }));
+    await user.click(await screen.findByRole("option", { name: "Ascendente" }));
     await user.click(screen.getByRole("button", { name: "Enviar solicitud" }));
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Sin enviar"));

@@ -41,7 +41,7 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
       if (init?.body) backendBody = JSON.parse(String(init.body));
       return new Response(JSON.stringify({ id: "INS-TEST-1" }), { status: 200, headers: { "content-type": "application/json" } });
     });
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
 
     const response = await POST(new Request("http://localhost/api/environmental-inspections/INS-TEST-1/complete", {
       method: "POST",

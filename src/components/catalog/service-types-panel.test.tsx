@@ -25,14 +25,14 @@ describe("ServiceTypesPanel", () => {
       return listServiceTypes(new Request(request, { headers }));
     })));
     const { container } = render(<ServiceTypesPanel scenario={scenarios.officeDutyQueue} />);
-    const loading = screen.getByRole("status", { name: "Cargando tipos de servicio" });
+    const loading = screen.getByRole("region", { name: "Listado de tipos de servicio" });
     expect(loading.querySelectorAll("thead th")).toHaveLength(7);
     expect(loading.querySelectorAll("tbody tr")).toHaveLength(5);
     expect(loading.querySelectorAll("tbody tr:first-child td")).toHaveLength(7);
     expect(loading.querySelectorAll("tbody tr:first-child td:last-child [data-slot=skeleton]")).toHaveLength(1);
     const widths = Array.from(loading.querySelectorAll("col"), (column) => column.className);
     await screen.findByRole("row", { name: /WASTE-ROUTE/ }, { timeout: 3000 });
-    expect(screen.queryByRole("status", { name: "Cargando tipos de servicio" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Listado de tipos de servicio" })).not.toBeInTheDocument();
     expect(Array.from(container.querySelectorAll("col"), (column) => column.className)).toEqual(widths);
     expect(container.querySelectorAll("thead th")).toHaveLength(7);
   });
