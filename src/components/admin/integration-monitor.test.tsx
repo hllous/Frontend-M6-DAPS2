@@ -6,7 +6,7 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
-import { IntegrationMonitor } from "./integration-monitor";
+import { IntegrationMonitor, actionLabels, statusLabels } from "./integration-monitor";
 
 const server = setupServer(...handlers);
 
@@ -127,5 +127,41 @@ describe("IntegrationMonitor", () => {
     expect(within(table).getByText("En reparación")).toBeVisible();
     expect(within(table).getByText("Estado: new state")).toBeVisible();
     expect(within(table).queryByText(/CREATE|ASSIGN_CREW|NEW_BACKEND_ACTION|UNDER_REPAIR/)).not.toBeInTheDocument();
+  });
+
+  it("translates every label in the maps and never shows the raw code", async () => {
+    const id = (n: number) => `650e8400-e29b-41d4-a716-${String(n).padStart(12, "0")}`;
+    const actions = Object.keys(actionLabels);
+    const statuses = Object.keys(statusLabels);
+    const rows = Array.from({ length: Math.max(actions.length, statuses.length) }, (_, n) => ({
+      id: id(n), entityType: "SERVICE", entityId: "550e8400-e29b-41d4-a716-446655440021", actorUserId: "42",
+      actorRoles: ["M6_ADMIN"], note: null, occurredAt: "2026-10-31T12:00:00.000Z",
+      action: actions[n % actions.length], fromStatus: statuses[n % statuses.length], toStatus: statuses[(n + 1) % statuses.length],
+    }));
+    server.use(http.get("*/api/audit", () => HttpResponse.json({ data: rows, meta: { total: rows.length, page: 1, pageSize: 20, totalPages: 1 } })));
+    const user = userEvent.setup();
+    render(<IntegrationMonitor canManage={false} initialTab="activity" />);
+    await user.click(await screen.findByRole("tab", { name: "Registro de actividad" }));
+    const table = await screen.findByRole("table", { name: "Registro de actividad" });
+    for (const label of [...Object.values(actionLabels), ...Object.values(statusLabels)]) expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
+    expect(within(table).queryByText(/[A-Z]+_[A-Z_]+|^[A-Z]{3,}$/)).not.toBeInTheDocument();
+  });
+
+  it("shows a dash for missing statuses and safe fallbacks for empty or prototype-like actions", async () => {
+    const base = { entityType: "SERVICE", entityId: "550e8400-e29b-41d4-a716-446655440021", actorUserId: "42", actorRoles: ["M6_ADMIN"], note: null, occurredAt: "2026-10-31T12:00:00.000Z", fromStatus: null, toStatus: "" };
+    const data = [
+      { ...base, id: "650e8400-e29b-41d4-a716-446655440201", action: "   " },
+      { ...base, id: "650e8400-e29b-41d4-a716-446655440202", action: "constructor" },
+      { ...base, id: "650e8400-e29b-41d4-a716-446655440203", action: "__proto__" },
+    ];
+    server.use(http.get("*/api/audit", () => HttpResponse.json({ data, meta: { total: 3, page: 1, pageSize: 20, totalPages: 1 } })));
+    const user = userEvent.setup();
+    render(<IntegrationMonitor canManage={false} initialTab="activity" />);
+    await user.click(await screen.findByRole("tab", { name: "Registro de actividad" }));
+    const table = await screen.findByRole("table", { name: "Registro de actividad" });
+    expect(within(table).getByText("Acción no especificada")).toBeVisible();
+    expect(within(table).getByText("Acción registrada: constructor")).toBeVisible();
+    expect(within(table).getByText("Acción registrada: proto")).toBeVisible();
+    expect(within(table).getAllByText("—").length).toBeGreaterThanOrEqual(6);
   });
 });

@@ -147,14 +147,14 @@ const roleLabels: Record<M6Role, string> = {
 };
 
 // Valores de `action` que emite el Backend en la auditoría de dominio (audit.record en src/modules/**).
-const actionLabels: Record<string, string> = {
+export const actionLabels: Record<string, string> = {
   CREATE: "Creó un registro",
   UPDATE: "Actualizó un registro",
   ACTIVATE: "Activó un registro",
   DEACTIVATE: "Dio de baja un registro",
-  START: "Inició la tarea",
-  COMPLETE: "Completó la tarea",
-  CLOSE: "Cerró la solicitud",
+  START: "Inició el trabajo",
+  COMPLETE: "Completó el trabajo",
+  CLOSE: "Cerró el caso",
   CANCEL: "Canceló un servicio",
   SUSPEND: "Suspendió un servicio",
   RESUME: "Reanudó un servicio",
@@ -228,7 +228,9 @@ function readableCode(value: string): string {
 }
 
 function auditActionLabel(action: string): string {
-  return actionLabels[action] ?? `Acción registrada: ${readableCode(action)}`;
+  if (Object.hasOwn(actionLabels, action)) return actionLabels[action];
+  const code = readableCode(action.trim());
+  return code ? `Acción registrada: ${code}` : "Acción no especificada";
 }
 
 function eventQuery(filters: EventFilters, page: number): string {
@@ -248,11 +250,11 @@ function auditQuery(filters: AuditFilters, page: number): string {
 }
 
 // Estados del Backend (enums de Prisma) que aparecen en fromStatus/toStatus.
-const statusLabels: Record<string, string> = {
+export const statusLabels: Record<string, string> = {
   ACTIVE: "Activo",
   INACTIVE: "Inactivo",
   SCHEDULED: "Programado",
-  RESCHEDULED: "Reprogramado",
+  RESCHEDULED: "A reprogramar",
   IN_PROGRESS: "En curso",
   SUSPENDED: "Suspendido",
   COMPLETED: "Completado",
@@ -289,7 +291,9 @@ const statusLabels: Record<string, string> = {
 
 function statusLabel(value: string | null): string {
   if (!value) return "—";
-  return statusLabels[value] ?? `Estado: ${readableCode(value)}`;
+  if (Object.hasOwn(statusLabels, value)) return statusLabels[value];
+  const code = readableCode(value.trim());
+  return code ? `Estado: ${code}` : "—";
 }
 
 function EventActions({ event, canManage, onOpenDetail }: {
