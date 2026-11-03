@@ -61,7 +61,7 @@ export function isNearExpiry(session: Session, now = Date.now()): boolean {
 }
 
 /**
- * `POST /auth/refresh` de M1 (Catálogo v3.0 §8, 204). NO VERIFICADO contra M1 (no está hosteado): el contrato no define
+ * `POST /auth/refresh` de M1 (Catálogo v3.0 §8, 204). Aún no verificado contra M1 hosteado: el contrato no define
  * cómo se manda el refresh token ni dónde vienen los tokens nuevos. Supuestos, simétricos al login: el refresh viaja en
  * `X-Refresh-Token`; los tokens nuevos vuelven en `Authorization: Bearer` y `X-Refresh-Token` (o, si no, en un JSON
  * `{ accessToken, refreshToken }`); sin `X-Refresh-Token` nuevo se conserva el anterior.

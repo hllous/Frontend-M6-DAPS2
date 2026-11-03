@@ -20,6 +20,7 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 - [backend-context/](backend-context/README.md): espejo de contexto y API del backend. Es de solo lectura; ante una diferencia, corregir la fuente del backend y volver a copiarlo.
 - [design/examples/](design/examples/README.md): ejemplos verificables del estándar de [DESIGN](../DESIGN.md).
 - [operations/deploy.md](operations/deploy.md): estado y procedimiento de despliegue.
+- [operations/external-contracts.md](operations/external-contracts.md): contratos externos, evidencia y estado de GA.
 
 ## Dónde agregar documentación
 
