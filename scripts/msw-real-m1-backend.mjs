@@ -6,13 +6,13 @@ if (process.env.NODE_ENV === "production" || process.env.M6_REAL_M1_MOCK_BACKEND
 }
 
 const employees = new Map([
-  ["2", { roles: ["M6_ADMIN"] }],
-  ["3", { roles: ["M6_OFICINA_OPERACIONES"] }],
-  ["5", { roles: ["M6_OFICINA_AMBIENTAL"] }],
-  ["8", { roles: ["M6_AUDITOR"] }],
-  ["10000", { roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "crew-10000", name: "Cuadrilla Demo", role: "LEADER" }] }],
-  ["10001", { roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "crew-10001", name: "Cuadrilla Demo", role: "MEMBER" }] }],
-  ["10070", { roles: ["M6_CAMPO_INSPECTOR"] }],
+  ["10000", { roles: ["M6_ADMIN"] }],
+  ["10002", { roles: ["M6_OFICINA_OPERACIONES"] }],
+  ["10004", { roles: ["M6_OFICINA_AMBIENTAL"] }],
+  ["10007", { roles: ["M6_AUDITOR"] }],
+  ["10009", { roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "crew-10009", name: "Cuadrilla Demo", role: "LEADER" }] }],
+  ["10010", { roles: ["M6_CAMPO_CUADRILLA"], crews: [{ id: "crew-10010", name: "Cuadrilla Demo", role: "MEMBER" }] }],
+  ["10011", { roles: ["M6_CAMPO_INSPECTOR"] }],
   ["900", { roles: [] }],
 ]);
 
