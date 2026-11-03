@@ -84,7 +84,7 @@ const eslintConfig = [
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none", ignoreRestSiblings: true }],
     },
   },
-  { ignores: ["public/mockServiceWorker.js", ".agents/**", ".claude/**", ".codex*/**", ".codex/**", ".orca/**"] },
+  { ignores: ["public/mockServiceWorker.js", ".agents/**", ".claude/**", ".codex*/**", ".codex/**", ".orca/**", ".next-*/**"] },
 ];
 
 export default eslintConfig;

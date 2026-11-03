@@ -136,7 +136,7 @@ const streetClosureRequestShape = z.object({
  */
 function fromWireShape(record: unknown): unknown {
   if (!record || typeof record !== "object" || !("sections" in record)) return record;
-  const { sections, closureFrom, closureTo, ...rest } = record as Record<string, unknown>;
+  const { sections, closureFrom, closureTo, approvedFrom, approvedTo, ...rest } = record as Record<string, unknown>;
   // Only fill what is absent: a field already in the internal shape wins over its wire alias.
   return {
     ...rest,
@@ -144,6 +144,9 @@ function fromWireShape(record: unknown): unknown {
     affectedSections: rest.affectedSections ?? sections,
     requestedFrom: rest.requestedFrom ?? closureFrom,
     requestedTo: rest.requestedTo ?? closureTo,
+    // The REST names M7's authorized window approvedFrom/approvedTo (the event calls it startDate/endDate).
+    startDate: rest.startDate ?? approvedFrom,
+    endDate: rest.endDate ?? approvedTo,
   };
 }
 
