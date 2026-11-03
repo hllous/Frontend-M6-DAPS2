@@ -2,6 +2,7 @@ import { m1BaseUrl } from "./m1-refresh";
 
 const MAX_BODY_CHARS = 8_192;
 const MAX_TOKEN_CHARS = 1_200;
+const MAX_ACCESS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 export const LOGIN_TIMEOUT_MS = 90_000;
 const JWT_SHAPE = /^[\w-]+\.[\w-]+\.[\w-]+$/;
 
@@ -77,7 +78,8 @@ export async function loginWithM1(
     throw new M1ServiceUnavailableError();
   }
 
-  if (response.status === 401) throw new M1CredentialsRejectedError();
+  // Catalog v3.0 §6/§9 groups these login responses with rejected credentials; unknown statuses stay unavailable.
+  if ([400, 401, 404, 422].includes(response.status)) throw new M1CredentialsRejectedError();
   if (response.status === 403) throw new M1AccountBlockedError();
   if (!response.ok) throw new M1ServiceUnavailableError();
 
@@ -123,22 +125,25 @@ export function readM1AccessClaims(token: string, now = Date.now()): M1AccessCla
     const numericSubject = typeof subject === "number"
       ? Number.isSafeInteger(subject) && subject >= 0
       : typeof subject === "string" && /^\d{1,19}$/.test(subject);
+    const normalizedSubject = numericSubject ? BigInt(String(subject)).toString() : undefined;
+    const expiresAt = typeof value.exp === "number" ? value.exp * 1000 : Number.NaN;
     if (
       value.iss !== "modulo1-ciudadanos" ||
       value.typ !== "access" ||
-      !numericSubject ||
+      !normalizedSubject ||
       (value.sub_type !== "CIUDADANO" && value.sub_type !== "EMPLEADO") ||
       typeof value.rol !== "string" || value.rol.length === 0 ||
-      typeof value.exp !== "number" || !Number.isFinite(value.exp) || value.exp * 1000 <= now
+      typeof value.exp !== "number" || !Number.isFinite(value.exp) || !Number.isFinite(expiresAt) ||
+      expiresAt <= now || expiresAt > now + MAX_ACCESS_LIFETIME_MS
     ) {
       return undefined;
     }
 
     return {
-      subject: String(subject),
+      subject: normalizedSubject,
       subType: value.sub_type,
       role: value.rol,
-      expiresAt: value.exp * 1000,
+      expiresAt,
     };
   } catch {
     return undefined;

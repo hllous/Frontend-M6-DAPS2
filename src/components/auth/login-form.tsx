@@ -38,6 +38,7 @@ export function LoginForm({
     if (pending) return;
     setError(undefined);
     setPending(true);
+    let loginSucceeded = false;
 
     try {
       const response = await fetch("/api/session/login", {
@@ -56,11 +57,12 @@ export function LoginForm({
         return;
       }
       window.location.assign(redirectTo);
+      loginSucceeded = true;
     } catch {
       setError({ message: "No se pudo ingresar. Revise la conexión e intente nuevamente.", denied: false });
       setPassword("");
     } finally {
-      setPending(false);
+      if (!loginSucceeded) setPending(false);
     }
   }
 

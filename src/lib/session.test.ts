@@ -9,6 +9,7 @@ import {
   createSession,
   effectiveSessionExpiry,
   getAuthMode,
+  getRequiredSession,
   getSessionFromCookieValue,
   isSessionActive,
   publicSession,
@@ -34,6 +35,15 @@ describe("owned BFF session", () => {
 
     vi.stubEnv("NODE_ENV", "production");
     expect(sessionCookieOptions(session).secure).toBe(true);
+  });
+
+  it("keeps session cookies Secure on non-loopback hosts even outside production", () => {
+    const session = createSession("office-duty-queue", { mode: "mock", now });
+    vi.stubEnv("NODE_ENV", "development");
+
+    expect(sessionCookieOptions(session, new Request("http://localhost:3000/login")).secure).toBe(false);
+    expect(sessionCookieOptions(session, new Request("http://m6.example.test/login")).secure).toBe(true);
+    expect(sessionCookieOptions(session, new Request("https://m6.example.test/login")).secure).toBe(true);
   });
 
   it("seals a mock Office session without exposing its token-shaped contents", () => {
@@ -78,6 +88,25 @@ describe("owned BFF session", () => {
     expect(isSessionActive(session, now + 16 * 60 * 1000)).toBe(true);
     expect(isSessionActive(session, now + SESSION_IDLE_MS)).toBe(false);
     expect(isSessionActive(session, session.absoluteExpiresAt)).toBe(false);
+  });
+
+  it("accepts a roleless M1 session without a demo scenario at the BFF session boundary", () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
+    vi.stubEnv("M6_SESSION_SECRET", secret);
+    const sessionNow = Date.now();
+    const session = createM1Session({
+      accessToken: "header.payload.signature",
+      refreshToken: "refresh-test",
+      jwtExpiresAt: sessionNow + 15 * 60 * 1000,
+      identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
+      roles: [],
+      now: sessionNow,
+    });
+    const request = new Request("http://localhost/api/session", {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session, secret)}` },
+    });
+
+    expect(getRequiredSession(request)).toMatchObject({ mode: "real-m1", roles: [] });
   });
 
   it("round-trips the server-only development credential through the sealed value", () => {
@@ -170,9 +199,11 @@ describe("owned BFF session", () => {
     expect(log).toHaveBeenCalledWith("[m6-auth-unavailable]", "M6_DEV_JWT no tiene una expiración válida.");
   });
 
-  it("respects an explicit M6_AUTH_MODE override in production", () => {
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe("backend-development");
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock" })).toBe("mock");
+  it("forces real M1 for production demo modes unless the demo override is explicit", () => {
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe("real-m1");
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock" })).toBe("real-m1");
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development", M6_ALLOW_DEMO: "true" })).toBe("backend-development");
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock", M6_ALLOW_DEMO: "true" })).toBe("mock");
   });
 
   it("fails closed to real M1 in production when M6_AUTH_MODE is unset", () => {

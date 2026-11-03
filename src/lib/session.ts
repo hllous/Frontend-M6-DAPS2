@@ -107,6 +107,7 @@ type SessionOptions = {
 
 type RuntimeEnvironment = {
   M6_AUTH_MODE?: string;
+  M6_ALLOW_DEMO?: string;
   M6_DEV_JWT?: string;
   M6_SESSION_SECRET?: string;
   NODE_ENV?: string;
@@ -118,11 +119,24 @@ const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
 
 export function getAuthMode(environment: RuntimeEnvironment = process.env): AuthMode {
   const configuredMode = environment.M6_AUTH_MODE;
+  if (isProductionDemoModeMisconfigured(environment)) {
+    return "real-m1";
+  }
   if (configuredMode === "mock" || configuredMode === "backend-development" || configuredMode === "real-m1") {
     return configuredMode;
   }
 
   return environment.NODE_ENV === "production" ? "real-m1" : "mock";
+}
+
+export function isProductionDemoModeMisconfigured(environment: RuntimeEnvironment = process.env): boolean {
+  return environment.NODE_ENV === "production" &&
+    environment.M6_ALLOW_DEMO !== "true" &&
+    isDemoMode(environment.M6_AUTH_MODE);
+}
+
+function isDemoMode(mode: string | undefined): boolean {
+  return mode === "mock" || mode === "backend-development";
 }
 
 export function createSession(
@@ -279,7 +293,7 @@ export function sealSession(session: Session, secret = sessionSecret()): string 
  * Deja la cookie renovada en la respuesta del route handler, arme la respuesta que la arme (Next la fusiona al
  * enviarla). Fuera de un pedido de Next (tests, scripts) no hay store de cookies y no hace nada.
  */
-export async function persistRenewedSession(session: Session): Promise<void> {
+export async function persistRenewedSession(session: Session, request?: Request): Promise<void> {
   let value: string;
   try {
     value = sealSession(session);
@@ -288,7 +302,7 @@ export async function persistRenewedSession(session: Session): Promise<void> {
     throw new BackendUnavailableError(502, "La sesión renovada es demasiado grande para la cookie.", { cause: error });
   }
   try {
-    (await cookies()).set({ name: AUTH_COOKIE_NAME, value, ...sessionCookieOptions(session) });
+    (await cookies()).set({ name: AUTH_COOKIE_NAME, value, ...sessionCookieOptions(session, request) });
   } catch {
     // Sin contexto de pedido de Next: los caminos explícitos (forwardResponse, /api/session) sellan igual.
   }
@@ -327,7 +341,7 @@ export function getSessionFromCookieValue(
 // Sesión renovada contra M1 durante un pedido: el resto del pedido ve los tokens nuevos, no los de la cookie.
 const renewedRequestSessions = new WeakMap<Request, Session>();
 // Respuesta que debe llevar la cookie resellada con esa sesión (la aplica forwardResponse).
-const renewedResponseSessions = new WeakMap<Response, Session>();
+const renewedResponseSessions = new WeakMap<Response, { session: Session; request: Request }>();
 
 export function rememberRenewedSession(request: Request, session: Session): void {
   renewedRequestSessions.set(request, session);
@@ -337,12 +351,16 @@ export function wasSessionRenewed(request: Request): boolean {
   return renewedRequestSessions.has(request);
 }
 
-export function rememberRenewedResponse(response: Response, session: Session): void {
-  renewedResponseSessions.set(response, session);
+export function rememberRenewedResponse(response: Response, session: Session, request: Request): void {
+  renewedResponseSessions.set(response, { session, request });
 }
 
 export function renewedSessionForResponse(response: Response): Session | undefined {
-  return renewedResponseSessions.get(response);
+  return renewedResponseSessions.get(response)?.session;
+}
+
+export function renewedRequestForResponse(response: Response): Request | undefined {
+  return renewedResponseSessions.get(response)?.request;
 }
 
 export function getSessionFromRequest(
@@ -363,10 +381,8 @@ export function getSessionFromRequest(
   return getSessionFromCookieValue(cookieValue, secret, now);
 }
 
-export function getRequiredSession(request: Request): Session & { scenarioId: ScenarioId } {
-  const session = requireSession(getSessionFromRequest(request));
-  if (!session.scenarioId) throw new ForbiddenSessionError("La sesión no tiene un escenario operativo asignado.");
-  return session as Session & { scenarioId: ScenarioId };
+export function getRequiredSession(request: Request): Session {
+  return requireSession(getSessionFromRequest(request));
 }
 
 export async function getSession(
@@ -377,10 +393,10 @@ export async function getSession(
   return getSessionFromCookieValue(cookieStore.get(AUTH_COOKIE_NAME)?.value, secret, now);
 }
 
-export function sessionCookieOptions(session: Session) {
+export function sessionCookieOptions(session: Session, request?: Request) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(request),
     sameSite: "lax" as const,
     path: "/",
     maxAge: Math.max(0, Math.ceil((effectiveSessionExpiry(session) - Date.now()) / 1000)),
@@ -388,12 +404,31 @@ export function sessionCookieOptions(session: Session) {
 }
 
 /** Marca de "ya ingresó": vive lo que el tope de la sesión y la lee el proxy. */
-export function sessionMarkerCookieOptions() {
-  return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: SESSION_ABSOLUTE_MS / 1000 };
+export function sessionMarkerCookieOptions(request?: Request) {
+  return { httpOnly: true, secure: shouldUseSecureCookie(request), sameSite: "lax" as const, path: "/", maxAge: SESSION_ABSOLUTE_MS / 1000 };
 }
 
-export function sessionCookieRemovalOptions() {
-  return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 0 };
+export function sessionCookieRemovalOptions(request?: Request) {
+  return { httpOnly: true, secure: shouldUseSecureCookie(request), sameSite: "lax" as const, path: "/", maxAge: 0 };
+}
+
+function shouldUseSecureCookie(request?: Request): boolean {
+  if (process.env.NODE_ENV === "production") return true;
+  if (!request) return false;
+  try {
+    return !isLoopbackHostname(new URL(request.url).hostname);
+  } catch {
+    return true;
+  }
+}
+
+export function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host === "::1") return true;
+  const octets = host.split(".");
+  return octets.length === 4 &&
+    Number(octets[0]) === 127 &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255);
 }
 
 export function sessionSecret(environment: RuntimeEnvironment = process.env): string {
@@ -433,7 +468,9 @@ export function readJwtExpiry(token: string): number | undefined {
 /** `sub` como texto (M1 lo manda numérico o string); undefined si no se puede leer. */
 export function readJwtSubject(token: string): string | undefined {
   const sub = readJwtPayload(token)?.sub;
-  return typeof sub === "string" || typeof sub === "number" ? String(sub) : undefined;
+  if (typeof sub === "string" && /^\d{1,19}$/.test(sub)) return BigInt(sub).toString();
+  if (typeof sub === "number" && Number.isSafeInteger(sub) && sub >= 0) return BigInt(sub).toString();
+  return undefined;
 }
 
 function isSession(value: Partial<Session>): value is Session {
