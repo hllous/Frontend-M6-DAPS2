@@ -94,10 +94,10 @@ async function handleLoginRequest(request: Request) {
 
     try {
       const backendOrigin = process.env.M6_BACKEND_ORIGIN;
-      if (!backendOrigin) throw new BackendUnavailableError(503);
-      wakeBackend(backendOrigin);
+      if (backendOrigin) wakeBackend(backendOrigin);
       const result = await loginWithM1(email, password);
       if (result.claims.subType !== "EMPLEADO") throw new CitizenForbiddenError();
+      if (!backendOrigin) throw new BackendUnavailableError(503);
 
       const me = await fetchMeWithToken(backendOrigin, result.accessToken);
       if (me.subType !== "EMPLEADO") throw new CitizenForbiddenError();

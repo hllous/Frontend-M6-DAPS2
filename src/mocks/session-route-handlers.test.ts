@@ -7,10 +7,14 @@ import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import { GET as sessionPulse } from "@/app/api/session/route";
 import { sessionRouteHandlers } from "./session-route-handlers";
 
-const M1_LOGIN = "http://m1.internal/api/v1/auth/usuario/login";
-const M1_REFRESH = "http://m1.internal/api/v1/auth/refresh";
+const M1_LOGIN = "https://m1.internal/api/v1/auth/usuario/login";
+const M1_REFRESH = "https://m1.internal/api/v1/auth/refresh";
 const BACKEND_ME = "http://backend.internal/me";
-const server = setupServer(...sessionRouteHandlers());
+const BACKEND_HEALTH = "http://backend.internal/health";
+const server = setupServer(
+  ...sessionRouteHandlers(),
+  http.get(BACKEND_HEALTH, () => HttpResponse.json({ status: "ok" })),
+);
 const originalEnvironment = {
   mode: process.env.M6_AUTH_MODE,
   m1BaseUrl: process.env.M1_BASE_URL,
@@ -73,7 +77,7 @@ afterEach(() => {
 });
 beforeEach(() => {
   process.env.M6_AUTH_MODE = "real-m1";
-  process.env.M1_BASE_URL = "http://m1.internal/api/v1/";
+  process.env.M1_BASE_URL = "https://m1.internal/api/v1/";
   process.env.M6_BACKEND_ORIGIN = "http://backend.internal";
 });
 
