@@ -62,6 +62,25 @@ describe("street closure handlers delegate to the real BFF routes", () => {
     expect(await denied.json()).toMatchObject({ statusCode: 403 });
   });
 
+  it("returns M7's approved window and rejection reason through the closure routes", async () => {
+    const approvedList = await call("GET", "/api/street-closure-requests?status=APPROVED");
+    expect(approvedList.status).toBe(200);
+    expect((await approvedList.json()).data).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "SCR-1003",
+        approvedFrom: "2026-09-05T14:30:00.000Z",
+        approvedTo: "2026-09-05T18:00:00.000Z",
+      }),
+    ]));
+
+    const rejectedDetail = await call("GET", "/api/street-closure-requests/SCR-1004");
+    expect(rejectedDetail.status).toBe(200);
+    expect(await rejectedDetail.json()).toMatchObject({
+      id: "SCR-1004",
+      rejectionReason: "Debe permanecer libre la avenida durante el desfile.",
+    });
+  });
+
   it("returns the real 404 for an unknown request and 400 for an invalid approval", async () => {
     expect((await call("GET", "/api/street-closure-requests/SCR-UNKNOWN")).status).toBe(404);
     expect((await call("POST", "/api/street-closure-requests/SCR-1001/approve", undefined, {})).status).toBe(400);

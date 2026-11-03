@@ -214,7 +214,7 @@ describe("street closure request adapter", () => {
   });
 
   it("returns no dependency when a Service has no closure request", async () => {
-    await expect(streetClosureRequestsAdapter.getForService("SVC-1051")).resolves.toEqual({
+    await expect(streetClosureRequestsAdapter.getForService("SVC-1053")).resolves.toEqual({
       request: null,
       outcome: "none",
     });
@@ -255,23 +255,103 @@ describe("wire shape of StreetClosureRequestResponseDto", () => {
     expect(parsed.affectedSections[0]?.direction).toBeUndefined();
   });
 
-  it("reads M7's final approved-window and rejection fields", () => {
-    expect(streetClosureRequestSchema.parse({
+  it("normalizes M7's approved window and rejection response for current and older records", () => {
+    const cases = [
+      {
+        response: {
+          status: "APPROVED",
+          approvedFrom: "2026-10-01T09:00:00.000Z",
+          approvedTo: "2026-10-01T12:00:00.000Z",
+        },
+        expected: {
+          approvedFrom: "2026-10-01T09:00:00.000Z",
+          approvedTo: "2026-10-01T12:00:00.000Z",
+          rejectionReason: null,
+        },
+      },
+      {
+        response: { status: "APPROVED", approvedFrom: null, approvedTo: null },
+        expected: { approvedFrom: null, approvedTo: null, rejectionReason: null },
+      },
+      {
+        response: {
+          status: "REJECTED",
+          rejectionReason: "Debe quedar libre el corredor durante el evento.",
+        },
+        expected: {
+          approvedFrom: null,
+          approvedTo: null,
+          rejectionReason: "Debe quedar libre el corredor durante el evento.",
+        },
+      },
+      {
+        response: { status: "REJECTED", rejectionReason: null },
+        expected: { approvedFrom: null, approvedTo: null, rejectionReason: null },
+      },
+      {
+        response: {
+          status: "EXPIRED",
+          approvedFrom: "2026-10-01T09:00:00.000Z",
+          approvedTo: "2026-10-01T12:00:00.000Z",
+        },
+        expected: {
+          approvedFrom: "2026-10-01T09:00:00.000Z",
+          approvedTo: "2026-10-01T12:00:00.000Z",
+          rejectionReason: null,
+        },
+      },
+      {
+        response: { status: "REQUESTED" },
+        expected: { approvedFrom: null, approvedTo: null, rejectionReason: null },
+      },
+    ];
+
+    for (const { response, expected } of cases) {
+      expect(streetClosureRequestSchema.parse({ ...wire, ...response })).toMatchObject(expected);
+    }
+
+    const legacyNames = streetClosureRequestSchema.parse({
       ...wire,
-      status: "REJECTED",
+      status: "APPROVED",
       startDate: "2026-10-01T09:00:00.000Z",
       endDate: "2026-10-01T12:00:00.000Z",
-      rejectionReason: "Debe quedar libre el corredor durante el evento.",
-    })).toMatchObject({
-      startDate: "2026-10-01T09:00:00.000Z",
-      endDate: "2026-10-01T12:00:00.000Z",
-      rejectionReason: "Debe quedar libre el corredor durante el evento.",
+    });
+    expect(legacyNames).not.toHaveProperty("startDate");
+    expect(legacyNames).not.toHaveProperty("endDate");
+  });
+
+  it("returns M7's response fields from the REST list and detail adapters", async () => {
+    const approved = {
+      ...wire,
+      id: "SCR-REST-APPROVED",
+      status: "APPROVED",
+      approvedFrom: "2026-10-01T09:00:00.000Z",
+      approvedTo: "2026-10-01T12:00:00.000Z",
+    };
+    server.use(
+      http.get("*/api/street-closure-requests", () => HttpResponse.json({
+        data: [approved],
+        meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+      })),
+      http.get("*/api/street-closure-requests/SCR-REST-APPROVED", () => HttpResponse.json(approved)),
+    );
+
+    const page = await streetClosureRequestsAdapter.list();
+    const detail = await streetClosureRequestsAdapter.get("SCR-REST-APPROVED");
+
+    expect(page.requests[0]).toMatchObject({
+      approvedFrom: "2026-10-01T09:00:00.000Z",
+      approvedTo: "2026-10-01T12:00:00.000Z",
+    });
+    expect(detail).toMatchObject({
+      approvedFrom: "2026-10-01T09:00:00.000Z",
+      approvedTo: "2026-10-01T12:00:00.000Z",
     });
   });
 
   it("maps the REST approvedFrom/approvedTo onto the approved window", () => {
     expect(streetClosureRequestSchema.parse({ ...wire, status: "APPROVED", approvedFrom: "2026-10-01T09:00:00.000Z", approvedTo: "2026-10-01T12:00:00.000Z" }))
-      .toMatchObject({ startDate: "2026-10-01T09:00:00.000Z", endDate: "2026-10-01T12:00:00.000Z" });
+      .toMatchObject({ approvedFrom: "2026-10-01T09:00:00.000Z", approvedTo: "2026-10-01T12:00:00.000Z" });
   });
 
   it("maps the wire aliases when they are present", () => {

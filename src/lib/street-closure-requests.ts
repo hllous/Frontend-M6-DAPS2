@@ -117,8 +117,8 @@ const streetClosureRequestShape = z.object({
   closureType: streetClosureTypeSchema.nullish().transform((value) => value ?? null),
   requestedFrom: z.string().nullish().transform((value) => value ?? null),
   requestedTo: z.string().nullish().transform((value) => value ?? null),
-  startDate: z.string().nullish().transform((value) => value ?? null),
-  endDate: z.string().nullish().transform((value) => value ?? null),
+  approvedFrom: z.string().nullish().transform((value) => value ?? null),
+  approvedTo: z.string().nullish().transform((value) => value ?? null),
   rejectionReason: z.string().nullish().transform((value) => value ?? null),
   affectedSections: z.array(affectedSectionSchema).min(1),
   status: streetClosureRequestStatusSchema,
@@ -131,12 +131,12 @@ const streetClosureRequestShape = z.object({
 
 /**
  * Backend's StreetClosureRequestResponseDto names these fields `sections`, `closureFrom` and
- * `closureTo` and has no `sourceModule` (#735). Map the wire shape onto the internal one; anything
- * that is already in the internal shape (fixtures, the BFF's own output) passes through untouched.
+ * `closureTo` and has no `sourceModule` (#735). Its approved window is `approvedFrom`/`approvedTo`.
+ * Map the wire shape onto the internal one; anything already in the internal shape passes through.
  */
 function fromWireShape(record: unknown): unknown {
   if (!record || typeof record !== "object" || !("sections" in record)) return record;
-  const { sections, closureFrom, closureTo, approvedFrom, approvedTo, ...rest } = record as Record<string, unknown>;
+  const { sections, closureFrom, closureTo, ...rest } = record as Record<string, unknown>;
   // Only fill what is absent: a field already in the internal shape wins over its wire alias.
   return {
     ...rest,
@@ -144,9 +144,6 @@ function fromWireShape(record: unknown): unknown {
     affectedSections: rest.affectedSections ?? sections,
     requestedFrom: rest.requestedFrom ?? closureFrom,
     requestedTo: rest.requestedTo ?? closureTo,
-    // The REST names M7's authorized window approvedFrom/approvedTo (the event calls it startDate/endDate).
-    startDate: rest.startDate ?? approvedFrom,
-    endDate: rest.endDate ?? approvedTo,
   };
 }
 

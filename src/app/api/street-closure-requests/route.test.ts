@@ -57,7 +57,7 @@ describe("street closure request BFF routes", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(streetClosureRequestFixtures).toHaveLength(2);
+    expect(streetClosureRequestFixtures).toHaveLength(4);
   });
 
   it("creates a pending M6 record only from an authorized TreeIntervention", async () => {
@@ -99,7 +99,7 @@ describe("street closure request BFF routes", () => {
       );
 
       expect(response.status).toBe(409);
-      expect(streetClosureRequestFixtures).toHaveLength(2);
+      expect(streetClosureRequestFixtures).toHaveLength(4);
     },
   );
 
@@ -139,7 +139,7 @@ describe("street closure request BFF routes", () => {
       new Request("http://localhost/api/street-closure-requests", { headers: { cookie: officeCookie } }),
     );
     expect(list.status).toBe(200);
-    expect((await list.json()).data).toHaveLength(2);
+    expect((await list.json()).data).toHaveLength(4);
   });
 
   it("allows Field to read only the closure context for its assigned Service", async () => {
