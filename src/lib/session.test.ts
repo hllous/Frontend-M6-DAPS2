@@ -9,6 +9,7 @@ import {
   createSession,
   effectiveSessionExpiry,
   getAuthMode,
+  getRequiredSession,
   getSessionFromCookieValue,
   isSessionActive,
   publicSession,
@@ -78,6 +79,25 @@ describe("owned BFF session", () => {
     expect(isSessionActive(session, now + 16 * 60 * 1000)).toBe(true);
     expect(isSessionActive(session, now + SESSION_IDLE_MS)).toBe(false);
     expect(isSessionActive(session, session.absoluteExpiresAt)).toBe(false);
+  });
+
+  it("accepts a roleless M1 session without a demo scenario at the BFF session boundary", () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
+    vi.stubEnv("M6_SESSION_SECRET", secret);
+    const sessionNow = Date.now();
+    const session = createM1Session({
+      accessToken: "header.payload.signature",
+      refreshToken: "refresh-test",
+      jwtExpiresAt: sessionNow + 15 * 60 * 1000,
+      identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
+      roles: [],
+      now: sessionNow,
+    });
+    const request = new Request("http://localhost/api/session", {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session, secret)}` },
+    });
+
+    expect(getRequiredSession(request)).toMatchObject({ mode: "real-m1", roles: [] });
   });
 
   it("round-trips the server-only development credential through the sealed value", () => {

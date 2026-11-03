@@ -391,10 +391,10 @@ export async function getSession(
   return getSessionFromCookieValue(cookieStore.get(AUTH_COOKIE_NAME)?.value, secret, now);
 }
 
-export function sessionCookieOptions(session: Session) {
+export function sessionCookieOptions(session: Session, request?: Request) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(request),
     sameSite: "lax" as const,
     path: "/",
     maxAge: Math.max(0, Math.ceil((effectiveSessionExpiry(session) - Date.now()) / 1000)),
