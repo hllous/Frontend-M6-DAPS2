@@ -107,6 +107,7 @@ type SessionOptions = {
 
 type RuntimeEnvironment = {
   M6_AUTH_MODE?: string;
+  M6_ALLOW_DEMO?: string;
   M6_DEV_JWT?: string;
   M6_SESSION_SECRET?: string;
   NODE_ENV?: string;
@@ -118,11 +119,24 @@ const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
 
 export function getAuthMode(environment: RuntimeEnvironment = process.env): AuthMode {
   const configuredMode = environment.M6_AUTH_MODE;
+  if (
+    environment.NODE_ENV === "production" &&
+    environment.M6_ALLOW_DEMO !== "true" &&
+    (configuredMode === "mock" || configuredMode === "backend-development")
+  ) {
+    return "real-m1";
+  }
   if (configuredMode === "mock" || configuredMode === "backend-development" || configuredMode === "real-m1") {
     return configuredMode;
   }
 
   return environment.NODE_ENV === "production" ? "real-m1" : "mock";
+}
+
+export function isProductionDemoModeMisconfigured(environment: RuntimeEnvironment = process.env): boolean {
+  return environment.NODE_ENV === "production" &&
+    environment.M6_ALLOW_DEMO !== "true" &&
+    (environment.M6_AUTH_MODE === "mock" || environment.M6_AUTH_MODE === "backend-development");
 }
 
 export function createSession(

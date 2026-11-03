@@ -16,6 +16,7 @@ import {
   createSession,
   createM1Session,
   getAuthMode,
+  isProductionDemoModeMisconfigured,
   publicSession,
   SESSION_MARKER_COOKIE_NAME,
   sessionMarkerCookieOptions,
@@ -39,6 +40,11 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
 }
 
 export async function POST(request: Request) {
+  if (isProductionDemoModeMisconfigured()) {
+    console.error("[m6-auth-mode-misconfigured]", process.env.M6_AUTH_MODE);
+    return loginFailure(503, "El ingreso no está disponible por una configuración del servidor.");
+  }
+
   const rejection = getSessionMutationRejection(request);
   if (rejection) return loginFailure(rejection.status, rejection.message);
 

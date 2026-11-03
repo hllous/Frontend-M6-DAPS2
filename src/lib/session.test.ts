@@ -170,9 +170,11 @@ describe("owned BFF session", () => {
     expect(log).toHaveBeenCalledWith("[m6-auth-unavailable]", "M6_DEV_JWT no tiene una expiración válida.");
   });
 
-  it("respects an explicit M6_AUTH_MODE override in production", () => {
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe("backend-development");
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock" })).toBe("mock");
+  it("forces real M1 for production demo modes unless the demo override is explicit", () => {
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe("real-m1");
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock" })).toBe("real-m1");
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development", M6_ALLOW_DEMO: "true" })).toBe("backend-development");
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock", M6_ALLOW_DEMO: "true" })).toBe("mock");
   });
 
   it("fails closed to real M1 in production when M6_AUTH_MODE is unset", () => {
