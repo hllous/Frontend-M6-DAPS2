@@ -146,10 +146,46 @@ const roleLabels: Record<M6Role, string> = {
   M6_AUDITOR: "Auditor",
 };
 
+// Valores de `action` que emite el Backend en la auditoría de dominio (audit.record en src/modules/**).
 const actionLabels: Record<string, string> = {
-  REPORT_DAMAGE: "Informó un daño",
+  CREATE: "Creó un registro",
+  UPDATE: "Actualizó un registro",
+  ACTIVATE: "Activó un registro",
+  DEACTIVATE: "Dio de baja un registro",
+  START: "Inició la tarea",
+  COMPLETE: "Completó la tarea",
+  CLOSE: "Cerró la solicitud",
+  CANCEL: "Canceló un servicio",
+  SUSPEND: "Suspendió un servicio",
+  RESUME: "Reanudó un servicio",
+  RESCHEDULE: "Reprogramó un servicio",
+  CONFIRM_RESCHEDULE: "Confirmó la reprogramación",
+  ASSIGN_CREW: "Asignó una cuadrilla",
+  ASSIGN_SERVICE: "Asignó un servicio",
   COMPLETE_SERVICE: "Completó un servicio",
+  ADD_MEMBERS: "Agregó integrantes a la cuadrilla",
+  REMOVE_MEMBER: "Quitó un integrante de la cuadrilla",
+  REASSIGN_ZONE: "Reasignó la zona de la cuadrilla",
+  REPORT_OVERFLOW: "Informó un desborde",
+  EMPTY: "Registró un vaciado",
+  REPORT_DAMAGE: "Informó un daño",
+  START_REPAIR: "Inició una reparación",
+  COMPLETE_REPAIR: "Completó una reparación",
+  RELOCATE: "Inició una reubicación",
+  CONFIRM_RELOCATION: "Confirmó una reubicación",
+  REMOVE: "Retiró un contenedor",
+  REQUEST_INFORMATION: "Solicitó más información",
+  STATUS_CHANGE: "Cambió el estado",
   START_REVIEW: "Inició una revisión",
+  FORWARD: "Derivó el expediente",
+  DISMISS: "Desestimó el expediente",
+  SCHEDULE: "Programó una inspección",
+  ISSUE: "Emitió un acta",
+  SUBMIT_FOR_AUTHORIZATION: "Envió a autorización",
+  AUTHORIZE: "Autorizó una intervención",
+  APPROVE: "Aprobó la solicitud",
+  REJECT: "Rechazó la solicitud",
+  END: "Finalizó el corte",
 };
 
 function eventActivityHref(event: Pick<OutboxEvent, "aggregateType" | "aggregateId">): string | null {
@@ -186,8 +222,13 @@ function AuditEntityLink({ entry }: { entry: AuditEntry }) {
   );
 }
 
+// Valor futuro sin traducción: "NEW_ACTION" -> "new action", sin mostrar el código de la API.
+function readableCode(value: string): string {
+  return value.toLowerCase().replace(/_/g, " ");
+}
+
 function auditActionLabel(action: string): string {
-  return actionLabels[action] ?? `Acción registrada: ${action}`;
+  return actionLabels[action] ?? `Acción registrada: ${readableCode(action)}`;
 }
 
 function eventQuery(filters: EventFilters, page: number): string {
@@ -206,20 +247,49 @@ function auditQuery(filters: AuditFilters, page: number): string {
   return params.toString();
 }
 
+// Estados del Backend (enums de Prisma) que aparecen en fromStatus/toStatus.
+const statusLabels: Record<string, string> = {
+  ACTIVE: "Activo",
+  INACTIVE: "Inactivo",
+  SCHEDULED: "Programado",
+  RESCHEDULED: "Reprogramado",
+  IN_PROGRESS: "En curso",
+  SUSPENDED: "Suspendido",
+  COMPLETED: "Completado",
+  PARTIALLY_COMPLETED: "Completado parcialmente",
+  CANCELLED: "Cancelado",
+  OVERFLOWED: "Desbordado",
+  DAMAGED: "Dañado",
+  UNDER_REPAIR: "En reparación",
+  RELOCATING: "En reubicación",
+  REMOVED: "Retirado",
+  REQUESTED: "Solicitado",
+  PENDING_AUTHORIZATION: "Pendiente de autorización",
+  AUTHORIZED: "Autorizado",
+  REJECTED: "Rechazado",
+  APPROVED: "Aprobado",
+  ENDED: "Finalizado",
+  EXPIRED: "Vencido",
+  RECEIVED: "Recibido",
+  UNDER_REVIEW: "En revisión",
+  FORWARDED: "Derivado",
+  DISMISSED: "Desestimado",
+  INSPECTION_SCHEDULED: "Inspección programada",
+  INSPECTED: "Inspeccionado",
+  NO_VIOLATION: "Sin infracción",
+  VIOLATION_FOUND: "Infracción constatada",
+  INCONCLUSIVE: "No concluyente",
+  NOTICE_ISSUED: "Acta emitida",
+  SANCTIONED: "Sancionado",
+  CLOSED: "Cerrado",
+  PENDING: "Pendiente",
+  SENT: "Enviado",
+  FAILED: "Fallido",
+};
+
 function statusLabel(value: string | null): string {
   if (!value) return "—";
-  const labels: Record<string, string> = {
-    ACTIVE: "Activo",
-    DAMAGED: "Dañado",
-    IN_PROGRESS: "En curso",
-    COMPLETED: "Completado",
-    RECEIVED: "Recibido",
-    UNDER_REVIEW: "En revisión",
-    PENDING: "Pendiente",
-    SENT: "Enviado",
-    FAILED: "Fallido",
-  };
-  return labels[value] ?? value;
+  return statusLabels[value] ?? `Estado: ${readableCode(value)}`;
 }
 
 function EventActions({ event, canManage, onOpenDetail }: {

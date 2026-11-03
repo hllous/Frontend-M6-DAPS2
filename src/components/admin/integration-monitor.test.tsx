@@ -107,4 +107,25 @@ describe("IntegrationMonitor", () => {
     expect(within(table).getByText("Informó un daño")).toBeVisible();
     expect(within(table).queryByText("Completó un servicio")).not.toBeInTheDocument();
   });
+
+  it("translates every known audit action and status, and falls back to readable Spanish for unknown ones", async () => {
+    const base = { entityType: "SERVICE", entityId: "550e8400-e29b-41d4-a716-446655440021", actorUserId: "42", actorRoles: ["M6_ADMIN"], note: null, occurredAt: "2026-10-31T12:00:00.000Z" };
+    const data = [
+      { ...base, id: "650e8400-e29b-41d4-a716-446655440101", action: "CREATE", fromStatus: null, toStatus: "ACTIVE" },
+      { ...base, id: "650e8400-e29b-41d4-a716-446655440102", action: "ASSIGN_CREW", fromStatus: "SCHEDULED", toStatus: "UNDER_REPAIR" },
+      { ...base, id: "650e8400-e29b-41d4-a716-446655440103", action: "NEW_BACKEND_ACTION", fromStatus: "SCHEDULED", toStatus: "NEW_STATE" },
+    ];
+    server.use(http.get("*/api/audit", () => HttpResponse.json({ data, meta: { total: 3, page: 1, pageSize: 20, totalPages: 1 } })));
+    const user = userEvent.setup();
+    render(<IntegrationMonitor canManage={false} initialTab="activity" />);
+
+    await user.click(await screen.findByRole("tab", { name: "Registro de actividad" }));
+    const table = await screen.findByRole("table", { name: "Registro de actividad" });
+    expect(within(table).getByText("Creó un registro")).toBeVisible();
+    expect(within(table).getByText("Asignó una cuadrilla")).toBeVisible();
+    expect(within(table).getByText("Acción registrada: new backend action")).toBeVisible();
+    expect(within(table).getByText("En reparación")).toBeVisible();
+    expect(within(table).getByText("Estado: new state")).toBeVisible();
+    expect(within(table).queryByText(/CREATE|ASSIGN_CREW|NEW_BACKEND_ACTION|UNDER_REPAIR/)).not.toBeInTheDocument();
+  });
 });
