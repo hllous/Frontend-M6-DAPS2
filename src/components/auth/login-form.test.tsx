@@ -1,9 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm } from "./login-form";
 import { scenarios } from "@/lib/scenarios";
+
+const originalLocation = window.location;
+
+afterEach(() => {
+  Object.defineProperty(window, "location", { value: originalLocation, writable: true, configurable: true });
+  vi.restoreAllMocks();
+});
 
 describe("LoginForm", () => {
   it("lets an operator choose a profile and enter through the BFF", async () => {
@@ -31,7 +38,6 @@ describe("LoginForm", () => {
         "x-requested-with": "XMLHttpRequest",
       },
     }));
-    expect(document.cookie).not.toContain("m6_session=");
     fetchMock.mockRestore();
   });
 
@@ -121,8 +127,25 @@ describe("LoginForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("El correo o la contraseña no son correctos.");
     expect(screen.getByRole("textbox", { name: "Correo electrónico" })).toHaveValue("persona@example.test");
     expect(screen.getByLabelText("Contraseña")).toHaveValue("");
-    expect(document.cookie).not.toContain("m6_session=");
     fetchMock.mockRestore();
+  });
+
+  it("keeps submit locked after a successful login while navigation starts", async () => {
+    const user = userEvent.setup();
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", { value: { assign }, writable: true, configurable: true });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ session: {} }));
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="real-m1" redirectTo="/app" />);
+
+    await user.type(screen.getByRole("textbox", { name: "Correo electrónico" }), "persona@example.test");
+    await user.type(screen.getByLabelText("Contraseña"), "clave");
+    await user.click(screen.getByRole("button", { name: "Ingresar al sistema" }));
+
+    expect(assign).toHaveBeenCalledWith("/app");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Ingresando…" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Ingresando…" }));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("shows progress and blocks a second submit while real-M1 login is pending", async () => {

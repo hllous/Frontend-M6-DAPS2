@@ -5,7 +5,7 @@ import { GET as sessionPulse } from "@/app/api/session/route";
 import { POST as logout } from "@/app/api/session/logout/route";
 import { fetchBackend } from "./bff-backend";
 import { errorResponse, forwardResponse, mapSessionError } from "./bff-route";
-import { FAILURE_MEMO_MS, MEMO_MS } from "./m1-refresh";
+import { FAILURE_MEMO_MS, MEMO_MS, m1BaseUrl } from "./m1-refresh";
 import { fetchMe, sealRolesIfChanged } from "./me";
 import { SESSION_MUTATION_HEADERS } from "./session-request";
 import {
@@ -334,6 +334,7 @@ describe("cuándo se renueva", () => {
 
   it("en producción exige https", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("M6_ALLOW_DEMO", "true");
     vi.stubEnv("M6_SESSION_SECRET", "test-secret");
     const { request } = near();
     process.env.M1_BASE_URL = "http://m1.internal";
@@ -346,6 +347,7 @@ describe("cuándo se renueva", () => {
 
   it("en producción rechaza el M1 falso incluso si usa HTTPS", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("M6_ALLOW_DEMO", "true");
     vi.stubEnv("M6_SESSION_SECRET", "test-secret");
     process.env.M1_BASE_URL = "https://m1.internal";
     process.env.M1_FAKE_ENABLED = "true";
@@ -383,6 +385,21 @@ describe("cuándo se renueva", () => {
   });
 });
 
+describe("M1_BASE_URL", () => {
+  it("accepts plain HTTP only for loopback, and rejects localhost in production", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    process.env.M1_BASE_URL = "http://localhost:3130/api/v1/";
+    expect(m1BaseUrl()?.href).toBe("http://localhost:3130/api/v1/");
+
+    process.env.M1_BASE_URL = "http://m1.internal/api/v1/";
+    expect(m1BaseUrl()).toBeUndefined();
+
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.M1_BASE_URL = "http://localhost:3130/api/v1/";
+    expect(m1BaseUrl()).toBeUndefined();
+  });
+});
+
 describe("límites sobre la respuesta de M1", () => {
   const big = "x".repeat(1_300);
   const cases: [string, () => Response][] = [
@@ -414,6 +431,15 @@ describe("límites sobre la respuesta de M1", () => {
     const { request } = near();
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Refresh(jwt(inSeconds(900), 99))).mockResolvedValue(ok());
     await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(InvalidSessionError);
+  });
+
+  it("normaliza los ceros iniciales de sub al comparar tokens", async () => {
+    const { request } = near({ accessToken: jwt(inSeconds(30), "042") });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Refresh(jwt(inSeconds(900), "42"))).mockResolvedValueOnce(ok());
+
+    const response = await fetchBackend(request, "/services");
+
+    expect(response.status).toBe(200);
   });
 
   it("la llamada compartida a M1 no hereda el signal del primer llamador", async () => {

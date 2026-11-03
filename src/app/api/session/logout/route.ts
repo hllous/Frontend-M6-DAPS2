@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions());
-  response.cookies.set(SESSION_MARKER_COOKIE_NAME, "", sessionCookieRemovalOptions());
+  response.cookies.set(AUTH_COOKIE_NAME, "", sessionCookieRemovalOptions(request));
+  response.cookies.set(SESSION_MARKER_COOKIE_NAME, "", sessionCookieRemovalOptions(request));
   return response;
 }

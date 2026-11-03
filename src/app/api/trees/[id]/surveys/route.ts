@@ -54,6 +54,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const response = await fetchBackend(request, `/trees/${pathId(id)}/surveys`, "tree:survey", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       return forwardResponse(response);
     }
+    if (!session.scenarioId) throw new ForbiddenSessionError("La sesión no tiene un escenario operativo asignado.");
     const created = createTreeSurveyFixture(id, parsed.data, session.scenarioId);
     addTreeSurveyFixture(created);
     updateTreeFixture(id, {

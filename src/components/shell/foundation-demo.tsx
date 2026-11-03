@@ -11,7 +11,7 @@ import { onRemoteLogout } from "@/lib/session-client";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
 
 import { AppShell } from "./app-shell";
-import { ShellError, ShellForbidden, ShellNoRole, ShellUnauthenticated } from "./shell-states";
+import { ShellError, ShellForbidden, ShellUnauthenticated } from "./shell-states";
 
 type LoadState =
   | { status: "loading" }
@@ -45,7 +45,7 @@ export function FoundationDemo({
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
 
-  useEffect(() => onRemoteLogout(() => window.location.assign("/login")), []);
+  useEffect(() => onRemoteLogout(() => router.replace("/login")), [router]);
 
   // Un 403 ROLE_REQUIRED sugiere roles viejos: se releen de GET /me y la UI se recalcula sin recargar ni parpadear.
   useEffect(() => {
@@ -94,6 +94,10 @@ export function FoundationDemo({
   }, []);
 
   useEffect(() => {
+    if (state.status === "ready" && state.scenario.roles.length === 0) router.replace("/no-role");
+  }, [router, state]);
+
+  useEffect(() => {
     let isCurrent = true;
     async function requestScenario() {
       setState({ status: "loading" });
@@ -129,7 +133,7 @@ export function FoundationDemo({
 
   if (state.status === "unauthenticated") return <main className="p-6"><ShellUnauthenticated /></main>;
   if (state.status === "forbidden") return <main className="p-6"><ShellForbidden description={state.description} /></main>;
-  if (state.status === "ready" && state.scenario.roles.length === 0) return <ShellNoRole logoutAction={logoutAction} />;
+  if (state.status === "ready" && state.scenario.roles.length === 0) return null;
   if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} description={state.description} /></main>;
   return (
     <AppShell scenario={state.status === "ready" ? state.scenario : undefined} identity={identity} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />
