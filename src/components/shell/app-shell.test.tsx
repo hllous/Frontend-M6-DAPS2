@@ -36,6 +36,7 @@ describe("AppShell", () => {
       ["Catálogo", "/app?destination=catalog"],
       ["Tableros", "/app?destination=dashboards"],
       ["Accesos", "/app/access"],
+      ["Monitor de integración", "/app/admin/integration-monitor"],
     ]);
     expect(within(moduleNavigation).queryAllByRole("button")).toHaveLength(0);
   });
@@ -47,6 +48,23 @@ describe("AppShell", () => {
     const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
     expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toHaveAttribute("aria-current", "page");
     expect(within(moduleNavigation).getByRole("link", { name: "Mi trabajo" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("shows the monitor to auditors and marks its route active", () => {
+    window.history.replaceState(null, "", "/app/admin/integration-monitor");
+    render(<AppShell scenario={scenarios.officeLimited} />);
+
+    const auditorNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    expect(within(auditorNavigation).getByRole("link", { name: "Monitor de integración" }))
+      .toHaveAttribute("href", "/app/admin/integration-monitor");
+    expect(within(auditorNavigation).getByRole("link", { name: "Monitor de integración" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("hides the monitor from roles without its capability", () => {
+    render(<AppShell scenario={scenarios.fieldCrewLeader} />);
+    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    expect(within(moduleNavigation).queryByRole("link", { name: "Monitor de integración" })).not.toBeInTheDocument();
   });
 
   it("moves focus to main after a module change", async () => {

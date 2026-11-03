@@ -12,6 +12,7 @@ import {
 } from "@/lib/environmental-report-fixtures";
 import { resetGreenPointFixtures } from "@/lib/green-point-fixtures";
 import { resetGreenSpaceFixtures } from "@/lib/green-space-fixtures";
+import { resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
 import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetRouteFixtures } from "@/lib/routes-fixtures";
 import { resetServiceFrequencyFixtures } from "@/lib/service-frequency-fixtures";
@@ -38,6 +39,7 @@ const FIXTURE_RESETS = [
   resetSanctionOutcomeFixtures,
   resetGreenPointFixtures,
   resetGreenSpaceFixtures,
+  resetIntegrationMonitorFixtures,
   resetRepairRequestFixtures,
   resetRouteFixtures,
   resetServiceFrequencyFixtures,
