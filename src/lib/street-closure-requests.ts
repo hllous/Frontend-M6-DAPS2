@@ -88,8 +88,9 @@ export const createStreetClosureRequestInputSchema = z
     closureType: streetClosureTypeSchema,
     requestedFrom: z.string().trim().min(1, "Indique el inicio de la ventana solicitada"),
     requestedTo: z.string().trim().min(1, "Indique el fin de la ventana solicitada"),
-    // Backend's exact collection wire name is a documented hypothesis. The adapter
-    // owns this shape so the UI does not depend on that integration detail.
+    // Backend confirms REST `sections` and required `closureType`; its M7 event uses structured
+    // `affectedSections` entries with `direction` (Backend docs/bloqueantes at f288d31, 31/10; #447).
+    // The adapter owns the translation so the UI does not depend on the REST wire name.
     affectedSections: z.array(createAffectedSectionSchema).min(1, "Agregue al menos un tramo afectado"),
   })
   .superRefine((data, ctx) => {

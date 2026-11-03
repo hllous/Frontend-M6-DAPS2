@@ -84,6 +84,18 @@ _Avoid_: current zone, home zone (when a relocation applies)
 Acción específica de M6 que un actor puede realizar, como programar un Service, emitir un acta o autorizar una TreeIntervention. Una Capability es más acotada que un rol.
 _Avoid_: Role, permission, scope
 
+**M1 role**:
+Rol único que M1 da a cada persona (por ejemplo `ADMINISTRATIVO` o `AUDITOR`), sin área asociada. En M6 no autoriza nada por sí solo: solo acota qué M6 roles se le pueden asignar.
+_Avoid_: M6 role, permission
+
+**M6 role**:
+Rol propio de M6 (por ejemplo `M6_OFICINA_AMBIENTAL` o `M6_CAMPO_CUADRILLA`) que define qué hace una persona dentro de M6. Lo asigna un administrador de M6 dentro de lo que permite su M1 role.
+_Avoid_: M1 role, profile, persona
+
+**Role assignment**:
+Decisión de un administrador de M6 de otorgar o quitar un M6 role a una persona identificada por M1. Rige desde la siguiente acción de esa persona, sin esperar a que vuelva a ingresar.
+_Avoid_: Assignment (reservado para cuadrilla y vehículo en un Service), permission grant
+
 **My Work**:
 Lista personal de trabajo pendiente para un actor. Para Field muestra Services asignados; para Office, acciones que requieren su intervención, no un resumen de todo un equipo o zona.
 _Avoid_: Home, Inbox, Dashboard (as a synonym for this view)

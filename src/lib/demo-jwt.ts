@@ -4,9 +4,9 @@ import { DEMO_IDENTITIES } from "./demo-identities";
 import type { ScenarioId } from "./scenarios";
 
 /**
- * Firma local de tokens de demo (#745, #740). M1 no está hosteado: el BFF firma un access token por pedido, de vida corta,
- * con el contrato de `scripts/generate-demo-jwt.mjs` del backend. Así la sesión (cookie de horas) no depende del
- * vencimiento del token. Cuando M1 emita el login real, se borra este módulo y la rama `source: "demo"` de session.ts.
+ * Firma tokens de demo para `backend-development` (#745, #740). M1 ya está hosteado y su login real respondió 200,
+ * pero el Backend desplegado aún devuelve 401 en `/me` hasta que #488 cargue el secreto actual. Este camino se
+ * conserva hasta retirar el modo demo desplegado (#800); no sustituye el flujo real de M1 de #802.
  *
  * Solo servidor: `M6_JWT_SECRET` (el `JWT_SECRET` del backend, en base64) nunca lleva el prefijo NEXT_PUBLIC_.
  */
