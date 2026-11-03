@@ -91,12 +91,14 @@ describe("ReferralsWorkspace", () => {
     expect(within(list).getAllByText(/SVC-1050 · /)[0]).toBeVisible();
     expect(within(list).getByRole("button", { name: /SCR-1001/ })).toBeVisible();
     expect(within(list).getByText("Obras Públicas · Reparación")).toBeVisible();
-    expect(within(list).getAllByText("Tránsito · Corte de calle")).toHaveLength(2);
+    expect(within(list).getAllByText("Tránsito · Corte de calle")).toHaveLength(4);
     expect(within(list).getByRole("button", { name: /SCR-1002/ })).toBeVisible();
 
     await user.click(within(list).getByRole("button", { name: /SCR-1001/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     expect(within(detail).getByRole("status", { name: "Estado: Solicitada" })).toBeVisible();
+    expect(within(detail).getByText("Inicio solicitado")).toBeVisible();
+    expect(within(detail).getByText("Fin solicitado")).toBeVisible();
     expect(within(detail).getByText("05/09/2026 08:00")).toBeVisible();
     expect(within(detail).getByText("05/09/2026 12:00")).toBeVisible();
     expect(within(detail).getByRole("link", { name: /Ver servicio/ })).toHaveAttribute(
@@ -107,7 +109,7 @@ describe("ReferralsWorkspace", () => {
   });
 
   it("shows section directions in the list and detail, with final M7 response fields", async () => {
-    const base = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "SERVICE");
+    const base = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.id === "SCR-1001");
     if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a StreetClosureRequest fixture");
     const approved = {
       ...base,
@@ -121,8 +123,8 @@ describe("ReferralsWorkspace", () => {
           { streetName: "Bulevar Costero", fromCross: "Av. Belgrano", toCross: "Calle 12", direction: "FORWARD" as const },
           { streetName: "Av. Independencia", fromCross: "Calle 1", toCross: "Calle 2" },
         ],
-        startDate: "2026-10-01T09:00:00.000Z",
-        endDate: "2026-10-01T12:00:00.000Z",
+        approvedFrom: "2026-10-01T09:00:00.000Z",
+        approvedTo: "2026-10-01T12:00:00.000Z",
       },
     };
     const rejected = {
@@ -152,6 +154,9 @@ describe("ReferralsWorkspace", () => {
     expect(within(approvedDetail).getByText("Sentido no informado")).toBeVisible();
     expect(within(approvedDetail).getByText("Período autorizado")).toBeVisible();
     expect(within(approvedDetail).getByText(/01\/10\/2026/)).toBeVisible();
+    expect(within(approvedDetail).getByText("Inicio solicitado")).toBeVisible();
+    expect(within(approvedDetail).getByText("Fin solicitado")).toBeVisible();
+    expect(within(approvedDetail).getByText("05/09/2026 08:00")).toBeVisible();
 
     await user.click(within(approvedDetail).getByRole("button", { name: "Volver a derivaciones" }));
     const returnedList = await screen.findByRole("region", { name: "Lista de derivaciones" });
@@ -160,6 +165,50 @@ describe("ReferralsWorkspace", () => {
     const rejectedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     expect(within(rejectedDetail).getByText("Motivo del rechazo")).toBeVisible();
     expect(within(rejectedDetail).getByText("Debe quedar libre el corredor durante el evento.")).toBeVisible();
+  });
+
+  it("labels an approved closure without a window and a rejection without a reason", async () => {
+    const base = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.id === "SCR-1001");
+    if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a StreetClosureRequest fixture");
+    const approved = {
+      ...base,
+      id: "SCR-NO-APPROVED-WINDOW",
+      status: "APPROVED" as const,
+      request: {
+        ...base.request,
+        id: "SCR-NO-APPROVED-WINDOW",
+        status: "APPROVED" as const,
+        approvedFrom: null,
+        approvedTo: null,
+      },
+    };
+    const rejected = {
+      ...base,
+      id: "SCR-NO-REJECTION-REASON",
+      status: "REJECTED" as const,
+      request: {
+        ...base.request,
+        id: "SCR-NO-REJECTION-REASON",
+        status: "REJECTED" as const,
+        rejectionReason: null,
+      },
+    };
+    server.use(http.get("*/api/referrals", () => HttpResponse.json({ data: [approved, rejected], meta: { total: 2 } })));
+
+    const user = userEvent.setup();
+    render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
+
+    const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(list).getByRole("button", { name: /SCR-NO-APPROVED-WINDOW/ }));
+    const approvedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
+    expect(within(approvedDetail).getByText("Sin informar")).toBeVisible();
+
+    await user.click(within(approvedDetail).getByRole("button", { name: "Volver a derivaciones" }));
+    const returnedList = await screen.findByRole("region", { name: "Lista de derivaciones" });
+    await user.click(within(returnedList).getByRole("button", { name: /SCR-NO-REJECTION-REASON/ }));
+    const rejectedDetail = await screen.findByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
+    expect(within(rejectedDetail).getByText("Motivo del rechazo")).toBeVisible();
+    expect(within(rejectedDetail).getByText("Sin informar")).toBeVisible();
   });
 
   it("exposes an EnvironmentalInspection source and keeps the RepairRequest pending", async () => {
@@ -234,7 +283,7 @@ describe("ReferralsWorkspace", () => {
 
   it("shows live source changes as reconciliation work and preserves the original context", async () => {
     const all = fixtureReferrals();
-    const base = all.find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.sourceType === "SERVICE");
+    const base = all.find((referral) => referral.kind === "STREET_CLOSURE_REQUEST" && referral.id === "SCR-1001");
     if (!base || base.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a Service closure referral fixture");
     const changed = {
       ...base,

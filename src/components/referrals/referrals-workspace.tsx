@@ -246,6 +246,11 @@ function formatDateTime(value: string): string {
   return `${dateLabel} ${timeLabel}`;
 }
 
+function approvedClosurePeriod(from: string | null, to: string | null): string {
+  if (!from && !to) return "Sin informar";
+  return `${from ? formatDateTime(from) : "Sin informar"} – ${to ? formatDateTime(to) : "Sin informar"}`;
+}
+
 export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario }) {
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
   const [selectedId, setSelectedId] = useState<string | null>(() => {
@@ -925,16 +930,16 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
       <dl className="mt-4 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
         <DataField label="Tipo" value={request.closureType === "TOTAL" ? "Total" : request.closureType === "PARTIAL" ? "Parcial" : "Sin especificar"} />
         <DataField label="Motivo" value={request.reason} />
-        <DataField label="Inicio" value={request.requestedFrom ? formatDateTime(request.requestedFrom) : "—"} />
-        <DataField label="Fin" value={request.requestedTo ? formatDateTime(request.requestedTo) : "—"} />
-        {(request.startDate || request.endDate) && (
+        {(request.approvedFrom || request.approvedTo || request.status === "APPROVED" || request.status === "EXPIRED") && (
           <DataField
             label="Período autorizado"
-            value={`${request.startDate ? formatDateTime(request.startDate) : "—"} – ${request.endDate ? formatDateTime(request.endDate) : "—"}`}
+            value={approvedClosurePeriod(request.approvedFrom, request.approvedTo)}
           />
         )}
+        <DataField label="Inicio solicitado" value={request.requestedFrom ? formatDateTime(request.requestedFrom) : "—"} />
+        <DataField label="Fin solicitado" value={request.requestedTo ? formatDateTime(request.requestedTo) : "—"} />
         {referral.status === "REJECTED" && (
-          <DataField label="Motivo del rechazo" value={request.rejectionReason || "No se informó el motivo del rechazo"} />
+          <DataField label="Motivo del rechazo" value={request.rejectionReason || "Sin informar"} />
         )}
         {request.closureId && <DataField label="Nº de corte" value={request.closureId} />}
       </dl>
