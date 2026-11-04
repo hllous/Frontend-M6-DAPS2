@@ -1,5 +1,7 @@
 # M6 owns a server-side BFF session; the M1 JWT never reaches the browser
 
+**Current implementation status (2026-11-03, #800/#821):** the frontend supports `mock` for local development and tests and `real-m1` for deployed environments. The `backend-development` and demo-JWT signing paths have been removed. Backend PR [#502](https://github.com/hllous/Backend-M6-DAPS2/pull/502) records deployed login and `GET /me` 200 for four employee accounts; the M1 refresh request and renewed-token response shape remain unverified. Notes below retain the decisions and constraints as they were recorded at their dates.
+
 M1 has now published v2 authentication endpoints and confirmed that it emits the user JWT. It still has not published an OAuth2/OIDC-compatible contract: no JWKS or other verification-key distribution, JWT algorithm, issuer/audience, claims shape, exact lifetimes, or refresh-token rotation/revocation behavior. That still rules out adopting Better Auth today. The frontend deploys to Vercel's free serverless tier with no Redis or session store available.
 
 **Implementation status (2026-09-30):** the frontend currently supports `mock` and `backend-development` sessions. `real-m1` deliberately fails closed; there is no M1 login, refresh, or logout integration yet. The `m6_session` cookie is encrypted by the current code with AES-256-GCM using `M6_SESSION_SECRET`; it is a custom sealed-cookie format, not a standards-compliant compact JWE. This note distinguishes the shipped session boundary from the M1 flow selected below.

@@ -24,11 +24,11 @@ Each phase states:
 
 ## Estado de implementación
 
-Revisión del árbol de trabajo al **01/10/2026**. Las fases 0–7 tienen pantallas, adaptadores y recorridos de prueba en el repositorio. Este estado se basa en la presencia y revisión de esos archivos; las suites no se ejecutaron para esta actualización documental.
+Revisión del árbol de trabajo al **03/11/2026**. Las fases 0–7 tienen pantallas, adaptadores y recorridos de prueba en el repositorio. Este estado se basa en la presencia y revisión de esos archivos; las suites no se ejecutaron para esta actualización documental.
 
 | Fase | Estado en el frontend | Referencias |
 |---|---|---|
-| 0 — Foundation | Implementada en modo mock y `backend-development`. El inicio de sesión real de M1 sigue bloqueado. | [sesión BFF](src/app/api/session/login/route.ts), [ingreso y actores](e2e/entry-and-roles.spec.ts) |
+| 0 — Foundation | Implementada en modo `mock` y `real-m1`. Los despliegues usan `real-m1`; `mock` queda limitado al desarrollo local y las pruebas. | [sesión BFF](src/app/api/session/login/route.ts), [ingreso y actores](e2e/entry-and-roles.spec.ts) |
 | 1 — Service core loop | Implementada; Oficina puede cancelar directamente desde `RESCHEDULED` con un motivo, de acuerdo con Backend (#114, completado). | [workspace de Servicios](src/components/services/services-workspace.tsx), [journeys](e2e/services.spec.ts) |
 | 2a–2d — Catálogos | Implementadas las vistas de catálogos y sus adaptadores, con barrios y comunas del catálogo de M9 (vía Backend) y cuadrillas con especialidad, zona base y reubicaciones (#760). | [catálogos](src/app/app/catalog/page.tsx), [zonas](e2e/zones-catalog.spec.ts) |
 | 3 — Derivaciones | Implementadas las solicitudes de reparación y de corte, con conciliación manual y anomalías visibles. | [derivaciones](e2e/referrals.spec.ts) |
@@ -40,13 +40,13 @@ Revisión del árbol de trabajo al **01/10/2026**. Las fases 0–7 tienen pantal
 
 ## Typed external and cross-cutting gates
 
-Estado revisado el 30/10/2026 contra el código frontend y Backend `develop` `374f66e` (la revisión anterior fue el 01/10/2026 contra `30d49ea`). La tabla reúne dependencias, límites y decisiones con su estado individual, aunque las pantallas de sus fases ya estén implementadas.
+Estado revisado el 03/11/2026 contra el código frontend y la evidencia de Backend PR [#502](https://github.com/hllous/Backend-M6-DAPS2/pull/502); la revisión anterior del inventario de API fue el 30/10/2026 contra Backend `develop` `374f66e`. La tabla reúne dependencias, límites y decisiones con su estado individual, aunque las pantallas de sus fases ya estén implementadas.
 
 | Gate | Type | Affects | Tracking |
 |---|---|---|---|
-| M1 published its JWT contract (Catalog v3.0/v3.1: HMAC with a base64 secret, `iss`, `typ`, `sub_type`, `rol`, 15 min) and Backend validates it, but **M1 is not hosted**: there is no real login to integrate or test. Real-M1 login still fails closed in the frontend; the BFF refresh against M1 is implemented but dormant and its request/response shape is unverified | Blocks production authentication | Phase 0 / Phase 8 | [#145](https://github.com/hllous/Frontend-M6-DAPS2/issues/145), [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md), [CONTRACTS.md](CONTRACTS.md#identity-and-session-boundary-with-m1) |
+| Backend PR #502 records deployed M1 employee login and `GET /me` 200 for four accounts; the refresh request/response shape remains unverified | M1 refresh gap | Phase 8 | [Backend PR #502](https://github.com/hllous/Backend-M6-DAPS2/pull/502), [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md), [CONTRACTS.md](CONTRACTS.md#identity-and-session-boundary-with-m1) |
 | ~~Role-to-Capability mapping unconfirmed; no domain `@Roles()`~~ **Closed (Backend #161, 22/10):** Backend applies `@Roles` to every write and checks Field membership (`NOT_ASSIGNED`); the frontend derives Capabilities from `GET /me`. The REMOVAL decision needs `M6_ADMIN`; the frontend hides it from Operaciones (#770) | Frontend alignment gap | Phase 5 | [#770](https://github.com/hllous/Frontend-M6-DAPS2/issues/770), [ADR-0005](docs/adr/0005-m6-backend-is-the-sole-authorization-authority.md) |
-| Demo tokens: while M1 is not hosted, tokens are signed with the shared secret (Backend's demo exception to its ADR-004), either per request by the BFF (`M6_JWT_SECRET`, any seed persona from an open login) or as one `M6_DEV_JWT` from Backend's script. Must not reach an environment with real users | Development and demo integration only | Phase 0 `backend-development` mode | [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md), [Backend `docs/integracion/m1.md`](https://github.com/hllous/Backend-M6-DAPS2/blob/develop/docs/integracion/m1.md) |
+| The frontend demo-JWT path and `backend-development` mode are retired by #800; `mock` remains for local development and tests, and deployed environments require `real-m1` | Closed implementation gap | Phase 0 / Phase 8 | [#800](https://github.com/hllous/Frontend-M6-DAPS2/issues/800), [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md) |
 | ~~Barrio catalog unpublished, owner disputed~~ **Closed (22/10–27/10):** M9 owns and exposes the catalog; Backend caches it (`GET /neighborhoods`), groups Zones by Commune (`GET /communes`) and creates one Zone per barrio. The frontend reads both | Resolved | Phase 2c | [#624](https://github.com/hllous/Frontend-M6-DAPS2/issues/624), [Backend #376](https://github.com/hllous/Backend-M6-DAPS2/issues/376), [Backend #420](https://github.com/hllous/Backend-M6-DAPS2/issues/420) |
 | M7's final street-closure contract (28/10) changes the section shape (`direction`), makes `closureType` mandatory and adds extensions; Backend waits for M7's answers | Unresolved external contract | Phase 3 closure form | [#724](https://github.com/hllous/Frontend-M6-DAPS2/issues/724), [Backend #447](https://github.com/hllous/Backend-M6-DAPS2/issues/447) |
 | M4's establishment lookup contract is unpublished; frontend uses a local adapter | External data source pending | Phase 6 notice issuance | `CONTRACTS.md` → Remaining contract gaps |
@@ -64,11 +64,11 @@ Estado revisado el 30/10/2026 contra el código frontend y Backend `develop` `37
 
 **Depends on**: [Define the application information architecture](https://github.com/hllous/Frontend-M6-DAPS2/issues/7), [Define M6 actors, capabilities, and information boundaries](https://github.com/hllous/Frontend-M6-DAPS2/issues/8), [Define the contract-first frontend and backend boundary](https://github.com/hllous/Frontend-M6-DAPS2/issues/9), [Resolve the authentication and session architecture](https://github.com/hllous/Frontend-M6-DAPS2/issues/18), [the JWT stopgap decision](https://github.com/hllous/Frontend-M6-DAPS2/issues/46), `DESIGN.md`.
 
-**Scope note**: mock and dev-JWT (`M6_DEV_JWT`) modes only, per #46's three-mode split. The real M1 JWT mode is explicitly deferred to Phase 8 — do not present capability names or JWT claims as confirmed contracts anywhere in this phase; they're UI-only and optimistic per [ADR-0005](docs/adr/0005-m6-backend-is-the-sole-authorization-authority.md).
+**Scope note**: Phase 0 was initially implemented under #46's three-mode plan. The current frontend supports only `mock` and `real-m1`; the dev-JWT and `backend-development` paths have been retired. Capability names still describe frontend affordances only; Backend enforces authorization per [ADR-0005](docs/adr/0005-m6-backend-is-the-sole-authorization-authority.md).
 
 **Acceptance evidence**:
 - Shell renders the capability-gated nav (Mi Trabajo / Servicios / Inventario urbano / Control Ambiental / Mapa / Configuración / Tableros) per #7 («Catálogo» se separó en Configuración e Inventario urbano en #739), hiding items the mock actor's Capabilities don't grant.
-- Login works in mock and `backend-development` modes; real-M1 mode is not implemented yet and fails closed if attempted.
+- Login works in `mock` and `real-m1` modes; deployed builds reject `mock` mode.
 - One resource's adapter (any) round-trips through Zod validation against an MSW fixture with no network call reaching a real host.
 - Design tokens, breakpoints (760px/1024px), and the collapsible sidebar / mobile nav from `DESIGN.md` render correctly.
 
@@ -212,7 +212,7 @@ A vertical slice attached to Phase 1, not a horizontal sweep across every domain
 
 **Depends on**: every prior phase at its own per-increment quality baseline (WCAG, contract validation, and testing are not deferred to this phase — see the note below) — plus every "blocks production readiness" and "unresolved hypothesis" gate in the gates table above, and [Set measurable performance, observability, and release gates](https://github.com/hllous/Frontend-M6-DAPS2/issues/64), [Define the production-shaped quality and release evidence model](https://github.com/hllous/Frontend-M6-DAPS2/issues/19), [Define deployment, observability, and release architecture](https://github.com/hllous/Frontend-M6-DAPS2/issues/15), [Define the security, privacy, and audit model](https://github.com/hllous/Frontend-M6-DAPS2/issues/16).
 
-**Per-increment quality baseline (applies to Phases 1–7, not deferred here)**: every phase above ships WCAG 2.2 AA-compliant, Zod-contract-validated, tested code against its real or best-hypothesis contract as it's built. Phase 8 is the **closing** gate — the real M1 JWT cutover, the full cross-cutting accessibility/security audit, and performance budgets under real load — not where quality work first happens. Treating this phase as where hardening starts would mean Phases 1–7 shipped without it, which they don't.
+**Per-increment quality baseline (applies to Phases 1–7, not deferred here)**: every phase above ships WCAG 2.2 AA-compliant, Zod-contract-validated, tested code against its real or best-hypothesis contract as it's built. Phase 8 is the **closing** gate — the remaining M1 refresh contract, the full cross-cutting accessibility/security audit, and performance budgets under real load — not where quality work first happens. Treating this phase as where hardening starts would mean Phases 1–7 shipped without it, which they don't.
 
 **Acceptance evidence**:
 - Production mode uses M1's real JWT exclusively; mock and dev-JWT modes are disabled or unreachable outside development.
