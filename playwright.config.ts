@@ -20,7 +20,7 @@ export default defineConfig({
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
   workers: isCI ? 1 : undefined,
-  reporter: isCI ? [["github"], ["html", { open: "never" }]] : "list",
+  reporter: isCI ? [["github"], ["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
     trace: "retain-on-failure",
@@ -70,8 +70,6 @@ export default defineConfig({
                 name: "Mock frontend",
                 reuseExistingServer: !isCI,
                 timeout: 120_000,
-                // Lets `next dev` flush its Turbopack cache on exit (CI restores it next run).
-                ...(isCI ? { gracefulShutdown: { signal: "SIGTERM" as const, timeout: 10_000 } } : {}),
                 env: {
                   M6_AUTH_MODE: "mock",
                   M6_NEXT_DIST_DIR: ".next-e2e-mock",
