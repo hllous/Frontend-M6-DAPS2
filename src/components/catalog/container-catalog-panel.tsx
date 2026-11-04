@@ -79,7 +79,6 @@ import {
   type Attachment,
   type Container,
   type ContainerQuery,
-  containerStatusSchema,
   type ContainerStatus,
   type ContainerType,
   findInFlightServiceForContainer,
