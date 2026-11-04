@@ -4,11 +4,13 @@
 #
 # IMPORTANTE: los jobs "build" y "test" mantienen sus nombres para
 # preservar la convención de branch protection compartida con el
-# backend. "e2e" y "security" son gates nuevos (#88): ninguno se
-# ignora de forma permanente. "docs" (#348) valida la documentación y
-# es un check requerido una vez aplicadas las reglas de
-# .github/branch-protection-rules.json; el backend no tiene un job
-# "docs", así que los rule sets de ambos repos ahora difieren. El job
+# backend. "test" y "e2e" son jobs agregadores (#834): reparten el
+# trabajo en shards paralelos y exigen que todos terminen bien, así el
+# check requerido sigue siendo uno solo. "e2e" y "security" son gates
+# nuevos (#88): ninguno se ignora de forma permanente. "docs" (#348)
+# valida la documentación y es un check requerido una vez aplicadas las
+# reglas de .github/branch-protection-rules.json; el backend no tiene un
+# job "docs", así que los rule sets de ambos repos ahora difieren. El job
 # no lleva filtro de paths: un check requerido sin reportar bloquea el merge.
 # ──────────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ jobs:
             core.info(`Documentation-only pull request: ${docsOnly}`);
 
   # Todos los jobs usan Ubuntu 24.04 para evitar la migración de ubuntu-latest a Ubuntu 26 el 2026-10-19.
+  # El setup común (pnpm, Node 22, node_modules en caché) vive en .github/actions/setup-node-pnpm.
   build:
     name: build
     needs: changes
@@ -75,28 +78,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-          run_install: false
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Restore node_modules cache
-        id: cache-node-modules
-        uses: actions/cache@v6
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Restore Next.js build cache
         uses: actions/cache@v6
@@ -112,8 +95,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-  test:
-    name: test
+  lint:
+    name: lint
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
@@ -121,124 +104,143 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-          run_install: false
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Restore node_modules cache
-        id: cache-node-modules
-        uses: actions/cache@v6
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Lint
         run: pnpm lint
 
-      - name: Unit and component tests
-        run: pnpm test
+      - name: CI script tests
+        run: node --test scripts/ci/docs-only.node-test.mjs scripts/ci/e2e-shard.node-test.mjs
 
-      - name: Documentation-only classifier tests
-        run: node --test scripts/ci/docs-only.node-test.mjs
-
-  e2e-shard:
-    name: e2e shard ${{ matrix.shard }}/3
+  # Vitest abre un worker aislado por archivo (255 archivos): repartirlo en shards es
+  # lo que acorta el camino crítico. `isolate: false` no es opción: contamina estado
+  # entre archivos (rompe src/lib/containers.test.ts, entre otros).
+  unit-shard:
+    name: unit shard ${{ matrix.shard }}/4
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-          run_install: false
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
+      - name: Unit and component tests
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
-      - name: Restore node_modules cache
-        id: cache-node-modules
-        uses: actions/cache@v6
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Read Playwright version
-        id: playwright-version
+  test:
+    name: test
+    runs-on: ubuntu-24.04
+    needs: [changes, lint, unit-shard]
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Require lint and every unit shard to succeed
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          SHARDS_RESULT: ${{ needs.unit-shard.result }}
         run: |
-          version=$(node -p "require('@playwright/test/package.json').version")
-          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          if [ "$CHANGES_RESULT" = "success" ] && [ "$DOCS_ONLY" = "true" ]; then
+            exit 0
+          fi
+          test "$LINT_RESULT" = "success"
+          test "$SHARDS_RESULT" = "success"
 
-      - name: Restore Playwright browser cache
-        id: cache-playwright
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.version }}
+  # Smoke journeys, failure journeys, and axe/WCAG checks run against deterministic
+  # mock scenarios and fixture data only — no production or Tier 2 data ever enters
+  # these runs, so the traces/screenshots below carry none either.
+  # Cada shard arranca solo el frontend mock (E2E_TARGET=mock): el servidor real-m1
+  # y el fake M1 los usa únicamente el job "e2e real-m1".
+  e2e-shard:
+    name: e2e shard ${{ matrix.shard }}/10
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
+    runs-on: ubuntu-24.04
+    env:
+      E2E_TARGET: mock
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      - name: Install Playwright system dependencies
-        run: pnpm exec playwright install-deps chromium
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
-      - name: Install Playwright Chromium
-        if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
+      - name: Setup Playwright Chromium
+        uses: ./.github/actions/setup-playwright
 
-      # Smoke journeys, failure journeys, and axe/WCAG checks run against deterministic
-      # mock scenarios and fixture data only — no production or Tier 2 data ever enters
-      # these runs, so the traces/screenshots below carry none either.
+      # `--shard` corta bloques contiguos y los specs pesados caían juntos (un shard tardaba
+      # el doble que otro); scripts/ci/e2e-shard.cjs reparte los tests en round-robin.
       - name: Playwright smoke and accessibility suite
-        run: pnpm exec playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: |
+          grep=$(node scripts/ci/e2e-shard.cjs --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }})
+          pnpm exec playwright test --project=chromium --grep "$grep"
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
+  e2e-real-m1:
+    name: e2e real-m1
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
+    runs-on: ubuntu-24.04
+    env:
+      E2E_TARGET: real-m1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Setup Playwright Chromium
+        uses: ./.github/actions/setup-playwright
+
+      - name: Playwright real-m1 login suite
+        run: pnpm exec playwright test --project=real-m1
+
+      - name: Upload Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-real-m1
+          path: playwright-report/
+          retention-days: 7
+
   e2e:
     name: e2e
     runs-on: ubuntu-24.04
-    needs: [changes, e2e-shard]
+    needs: [changes, e2e-shard, e2e-real-m1]
     if: ${{ !cancelled() }}
     steps:
-      - name: Require every Playwright shard to succeed
+      - name: Require every Playwright job to succeed
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           SHARDS_RESULT: ${{ needs.e2e-shard.result }}
+          REAL_M1_RESULT: ${{ needs.e2e-real-m1.result }}
         run: |
           if [ "$CHANGES_RESULT" = "success" ] && [ "$DOCS_ONLY" = "true" ]; then
             exit 0
           fi
           test "$SHARDS_RESULT" = "success"
+          test "$REAL_M1_RESULT" = "success"
 
   security:
     name: security
@@ -249,28 +251,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 12.14.0
-          run_install: false
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Restore node_modules cache
-        id: cache-node-modules
-        uses: actions/cache@v6
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Dependency vulnerability scan
         run: pnpm audit --prod --audit-level=high
@@ -286,17 +268,10 @@ jobs:
 
       # markdownlint-cli2 0.23 exige Node 22+; todos los jobs usan Node 22.
       # Reglas y alcance en .markdownlint-cli2.jsonc.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
         with:
-          version: 12.14.0
-          run_install: false
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
+          install: "false"
 
       - name: Markdown lint
         run: pnpm dlx markdownlint-cli2@0.23.3

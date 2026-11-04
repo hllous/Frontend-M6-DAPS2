@@ -12,7 +12,7 @@ import { POST } from "./route";
 import { loginAs } from "@/test/session";
 
 const backendOrigin = "https://backend.internal";
-const backendDevJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+const backendDevJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
 const backendCrew = {
   id: "11111111-1111-4111-8111-111111111111",
   name: "Cuadrilla Belgrano — Recolección",
@@ -38,7 +38,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -308,9 +307,9 @@ describe("POST /api/services/[id]/complete backend forward path", () => {
     const serviceId = "field-service_42.3~";
     const backendFetch = mockFieldBackend();
     const cookie = await loginAs("field-crew-leader-route", {
-      mode: "backend-development",
+      mode: "real-m1",
       crew: { ...backendCrew, role: "LEADER" },
-      devJwt: backendDevJwt,
+      accessToken: backendDevJwt,
       backendOrigin,
     });
     backendFetch.mockClear();
@@ -334,9 +333,9 @@ describe("POST /api/services/[id]/complete backend forward path", () => {
     const serviceId = "field-service-out-of-scope";
     const backendFetch = mockFieldBackend("22222222-2222-4222-8222-222222222222");
     const cookie = await loginAs("field-crew-leader-route", {
-      mode: "backend-development",
+      mode: "real-m1",
       crew: { ...backendCrew, role: "LEADER" },
-      devJwt: backendDevJwt,
+      accessToken: backendDevJwt,
       backendOrigin,
     });
     backendFetch.mockClear();

@@ -15,7 +15,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -63,8 +62,7 @@ describe("referral detail BFF", () => {
   });
 
   it("returns a safe 502 when the backend success body is not JSON", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    process.env.M6_AUTH_MODE = "real-m1";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<!doctype html><title>Proxy error</title>", {
       status: 200,
@@ -85,8 +83,7 @@ describe("referral detail BFF", () => {
   });
 
   it("wraps non-JSON backend errors with the safe BFF envelope", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    process.env.M6_AUTH_MODE = "real-m1";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>internal proxy detail</html>", {
       status: 503,
@@ -114,10 +111,10 @@ describe("referral detail BFF", () => {
 
   it("checks backend referral sources with encoded ids using GET and the session bearer token", async () => {
     const id = "RR-encoded_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
     const cookie = await loginAs("office-duty-queue", {
-      mode: "backend-development",
-      devJwt,
+      mode: "real-m1",
+      accessToken: devJwt,
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ message: "No existe" }, { status: 404 }));

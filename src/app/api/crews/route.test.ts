@@ -21,8 +21,8 @@ describe("crews BFF route", () => {
   });
 
   it("forwards an authenticated backend crew list with GET", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
 
     const response = await GET(new Request("http://localhost/api/crews", { headers: { cookie } }));
@@ -60,8 +60,8 @@ describe("crews BFF route: zone and specialty", () => {
   });
 
   it("forwards zoneId and specialty to the backend", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
     await GET(new Request("http://localhost/api/crews?zoneId=zone-4&specialty=TREES", { headers: { cookie } }));
     const url = new URL(String(backendFetch.mock.calls[0]?.[0]));

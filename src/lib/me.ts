@@ -1,4 +1,5 @@
 import { getScenario } from "./scenarios";
+import { LOGIN_TIMEOUT_MS } from "./m1-auth";
 
 import type { NextResponse } from "next/server";
 
@@ -16,7 +17,7 @@ import {
   type Session,
 } from "./session";
 
-const ME_TIMEOUT_MS = 15_000;
+export const ME_TIMEOUT_MS = LOGIN_TIMEOUT_MS;
 
 /** Interpreta la respuesta de `GET /me`: 401 es sesión rechazada, 403 es un ciudadano, lo demás es indisponibilidad. */
 export async function readMeResponse(response: Response): Promise<Me> {
@@ -33,12 +34,16 @@ export async function readMeResponse(response: Response): Promise<Me> {
 }
 
 /** Login: todavía no hay sesión, así que se pide con el token de demo. */
-export async function fetchMeWithToken(origin: string, accessToken: string): Promise<Me> {
+export async function fetchMeWithToken(
+  origin: string,
+  accessToken: string,
+  options: { timeoutMs?: number } = {},
+): Promise<Me> {
   let response: Response;
   try {
     response = await fetch(new URL("/me", origin), {
       headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(ME_TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? ME_TIMEOUT_MS),
     });
   } catch {
     throw new BackendUnavailableError(503);
@@ -61,7 +66,7 @@ export function sealRolesIfChanged(response: NextResponse, request: Request, rol
   const session = getRequiredSession(request);
   if (sameRoles(session.roles, roles)) return;
   const next = { ...session, roles: [...roles] };
-  response.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(next), ...sessionCookieOptions(next) });
+  response.cookies.set({ name: AUTH_COOKIE_NAME, value: sealSession(next), ...sessionCookieOptions(next, request) });
 }
 
 /** Selecciona la cuadrilla del backend, priorizando liderazgo y luego el nombre del perfil. */

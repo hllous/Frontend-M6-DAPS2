@@ -1,9 +1,22 @@
 import path from "node:path";
 
+export function resolveNextDistDir(value) {
+  return typeof value === "string" && /^\.next(?:[-._][A-Za-z0-9][A-Za-z0-9_-]*)?$/.test(value)
+    ? value
+    : ".next";
+}
+
+export function typescriptConfigPathForDistDir(distDir) {
+  return distDir === ".next" ? "tsconfig.json" : "tsconfig.next-dist.json";
+}
+
 /** @type {import('next').NextConfig} */
+const distDir = resolveNextDistDir(process.env.M6_NEXT_DIST_DIR);
 const nextConfig = {
   // Allows concurrent local Next dev servers to use independent build state.
-  distDir: process.env.M6_NEXT_DIST_DIR || ".next",
+  distDir,
+  // Next adds generated route type paths to its active config. Keep custom dev dist paths out of tsconfig.json.
+  typescript: { tsconfigPath: typescriptConfigPathForDistDir(distDir) },
   // Necesario para el build de Docker: genera un servidor "standalone"
   // con solo lo necesario para correr en producción. Vercel arma su propio
   // empaquetado y con "standalone" el build falla buscando

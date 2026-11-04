@@ -8,18 +8,18 @@ describe("backendMode", () => {
     delete process.env.M6_BACKEND_ORIGIN;
   });
 
-  it("rejects an unset backend origin in backend-development mode", () => {
+  it("rejects an unset backend origin in real-m1 mode", () => {
     delete process.env.M6_BACKEND_ORIGIN;
 
-    expect(() => backendMode({ mode: "backend-development" })).toThrow(
+    expect(() => backendMode({ mode: "real-m1" })).toThrow(
       "La autenticación solicitada no está disponible.",
     );
   });
 
-  it("rejects an empty backend origin in backend-development mode", () => {
+  it("rejects an empty backend origin in real-m1 mode", () => {
     process.env.M6_BACKEND_ORIGIN = "";
 
-    expect(() => backendMode({ mode: "backend-development" })).toThrow(
+    expect(() => backendMode({ mode: "real-m1" })).toThrow(
       "La autenticación solicitada no está disponible.",
     );
   });
@@ -30,10 +30,10 @@ describe("backendMode", () => {
     expect(backendMode({ mode: "mock" })).toBe(false);
   });
 
-  it("returns true in backend-development mode when the origin is set", () => {
+  it("returns true in real-m1 mode when the origin is set", () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
 
-    expect(backendMode({ mode: "backend-development" })).toBe(true);
+    expect(backendMode({ mode: "real-m1" })).toBe(true);
   });
 
   it("builds the shared error envelope with complete 503 and 409 labels", async () => {

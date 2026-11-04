@@ -15,6 +15,11 @@ export type M6Role = (typeof M6_ROLES)[number];
 
 export const m6RoleSchema = z.enum(M6_ROLES);
 
+export function hasOfficeFieldRoleMix(roles: readonly M6Role[]): boolean {
+  const hasOfficeRole = roles.some((role) => role === "M6_ADMIN" || role.startsWith("M6_OFICINA_"));
+  return hasOfficeRole && roles.some((role) => role.startsWith("M6_CAMPO_"));
+}
+
 /** `GET /me` del backend: identidad del token y roles de M6 efectivos (asignados ∩ lo que permite el rol de M1). */
 export const meSchema = z.object({
   userId: z.string(),
@@ -34,6 +39,7 @@ const FIELD_ROLES: readonly M6Role[] = ["M6_CAMPO_CUADRILLA", "M6_CAMPO_INSPECTO
  * (docs/api/endpoints.md); `null` = cualquier rol de M6. Es solo optimista: el backend decide (ADR-0005).
  */
 const ROLES_BY_CAPABILITY: Record<Capability, readonly M6Role[] | null> = {
+  "role:manage": ["M6_ADMIN"],
   "integrationMonitor:view": ["M6_ADMIN", "M6_AUDITOR"],
   "integrationMonitor:manage": ["M6_ADMIN"],
   "service:view": null,

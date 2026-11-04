@@ -1,11 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { DEMO_IDENTITIES } from "../src/lib/demo-identities";
 
 const PASSWORD = "m6-dev-796";
 
 async function enterCredentials(page: import("@playwright/test").Page, email: string, password = PASSWORD) {
   const emailInput = page.getByRole("textbox", { name: "Correo electrónico" });
-  const passwordInput = page.getByLabel("Contraseña");
+  const passwordInput = page.getByLabel("Contraseña", { exact: true });
   await emailInput.click();
   await emailInput.pressSequentially(email);
   await passwordInput.click();
@@ -19,9 +20,6 @@ async function expectNoSessionCookie(context: import("@playwright/test").Browser
 }
 
 test.describe("Ingreso real con M1", () => {
-  // Needs the fake M1 and the MSW backend of docs/agents/real-m1-development.md; the default e2e run is in mock mode.
-  test.skip(process.env.M6_E2E_REAL_M1 !== "true", "Solo con M6_E2E_REAL_M1=true contra el modo real-m1 (ver docs/agents/real-m1-development.md).");
-
   test("explica el arranque en frío mientras M1 responde", async ({ page }) => {
     await page.route("**/api/session/login", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -31,7 +29,7 @@ test.describe("Ingreso real con M1", () => {
     const emailInput = page.getByRole("textbox", { name: "Correo electrónico" });
     await emailInput.click();
     await emailInput.pressSequentially("carlos.rodriguez@m6.local");
-    const passwordInput = page.getByLabel("Contraseña");
+    const passwordInput = page.getByLabel("Contraseña", { exact: true });
     await passwordInput.click();
     await passwordInput.pressSequentially(PASSWORD);
     await page.getByRole("button", { name: "Ingresar al sistema" }).click();
@@ -45,7 +43,7 @@ test.describe("Ingreso real con M1", () => {
     await enterCredentials(page, "carlos.rodriguez@m6.local");
 
     await expect(page).toHaveURL(/\/app\?destination=work$/, { timeout: 20_000 });
-    await expect(page.getByText("Empleado M1 · 2")).toBeVisible();
+    await expect(page.getByText(`Empleado M1 · ${DEMO_IDENTITIES["office-duty-queue"].sub}`)).toBeVisible();
   });
 
   test("muestra un error genérico para una contraseña incorrecta y conserva el correo", async ({ page, context }) => {
@@ -54,7 +52,7 @@ test.describe("Ingreso real con M1", () => {
 
     await expect(page.getByText("El correo o la contraseña no son correctos.")).toBeVisible();
     await expect(page.getByLabel("Correo electrónico")).toHaveValue("carlos.rodriguez@m6.local");
-    await expect(page.getByLabel("Contraseña")).toHaveValue("");
+    await expect(page.getByLabel("Contraseña", { exact: true })).toHaveValue("");
     await expectNoSessionCookie(context);
   });
 
@@ -88,6 +86,24 @@ test.describe("Ingreso real con M1", () => {
 
     await expect(page).toHaveURL(/\/login$/);
     await expectNoSessionCookie(context);
+  });
+
+  test("redirige a /no-role cuando una sesión sin permisos abre /app", async ({ page }) => {
+    await page.goto("/login");
+    await enterCredentials(page, "sin-rol@m6.local");
+
+    await expect(page).toHaveURL(/\/no-role$/, { timeout: 20_000 });
+    await page.goto("/app");
+    await expect(page).toHaveURL(/\/no-role$/);
+  });
+
+  test("redirige a /app cuando una sesión con permisos abre /no-role", async ({ page }) => {
+    await page.goto("/login");
+    await enterCredentials(page, "carlos.rodriguez@m6.local");
+
+    await expect(page).toHaveURL(/\/app$/, { timeout: 20_000 });
+    await page.goto("/no-role");
+    await expect(page).toHaveURL(/\/app$/);
   });
 
   test("informa cuando M1 no está disponible", async ({ page }) => {

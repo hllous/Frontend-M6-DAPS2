@@ -5,14 +5,14 @@ import { GET as sessionPulse } from "@/app/api/session/route";
 import { POST as logout } from "@/app/api/session/logout/route";
 import { fetchBackend } from "./bff-backend";
 import { errorResponse, forwardResponse, mapSessionError } from "./bff-route";
-import { FAILURE_MEMO_MS, MEMO_MS } from "./m1-refresh";
+import { FAILURE_MEMO_MS, MEMO_MS, m1BaseUrl } from "./m1-refresh";
 import { fetchMe, sealRolesIfChanged } from "./me";
 import { SESSION_MUTATION_HEADERS } from "./session-request";
+import { createTestSession } from "@/test/session";
 import {
   AUTH_COOKIE_NAME,
   BackendUnavailableError,
   InvalidSessionError,
-  createSession,
   getSessionFromCookieValue,
   getSessionFromRequest,
   publicSession,
@@ -37,8 +37,8 @@ type Overrides = Partial<Session>;
 function build(expSeconds: number, overrides: Overrides = {}) {
   const accessToken = jwt(expSeconds);
   const session: Session = {
-    ...createSession("office-duty-queue", { mode: "backend-development", devJwt: accessToken, backendOrigin: BACKEND }),
-    source: "m1",
+    ...createTestSession("office-duty-queue", { accessToken }),
+    identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
     refreshToken: `refresh-${++n}`,
     ...overrides,
   };
@@ -62,7 +62,7 @@ const me = (roles: string[]) => Response.json({ userId: "42", subType: "EMPLEADO
 const twinOf = (request: Request) => new Request(request.url, { headers: request.headers });
 
 beforeEach(() => {
-  process.env.M6_AUTH_MODE = "backend-development";
+  process.env.M6_AUTH_MODE = "real-m1";
   process.env.M6_BACKEND_ORIGIN = BACKEND;
   process.env.M1_BASE_URL = M1;
   cookieStore.set.mockReset();
@@ -305,17 +305,6 @@ describe("cuándo se renueva", () => {
   });
 
   it.each([
-    ["sin refresh token", () => near({ refreshToken: undefined })],
-    ["sin origen m1 (camino M6_DEV_JWT)", () => near({ source: undefined })],
-  ])("%s: no llama a M1 y deja pasar el 401", async (_name, setup) => {
-    const { request } = setup();
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 401 }));
-
-    expect((await fetchBackend(request, "/services")).status).toBe(401);
-    expect(m1Calls(fetchSpy)).toHaveLength(0);
-  });
-
-  it.each([
     ["sin M1_BASE_URL", undefined],
     ["URL inválida", "no es una url"],
     ["protocolo ftp", "ftp://m1.internal"],
@@ -383,6 +372,21 @@ describe("cuándo se renueva", () => {
   });
 });
 
+describe("M1_BASE_URL", () => {
+  it("accepts plain HTTP only for loopback, and rejects localhost in production", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    process.env.M1_BASE_URL = "http://localhost:3130/api/v1/";
+    expect(m1BaseUrl()?.href).toBe("http://localhost:3130/api/v1/");
+
+    process.env.M1_BASE_URL = "http://m1.internal/api/v1/";
+    expect(m1BaseUrl()).toBeUndefined();
+
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.M1_BASE_URL = "http://localhost:3130/api/v1/";
+    expect(m1BaseUrl()).toBeUndefined();
+  });
+});
+
 describe("límites sobre la respuesta de M1", () => {
   const big = "x".repeat(1_300);
   const cases: [string, () => Response][] = [
@@ -414,6 +418,15 @@ describe("límites sobre la respuesta de M1", () => {
     const { request } = near();
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Refresh(jwt(inSeconds(900), 99))).mockResolvedValue(ok());
     await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(InvalidSessionError);
+  });
+
+  it("normaliza los ceros iniciales de sub al comparar tokens", async () => {
+    const { request } = near({ accessToken: jwt(inSeconds(30), "042") });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(m1Refresh(jwt(inSeconds(900), "42"))).mockResolvedValueOnce(ok());
+
+    const response = await fetchBackend(request, "/services");
+
+    expect(response.status).toBe(200);
   });
 
   it("la llamada compartida a M1 no hereda el signal del primer llamador", async () => {

@@ -1,0 +1,23 @@
+import { hasOfficeFieldRoleMix, m6RoleSchema, type M6Role } from "@/lib/m6-roles";
+import { DEMO_IDENTITIES } from "@/lib/demo-identities";
+import { z } from "zod";
+
+export const replacementSchema = z.object({ roles: z.array(m6RoleSchema).refine((roles) => new Set(roles).size === roles.length).refine((roles) => !hasOfficeFieldRoleMix(roles)) }).strict();
+export const validUserId = (id: string) => /^\d+$/.test(id);
+const seed: Record<string, M6Role[]> = {
+  [DEMO_IDENTITIES["office-duty-queue"].sub]: ["M6_ADMIN"],
+  [DEMO_IDENTITIES["office-operations"].sub]: ["M6_OFICINA_OPERACIONES"],
+  [DEMO_IDENTITIES["field-crew-leader-route"].sub]: ["M6_CAMPO_CUADRILLA"],
+};
+let assignments = structuredClone(seed);
+export function resetRoleAssignmentFixtures() { assignments = structuredClone(seed); }
+export function getRoles(userId: string) { return assignments[userId] ?? []; }
+export function listRoles(page: number, pageSize: number) {
+  const all = Object.keys(assignments).filter((id) => assignments[id].length > 0).sort().map((userId) => ({ userId, roles: assignments[userId] }));
+  return { data: all.slice((page - 1) * pageSize, page * pageSize), meta: { total: all.length, page, pageSize, totalPages: Math.ceil(all.length / pageSize) } };
+}
+export function setRoles(userId: string, roles: M6Role[]) {
+  if (getRoles(userId).includes("M6_ADMIN") && !roles.includes("M6_ADMIN") && !Object.entries(assignments).some(([id, value]) => id !== userId && value.includes("M6_ADMIN"))) return false;
+  assignments[userId] = roles;
+  return true;
+}

@@ -8,7 +8,6 @@ import { loginAs } from "@/test/session";
 afterEach(() => {
   resetZoneFixtures();
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -61,7 +60,7 @@ describe("authenticated zones BFF route", () => {
     expect(body.meta.total).toBe(0);
   });
 
-  it("forwards a backend-development session through the BFF before serving real backend data", async () => {
+  it("forwards a real-m1 session through the BFF before serving real backend data", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 0 } }), {
@@ -69,7 +68,7 @@ describe("authenticated zones BFF route", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
     const response = await GET(new Request("http://localhost/api/zones?active=true", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -162,7 +161,7 @@ describe("authenticated zones BFF route", () => {
 
 describe("GET /api/zones communeId filter", () => {
   it("forwards communeId to the backend", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } }));
 
     await GET(new Request("http://localhost/api/zones?communeId=c0a80101-0000-4000-8000-000000000014&pageSize=100", { headers: { cookie } }));

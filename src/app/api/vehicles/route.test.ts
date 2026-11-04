@@ -5,7 +5,6 @@ import { loginAs, loginWithMe as login } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -57,8 +56,7 @@ describe("vehicles BFF route", () => {
 
 describe("vehicles BFF route pagination limits (#248)", () => {
   async function forwardedUrl(query: string) {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_AUTH_MODE = "real-m1";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi
       .spyOn(globalThis, "fetch")

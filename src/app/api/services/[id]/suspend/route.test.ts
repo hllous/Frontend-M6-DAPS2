@@ -10,7 +10,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -155,7 +154,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
     expect(body.statusNote).toBeNull();
   });
 
-  it("forwards the reason label and note with JSON content type in backend-development mode", async () => {
+  it("forwards the reason label and note with JSON content type in real-m1 mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
       if (String(url).includes("/crews")) {
@@ -166,7 +165,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
       }
       return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
     });
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
     backendFetch.mockClear();
 
     const response = await POST(
@@ -196,7 +195,7 @@ describe("POST /api/services/[id]/suspend BFF route", () => {
       }
       return Response.json({ id: "SVC-1050", statusNote: null });
     });
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
     backendFetch.mockClear();
 
     const response = await POST(
@@ -232,7 +231,7 @@ it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ id: "real-service", crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+  const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/suspend", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(suspendBody),

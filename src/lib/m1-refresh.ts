@@ -5,6 +5,7 @@ import {
   readJwtExpiry,
   readJwtSubject,
   rememberRenewedSession,
+  isLoopbackHostname,
   type Session,
 } from "./session";
 
@@ -30,15 +31,14 @@ type Renewal = { accessToken: string; refreshToken: string; jwtExpiresAt: number
 const renewals = new Map<string, { at: number; ttl: number; result: Promise<Renewal | null> }>();
 let warnedInvalidBase = false;
 
-/** `M1_BASE_URL` válida: URL absoluta, sin credenciales, https en producción. Inválida o ausente → undefined. */
+/** `M1_BASE_URL` válida: URL absoluta, sin credenciales; HTTP solo para loopback. Inválida o ausente → undefined. */
 export function m1BaseUrl(): URL | undefined {
   const raw = process.env.M1_BASE_URL;
   if (!raw) return undefined;
   try {
     const url = new URL(raw.replace(/\/?$/, "/"));
-    const protocolOk = url.protocol === "https:" || (url.protocol === "http:" && process.env.NODE_ENV !== "production");
-    const host = url.hostname.toLowerCase();
-    const localHost = host === "localhost" || host === "[::1]" || host === "::1" || host === "0.0.0.0" || /^127(?:\.\d{1,3}){3}$/.test(host);
+    const localHost = isLoopbackHostname(url.hostname);
+    const protocolOk = url.protocol === "https:" || (url.protocol === "http:" && localHost && process.env.NODE_ENV !== "production");
     const productionSafe = process.env.NODE_ENV !== "production" || (!localHost && process.env.M1_FAKE_ENABLED !== "true");
     if (protocolOk && productionSafe && !url.username && !url.password) return url;
   } catch {
@@ -46,7 +46,7 @@ export function m1BaseUrl(): URL | undefined {
   }
   if (!warnedInvalidBase) {
     warnedInvalidBase = true;
-    console.error("[m1-refresh] M1_BASE_URL no es válida (URL absoluta, https en producción, sin credenciales); la renovación queda deshabilitada.");
+    console.error("[m1-refresh] M1_BASE_URL no es válida (URL absoluta, HTTPS salvo HTTP de loopback, sin credenciales); la renovación queda deshabilitada.");
   }
   return undefined;
 }
@@ -61,7 +61,7 @@ export function isNearExpiry(session: Session, now = Date.now()): boolean {
 }
 
 /**
- * `POST /auth/refresh` de M1 (Catálogo v3.0 §8, 204). NO VERIFICADO contra M1 (no está hosteado): el contrato no define
+ * `POST /auth/refresh` de M1 (Catálogo v3.0 §8, 204). Aún no verificado contra M1 hosteado: el contrato no define
  * cómo se manda el refresh token ni dónde vienen los tokens nuevos. Supuestos, simétricos al login: el refresh viaja en
  * `X-Refresh-Token`; los tokens nuevos vuelven en `Authorization: Bearer` y `X-Refresh-Token` (o, si no, en un JSON
  * `{ accessToken, refreshToken }`); sin `X-Refresh-Token` nuevo se conserva el anterior.
@@ -169,6 +169,6 @@ export async function renewRequestSession<T extends RenewableSession>(
   }
   if (!next) throw new InvalidSessionError("M1 rechazó la renovación de la sesión.");
   rememberRenewedSession(request, next);
-  await persistRenewedSession(next);
+  await persistRenewedSession(next, request);
   return next as T;
 }

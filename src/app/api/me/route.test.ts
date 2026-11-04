@@ -18,7 +18,7 @@ describe("GET /api/me", () => {
   });
 
   it("returns the effective roles from the backend and reseals the session when they changed", async () => {
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(me(["M6_OFICINA_AMBIENTAL"])));
 
     const response = await call(cookie);
@@ -30,14 +30,14 @@ describe("GET /api/me", () => {
   });
 
   it("leaves the cookie alone when the roles did not change", async () => {
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(json(me(["M6_ADMIN"])));
 
     expect((await call(cookie)).headers.get("set-cookie")).toBeNull();
   });
 
   it("passes an employee without roles through: that is a state to explain, not an error", async () => {
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(json(me([])));
 
     const response = await call(cookie);
@@ -47,7 +47,7 @@ describe("GET /api/me", () => {
   });
 
   it("answers a citizen 403 without a role code, so it is not mistaken for a missing role", async () => {
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ statusCode: 403, message: "Este sistema es solo para personal municipal" }, 403));
 
     const response = await call(cookie);
@@ -59,14 +59,14 @@ describe("GET /api/me", () => {
   });
 
   it("clears nothing itself but relays a backend 401 as 401 so the client ends the session", async () => {
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ statusCode: 401, message: "Unauthorized" }, 401));
 
     expect((await call(cookie)).status).toBe(401);
   });
 
   it("rejects a response outside the documented contract", async () => {
-    const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ userId: "42", roles: ["M6_SUPERUSER"] }));
 
     expect((await call(cookie)).status).toBe(503);

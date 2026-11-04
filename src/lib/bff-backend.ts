@@ -5,7 +5,6 @@ import {
   getRequiredSession,
   getSessionFromRequest,
   rememberRenewedResponse,
-  sessionToken,
   requireCapability,
   wasSessionRenewed,
 } from "./session";
@@ -44,9 +43,9 @@ export async function fetchBackend(
   }
 
   const backendOrigin = process.env.M6_BACKEND_ORIGIN;
-  const sessionAccessToken = sessionToken(session);
+  const sessionAccessToken = session.accessToken;
   if (!backendOrigin || !sessionAccessToken) {
-    throw new AuthUnavailableError("El backend de desarrollo no está configurado.");
+    throw new AuthUnavailableError("El backend no está configurado.");
   }
 
   if (resourcePath.includes(INVALID_BACKEND_PATH_ID)) {
@@ -81,7 +80,7 @@ export async function fetchBackend(
   };
   const finish = (response: Response): Response => {
     const renewed = wasSessionRenewed(request) ? getSessionFromRequest(request) : undefined;
-    if (renewed) rememberRenewedResponse(response, renewed);
+    if (renewed) rememberRenewedResponse(response, renewed, request);
     rememberBffPath(response, new URL(request.url).pathname);
     return response;
   };
@@ -91,7 +90,7 @@ export async function fetchBackend(
     const replayable = !(init.body instanceof ReadableStream) && !(typeof init.body === "object" && init.body !== null && Symbol.asyncIterator in init.body);
     if (response.status === 401 && replayable && canRenew(session)) {
       const current = getSessionFromRequest(request);
-      const currentToken = current ? sessionToken(current) : undefined;
+      const currentToken = current?.accessToken;
       if (currentToken && currentToken !== accessToken) {
         // Otra llamada del mismo pedido (Promise.all) ya renovó: se reintenta con su token, sin renovar de nuevo.
         void response.body?.cancel().catch(() => undefined);
