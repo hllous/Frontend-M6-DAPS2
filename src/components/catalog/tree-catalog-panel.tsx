@@ -18,7 +18,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
-import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { CompactPager } from "@/components/ui/compact-pager";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
@@ -371,20 +371,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
         </Field>
         <Button type="button" variant="outline" disabled={!surveyTreeSelection} onClick={() => setSurveyTree(state.items.find((tree) => tree.id === surveyTreeSelection) ?? null)}>Ver historial de relevamientos</Button>
       </div> : null}
-      {state.status === "ready" && state.totalPages > 1 ? (() => {
-        const pageUrl = (targetPage: number) => {
-          const next = new URLSearchParams(searchParams.toString());
-          next.set("page", String(targetPage));
-          return `${pathname}?${next.toString()}`;
-        };
-        return <Pagination aria-label="Paginación de árboles" className="items-center justify-between gap-3">
-          <span className="text-sm text-muted-foreground">Página {page} de {state.totalPages}</span>
-          <PaginationContent>
-            <PaginationItem><PaginationPrevious href={page > 1 ? pageUrl(page - 1) : undefined} aria-disabled={page <= 1} className={page <= 1 ? "pointer-events-none opacity-50" : undefined} /></PaginationItem>
-            <PaginationItem><PaginationNext href={page < state.totalPages ? pageUrl(page + 1) : undefined} aria-disabled={page >= state.totalPages} className={page >= state.totalPages ? "pointer-events-none opacity-50" : undefined} /></PaginationItem>
-          </PaginationContent>
-        </Pagination>;
-      })() : null}
+      {state.status === "ready" && state.totalPages > 1 ? <CompactPager label="Paginación de árboles" page={page} totalPages={state.totalPages} onPageChange={(next) => setParams({ page: String(next) }, false)} /> : null}
       {surveyTree ? <TreeSurveyPanel tree={surveyTree} scenario={scenario} onClose={() => setSurveyTree(null)} /> : null}
       {canRequestIntervention ? <Button type="button" variant="outline" disabled={!surveyTreeSelection} onClick={() => { setInterventionTreeIds([surveyTreeSelection]); setInterventionOpen(true); }}>Solicitar intervención sobre el árbol seleccionado</Button> : null}
       {canRequestIntervention ? <TreeInterventionRequestDialog key={`${interventionOpen}-${interventionTreeIds.join(",")}`} open={interventionOpen} onOpenChange={setInterventionOpen} trees={state.status === "ready" ? state.items : []} initialTreeIds={interventionTreeIds} onCreated={() => setNotice("Solicitud de intervención creada. Estado inicial: solicitada.")} /> : null}

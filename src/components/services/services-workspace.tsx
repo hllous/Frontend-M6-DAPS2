@@ -536,6 +536,19 @@ export function ServicesWorkspace({
   // La página vuelve a 1 cuando cambia la búsqueda, un filtro, el orden o el período; también al elegir un servicio que está en otra página.
   const pageKey = [search, [...columnFilters.statuses].join(","), [...columnFilters.zones].join(","), [...columnFilters.crews].join(","), columnFilters.timeFrom, columnFilters.timeTo, sortKey, sortDir, activePeriod].join("|");
   const [pageState, setPageState] = useState({ page: 1, key: pageKey, revealedId: null as string | null });
+  const initialPageKey = useRef(pageKey);
+  const pageStorageKey = `m6:services-page:v1:${encodeURIComponent(scenario?.actor.userId ?? "user-lucia")}`;
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(pageStorageKey) ?? "null") as { key?: unknown; page?: unknown } | null;
+      if (saved?.key === initialPageKey.current && typeof saved.page === "number" && Number.isSafeInteger(saved.page) && saved.page > 0) {
+        setPageState((state) => ({ ...state, page: saved.page as number }));
+      }
+    } catch { /* La navegación sigue disponible sin almacenamiento. */ }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pageStorageKey]);
   const lastPage = Math.max(1, Math.ceil(sortedServices.length / SERVICES_PAGE_SIZE));
   let nextPageState = pageState;
   if (nextPageState.key !== pageKey) nextPageState = { page: 1, key: pageKey, revealedId: nextPageState.revealedId };
@@ -548,6 +561,7 @@ export function ServicesWorkspace({
   const tableGroupRef = useRef<HTMLDivElement>(null);
   const setPage = (next: number) => {
     setPageState({ ...nextPageState, page: next });
+    try { sessionStorage.setItem(pageStorageKey, JSON.stringify({ key: pageKey, page: next })); } catch { /* La página sigue disponible en esta visita. */ }
     requestAnimationFrame(() => {
       const group = tableGroupRef.current;
       if (!group) return;

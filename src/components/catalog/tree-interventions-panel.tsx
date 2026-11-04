@@ -3,12 +3,13 @@ import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, CircleX, Clock3, Eye, Info, Plus, RefreshCw, Send, ShieldAlert, UserRound } from "lucide-react";
+import { CalendarClock, CheckCircle2, CircleX, Clock3, Eye, Info, Plus, RefreshCw, Send, ShieldAlert, UserRound } from "lucide-react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button } from "@/components/ui/button";
+import { CompactPager } from "@/components/ui/compact-pager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -566,7 +567,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
             );
           })}
         </div>
-        <div className="flex items-center justify-between gap-3" aria-label="Paginación de intervenciones"><span className="text-sm text-muted-foreground">Página {state.page.page} de {state.page.totalPages}</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={state.page.page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft data-icon="inline-start" aria-hidden />Anterior</Button><Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={state.page.page >= state.page.totalPages} onClick={() => setPage((current) => current + 1)}>Siguiente<ChevronRight data-icon="inline-end" aria-hidden /></Button></div></div>
+        <CompactPager label="Paginación de intervenciones" page={state.page.page} totalPages={state.page.totalPages} onPageChange={setPage} />
       </> : null}
 
       {canRequest ? <TreeInterventionRequestDialog key={`${requestOpen}-${JSON.stringify(requestPrefill)}`} open={requestOpen} onOpenChange={setRequestOpen} trees={trees} {...requestPrefill} onCreated={() => { setNotice("Solicitud de intervención creada. Estado inicial: solicitada."); setPage(1); setRequestVersion((version) => version + 1); }} /> : null}
