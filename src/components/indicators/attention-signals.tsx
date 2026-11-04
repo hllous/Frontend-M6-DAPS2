@@ -60,7 +60,7 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
         previous: coverage.previous?.totals.notServiced ?? null,
         context: withTarget(`Cobertura ${plainNumber(coverage.totals.coveragePct, 1)} %`, coverage.targets?.coveragePct?.value),
         href: `/app?destination=services&status=PARTIALLY_COMPLETED&status=CANCELLED&status=SUSPENDED&periodo=${periodo}`,
-        linkLabel: "Ver servicios sin realizar",
+        linkLabel: "Ver lista de servicios sin realizar",
       }
       : { id: "not-serviced", family: "coverage", label: "Servicios sin realizar" },
     compliance
@@ -70,7 +70,7 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
         previous: compliance.previous?.totals.finished.late ?? null,
         context: withTarget(`A tiempo ${plainNumber(compliance.finished.onTimePct, 1)} %`, compliance.targets?.compliancePct?.value),
         href: `/app?destination=services&status=COMPLETED&status=PARTIALLY_COMPLETED&periodo=${periodo}`,
-        linkLabel: "Ver servicios finalizados del período",
+        linkLabel: "Ver lista de servicios finalizados del período",
       }
       : { id: "late", family: "compliance", label: "Servicios fuera de horario" },
     incidents
@@ -83,17 +83,21 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
           previous: history ? incidents.previous?.totals.containers?.overflowIncidents ?? null : null,
           context: `Desbordes del período · hoy ${full === 1 ? "hay 1 lleno" : `hay ${plainNumber(full)} llenos`}`,
           href: "/app/catalog/containers?status=OVERFLOWED",
-          linkLabel: "Ver contenedores desbordados",
+          linkLabel: "Ver lista de contenedores desbordados",
         } satisfies LoadedSignal;
       })()
       : { id: "overflow", family: "incidents", label: "Contenedores desbordados" },
   ];
 }
 
+function changeText(change: number) {
+  return change === 0 ? "Igual que antes" : `${plainNumber(Math.abs(change))} ${change > 0 ? "más" : "menos"} que antes`;
+}
+
 function Trend({ change }: { change: number | null }) {
   if (change === null) return <span className="text-xs text-muted-foreground">Sin período anterior</span>;
   const Icon = change === 0 ? Equal : change > 0 ? ArrowUpRight : ArrowDownRight;
-  const text = change === 0 ? "Igual que antes" : `${plainNumber(Math.abs(change))} ${change > 0 ? "más" : "menos"} que antes`;
+  const text = changeText(change);
   return (
     <span className="inline-flex items-center gap-1 text-xs" aria-hidden="true">
       <Icon className="size-4" />
@@ -120,8 +124,7 @@ function SignalCard({ signal, status, onRetry }: { signal: AttentionSignal; stat
   const change = signal.previous === null ? null : signal.value - signal.previous;
   const worse = change !== null && change > 0;
   const comparison = change === null ? "Sin período anterior para comparar."
-    : change === 0 ? "Igual que el período anterior."
-      : `${plainNumber(Math.abs(change))} ${change > 0 ? "más" : "menos"} que el período anterior, ${worse ? "empeora" : "mejora"}.`;
+    : `${changeText(change).replace("que antes", "que el período anterior")}${change === 0 ? "" : worse ? ", empeora" : ", mejora"}.`;
   return (
     <Card size="sm" className={cn("h-full", worse && "ring-1 ring-destructive/40")} role="group" aria-labelledby={titleId} aria-describedby={descriptionId}>
       <CardHeader>

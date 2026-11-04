@@ -26,7 +26,7 @@ test.describe("Tableros: Requiere atención (#861)", () => {
     await clickWithMouse(page, page.getByRole("button", { name: "Más filtros" }));
     await expect(page.getByRole("button", { name: /^Desde/ })).toBeVisible();
 
-    await clickWithMouse(page, section.getByRole("link", { name: "Ver contenedores desbordados" }));
+    await clickWithMouse(page, section.getByRole("link", { name: "Ver lista de contenedores desbordados" }));
     await expect(page).toHaveURL(/\/app\/catalog\/containers\?status=OVERFLOWED/);
   });
 });
@@ -46,7 +46,7 @@ test.describe("Tableros: Requiere atención en móvil (#861)", () => {
     await page.getByRole("button", { name: "Trimestre" }).tap();
     await expect(page.getByRole("button", { name: "Trimestre" })).toHaveAttribute("aria-pressed", "true");
 
-    await page.getByRole("link", { name: "Ver servicios sin realizar" }).tap();
+    await page.getByRole("link", { name: "Ver lista de servicios sin realizar" }).tap();
     await expect(page).toHaveURL(/destination=services.*status=PARTIALLY_COMPLETED/);
   });
 });
