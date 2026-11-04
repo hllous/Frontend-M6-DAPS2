@@ -10,9 +10,9 @@ describe("CatalogPager", () => {
     render(<CatalogPager page={1} pageSize={20} total={57} totalPages={3} onPageChange={onPageChange} label="Paginación de vehículos" />);
     expect(screen.getByRole("navigation", { name: "Paginación de vehículos" })).toBeVisible();
     expect(screen.getByText("Mostrando 1–20 de 57")).toBeVisible();
-    expect(screen.getByText("Página 1 de 3")).toHaveAttribute("aria-live", "polite");
-    expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    expect(screen.getByLabelText("Página 1 de 3")).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByRole("button", { name: "Página anterior" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Página siguiente" }));
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
@@ -20,8 +20,8 @@ describe("CatalogPager", () => {
     const onPageChange = vi.fn();
     render(<CatalogPager page={3} pageSize={20} total={57} totalPages={3} onPageChange={onPageChange} label="Paginación de vehículos" />);
     expect(screen.getByText("Mostrando 41–57 de 57")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: "Anterior" }));
+    expect(screen.getByRole("button", { name: "Página siguiente" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Página anterior" }));
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 

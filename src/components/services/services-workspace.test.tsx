@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
@@ -29,6 +29,7 @@ function startedServiceFixture() {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => sessionStorage.clear());
 afterEach(() => {
   server.resetHandlers();
   resetStreetClosureRequestFixtures();

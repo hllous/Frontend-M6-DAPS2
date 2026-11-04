@@ -1,7 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-
+import { CompactPager } from "@/components/ui/compact-pager";
 import styles from "./catalog-panel.module.css";
 
 type CatalogPagerProps = {
@@ -11,21 +10,13 @@ type CatalogPagerProps = {
   totalPages: number;
   onPageChange: (page: number) => void;
   label: string;
-  /** Si se da, un total de 0 anuncia este texto en vez de desmontar la paginación sin avisar. */
   announceEmpty?: string;
 };
 
 export function CatalogPager({ page, pageSize, total, totalPages, onPageChange, label, announceEmpty }: CatalogPagerProps) {
-  if (total === 0) return announceEmpty ? <nav aria-label={label} className={styles.pager}><span role="status" className="text-muted-foreground">{announceEmpty}</span></nav> : null;
-
-  return (
-    <nav aria-label={label} className={styles.pager}>
-      <span className="text-muted-foreground">Mostrando {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total}</span>
-      {totalPages > 1 ? <div className={styles.pagerControls}>
-        <Button variant="outline" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Anterior</Button>
-        <span aria-live="polite">Página {page} de {totalPages}</span>
-        <Button variant="outline" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Siguiente</Button>
-      </div> : null}
-    </nav>
-  );
+  if (total === 0) return announceEmpty ? <div className={styles.pager}><span role="status" className="text-muted-foreground">{announceEmpty}</span></div> : null;
+  return <div className={styles.pager}>
+    <span className="text-muted-foreground">Mostrando {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total}</span>
+    {totalPages > 1 ? <CompactPager page={page} totalPages={totalPages} onPageChange={onPageChange} label={label} /> : null}
+  </div>;
 }
