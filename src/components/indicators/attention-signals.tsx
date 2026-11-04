@@ -81,7 +81,7 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
           id: "overflow", family: "incidents", label: "Contenedores desbordados",
           value: history?.overflowIncidents ?? full,
           previous: history ? incidents.previous?.totals.containers?.overflowIncidents ?? null : null,
-          context: `Hoy ${full === 1 ? "hay 1 lleno" : `hay ${plainNumber(full)} llenos`} sin vaciar`,
+          context: `Desbordes del período · hoy ${full === 1 ? "hay 1 lleno" : `hay ${plainNumber(full)} llenos`}`,
           href: "/app/catalog/containers?status=OVERFLOWED",
           linkLabel: "Ver contenedores desbordados",
         } satisfies LoadedSignal;

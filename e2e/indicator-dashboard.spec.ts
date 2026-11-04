@@ -67,6 +67,7 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(page.getByText("Actualizado")).toBeVisible();
 
     const detail = page.locator("section[aria-labelledby='indicator-detail-title']");
+    await page.getByRole("button", { name: "Más filtros" }).click();
     await chooseOption(page, "Zona operativa", "Palermo");
     await page.getByRole("button", { name: "Actualizar" }).click();
     await expect(detail.getByText("Costera").first()).toBeVisible();
