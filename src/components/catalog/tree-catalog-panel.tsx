@@ -371,7 +371,7 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
         </Field>
         <Button type="button" variant="outline" disabled={!surveyTreeSelection} onClick={() => setSurveyTree(state.items.find((tree) => tree.id === surveyTreeSelection) ?? null)}>Ver historial de relevamientos</Button>
       </div> : null}
-      {state.status === "ready" && state.totalPages > 1 ? <CompactPager label="Paginación de árboles" page={page} totalPages={state.totalPages} onPageChange={(next) => setParams({ page: String(next) }, false)} /> : null}
+      {state.status === "ready" && state.totalPages > 1 ? <CompactPager label="Paginación de árboles" page={page} totalPages={state.totalPages} onPageChange={() => {}} getPageHref={(next) => { const params = new URLSearchParams(searchParams.toString()); params.set("page", String(next)); return `${pathname}?${params.toString()}`; }} /> : null}
       {surveyTree ? <TreeSurveyPanel tree={surveyTree} scenario={scenario} onClose={() => setSurveyTree(null)} /> : null}
       {canRequestIntervention ? <Button type="button" variant="outline" disabled={!surveyTreeSelection} onClick={() => { setInterventionTreeIds([surveyTreeSelection]); setInterventionOpen(true); }}>Solicitar intervención sobre el árbol seleccionado</Button> : null}
       {canRequestIntervention ? <TreeInterventionRequestDialog key={`${interventionOpen}-${interventionTreeIds.join(",")}`} open={interventionOpen} onOpenChange={setInterventionOpen} trees={state.status === "ready" ? state.items : []} initialTreeIds={interventionTreeIds} onCreated={() => setNotice("Solicitud de intervención creada. Estado inicial: solicitada.")} /> : null}

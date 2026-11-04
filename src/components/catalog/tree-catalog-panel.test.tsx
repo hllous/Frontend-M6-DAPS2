@@ -200,6 +200,7 @@ describe("TreeCatalogPanel", () => {
     const firstPage = render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
     expect(await screen.findByLabelText("Página 1 de 3")).toBeVisible();
     expect(screen.getByLabelText("Página anterior")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Página siguiente" })).toHaveAttribute("href", "/app/catalog/trees?page=2");
 
     firstPage.unmount();
     window.history.replaceState(null, "", "/app/catalog/trees?page=3");

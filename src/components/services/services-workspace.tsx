@@ -537,15 +537,17 @@ export function ServicesWorkspace({
   const pageKey = [search, [...columnFilters.statuses].join(","), [...columnFilters.zones].join(","), [...columnFilters.crews].join(","), columnFilters.timeFrom, columnFilters.timeTo, sortKey, sortDir, activePeriod].join("|");
   const [pageState, setPageState] = useState({ page: 1, key: pageKey, revealedId: null as string | null });
   const initialPageKey = useRef(pageKey);
+  const pageRestored = useRef(false);
   const pageStorageKey = `m6:services-page:v1:${encodeURIComponent(scenario?.actor.userId ?? "user-lucia")}`;
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem(pageStorageKey) ?? "null") as { key?: unknown; page?: unknown } | null;
+      pageRestored.current = true;
       if (saved?.key === initialPageKey.current && typeof saved.page === "number" && Number.isSafeInteger(saved.page) && saved.page > 0) {
         setPageState((state) => ({ ...state, page: saved.page as number }));
       }
-    } catch { /* La navegación sigue disponible sin almacenamiento. */ }
+    } catch { pageRestored.current = true; /* La navegación sigue disponible sin almacenamiento. */ }
     });
     return () => cancelAnimationFrame(frame);
   }, [pageStorageKey]);
@@ -558,6 +560,10 @@ export function ServicesWorkspace({
   }
   if (nextPageState !== pageState) setPageState(nextPageState);
   const page = nextPageState.page;
+  useEffect(() => {
+    if (!pageRestored.current || loadState.status !== "ready") return;
+    try { sessionStorage.setItem(pageStorageKey, JSON.stringify({ key: pageKey, page })); } catch { /* La página sigue disponible en esta visita. */ }
+  }, [loadState.status, page, pageKey, pageStorageKey]);
   const tableGroupRef = useRef<HTMLDivElement>(null);
   const setPage = (next: number) => {
     setPageState({ ...nextPageState, page: next });

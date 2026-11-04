@@ -155,6 +155,21 @@ describe("Services workspace period", () => {
     render(<ServicesWorkspace />);
     expect(await screen.findByText("Mostrando 26–30 de 30")).toBeVisible();
   });
+  it("restores the reset page after changing and clearing a filter", async () => {
+    window.history.replaceState(null, "", "/app?periodo=todo");
+    const services = Array.from({ length: 30 }, (_, index) => ({ ...serviceFixtures[0], id: `reset-${index}`, status: index < 15 ? "SCHEDULED" as const : "COMPLETED" as const }));
+    vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services, total: 30, totalPages: 1, page: 1, pageSize: 100 });
+    const user = userEvent.setup();
+    const { unmount } = render(<ServicesWorkspace />);
+    await user.click(await screen.findByRole("button", { name: "Página siguiente" }));
+    await pick("Estado", "Completado");
+    await screen.findByText("Mostrando 1–15 de 15");
+    await pick("Estado", "Todos");
+    expect(await screen.findByText("Mostrando 1–25 de 30")).toBeVisible();
+    unmount();
+    render(<ServicesWorkspace />);
+    expect(await screen.findByText("Mostrando 1–25 de 30")).toBeVisible();
+  });
   it("shows 25 services per page in chronological order with a pager and quick filters", async () => {
     window.history.replaceState(null, "", "/app?periodo=todo");
     const services = Array.from({ length: 60 }, (_, index) => ({ ...serviceFixtures[0], id: `s${index}`, title: `Servicio ${String(index).padStart(2, "0")}`, scheduledDate: `2026-09-${String(28 - (index % 28)).padStart(2, "0")}`, windowFrom: "08:00" }));
