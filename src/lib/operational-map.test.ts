@@ -13,6 +13,23 @@ afterEach(() => { server.resetHandlers(); operationalMapAdapter.invalidate(); })
 afterAll(() => server.close());
 
 describe("operational map adapter", () => {
+  it("ignores a failed obsolete load after a refresh starts", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let requests = 0;
+    server.use(http.get("*/api/containers", async () => {
+      requests++;
+      if (requests === 1) { await gate; return HttpResponse.json({}, { status: 500 }); }
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } });
+    }));
+    const old = operationalMapAdapter.load();
+    await vi.waitFor(() => expect(requests).toBe(1));
+    operationalMapAdapter.invalidate();
+    const fresh = operationalMapAdapter.load();
+    await fresh;
+    release();
+    await expect(old).resolves.toEqual(await fresh);
+  });
   it("retains pages that finish after another page fails", async () => {
     server.use(http.get("*/api/containers", async ({ request }) => {
       const page = Number(new URL(request.url).searchParams.get("page"));

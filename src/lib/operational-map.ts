@@ -101,6 +101,7 @@ export const operationalMapAdapter = {
       }, cachedPages.trees, (pages) => update("trees", pages)),
     ]);
 
+    if (generation !== currentGeneration) return this.load();
     const failure = results.find((result) => result.status === "rejected");
     if (failure?.status === "rejected") throw failure.reason;
     const [containers, greenPoints, greenSpaces, trees] = results.map((result) => {
@@ -108,7 +109,6 @@ export const operationalMapAdapter = {
       return result.value;
     }) as [Container[], GreenPoint[], GreenSpace[], Tree[]];
 
-    if (generation !== currentGeneration) return this.load();
     return { containers, greenPoints, greenSpaces, trees };
   },
 };
