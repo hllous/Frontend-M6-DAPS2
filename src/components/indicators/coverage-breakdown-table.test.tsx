@@ -83,7 +83,7 @@ describe("CoverageBreakdownTable", () => {
 
     const sortBy = screen.getByRole("combobox", { name: "Ordenar por" });
     await user.click(sortBy);
-    await user.click(screen.getByRole("option", { name: "Programado a futuro" }));
+    await user.click(await screen.findByRole("option", { name: "Programado a futuro" }));
 
     const firstRow = screen.getByRole("row", { name: /Zona 12/ });
     expect(sortBy).toHaveTextContent("Programado a futuro");
