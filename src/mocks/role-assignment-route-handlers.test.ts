@@ -56,7 +56,7 @@ describe("respuestas del backend", () => {
   it("rechaza respuestas de asignación que no respetan los DTO del backend", async () => {
     const restore = backendEnv();
     try {
-      const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", roles: ["M6_ADMIN"] });
+      const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1", roles: ["M6_ADMIN"] });
       const invalidAssignment = { userId: "42", roles: ["ROLE_DESCONOCIDO"] };
       const invalidPage = {
         data: [invalidAssignment],
