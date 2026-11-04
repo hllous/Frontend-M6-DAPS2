@@ -30,9 +30,10 @@ import {
   toggleInSet,
   type ZoneGroup,
 } from "./services-filters";
+import type { ServicesListPeriod } from "./services-list-cache";
 import type { ColumnFilters } from "./services-table";
 
-export type ServicesPeriod = "semana" | "mes" | "todo";
+export type ServicesPeriod = ServicesListPeriod;
 
 type FilterBarProps = {
   search: string;
@@ -264,9 +265,9 @@ export function ServicesFilterBar(props: FilterBarProps) {
       aria-label="Filtros de servicios"
       hidden={hidden}
       data-services-filter-toolbar
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2"
+      className="flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2"
     >
-      <SearchField search={search} onSearchChange={onSearchChange} className="w-64 max-w-full" />
+      <SearchField search={search} onSearchChange={onSearchChange} className="w-52 max-w-full" />
       <PeriodField {...props} id="services-period" />
       <FilterPopover label="Estado" count={filters.statuses.size}>
         <StatusOptions filters={filters} onFiltersChange={onFiltersChange} hideLegend />

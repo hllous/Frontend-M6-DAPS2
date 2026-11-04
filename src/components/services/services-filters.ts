@@ -36,7 +36,7 @@ export function zoneGroupsFromServices(services: Service[]): ZoneGroup[] {
   const zones = new Map<string, ZoneOption>();
   for (const service of services) {
     service.zoneIds.forEach((id, index) => {
-      if (!zones.has(id)) zones.set(id, { id, name: service.zoneNames[index] ?? service.zoneNames[0] ?? "Zona" });
+      if (!zones.has(id)) zones.set(id, { id, name: service.zoneNames.length === service.zoneIds.length ? service.zoneNames[index]! : "Zona" });
     });
   }
   if (zones.size === 0) return [];

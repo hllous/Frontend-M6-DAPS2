@@ -64,6 +64,7 @@ import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import styles from "./services-workspace.module.css";
 import { ServicesFilterBar } from "./services-filter-bar";
 import {
+  type ServicesListPeriod,
   readServicesListCache,
   servicesListCacheKey,
   writeServicesListCache,
@@ -80,7 +81,7 @@ import {
   useServicesColumnPreferences,
 } from "./services-column-editor";
 
-type Period = "semana" | "mes" | "todo";
+type Period = ServicesListPeriod;
 
 const SERVICES_PAGE_SIZE = 25;
 
