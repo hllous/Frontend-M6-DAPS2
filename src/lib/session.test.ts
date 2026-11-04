@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   AUTH_COOKIE_NAME,
-  AuthUnavailableError,
   SESSION_ABSOLUTE_MS,
   SESSION_IDLE_MS,
   createM1Session,
@@ -11,11 +10,11 @@ import {
   getAuthMode,
   getRequiredSession,
   getSessionFromCookieValue,
+  isProductionAuthModeMisconfigured,
   isSessionActive,
   publicSession,
   sealSession,
   sessionCookieOptions,
-  type Session,
 } from "./session";
 
 const now = Date.parse("2026-09-05T15:00:00.000Z");
@@ -57,23 +56,6 @@ describe("owned BFF session", () => {
     expect(AUTH_COOKIE_NAME).toBe("m6_session");
   });
 
-  it("bounds activity by JWT, idle, and absolute expiry", () => {
-    const session: Session = {
-      mode: "backend-development",
-      scenarioId: "field-crew-leader-route",
-      issuedAt: now,
-      lastActivityAt: now,
-      absoluteExpiresAt: now + 8 * 60 * 60 * 1000,
-      jwtExpiresAt: now + 20 * 60 * 1000,
-      accessToken: "header.payload.signature",
-      roles: ["M6_CAMPO_CUADRILLA"],
-    };
-
-    expect(effectiveSessionExpiry(session)).toBe(now + 20 * 60 * 1000);
-    expect(isSessionActive(session, now + 19 * 60 * 1000)).toBe(true);
-    expect(isSessionActive(session, now + 21 * 60 * 1000)).toBe(false);
-  });
-
   it("keeps an M1 session alive past the access JWT expiry, bounded by idle and absolute expiry", () => {
     const session = createM1Session({
       accessToken: "header.payload.signature",
@@ -109,34 +91,39 @@ describe("owned BFF session", () => {
     expect(getRequiredSession(request)).toMatchObject({ mode: "real-m1", roles: [] });
   });
 
-  it("round-trips the server-only development credential through the sealed value", () => {
-    vi.stubEnv("M6_AUTH_MODE", "backend-development");
+  it("keeps the M1 access token sealed and out of the public session", () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
     const token = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const session = createSession("field-crew-leader-route", {
-      mode: "backend-development",
+    const session = createM1Session({
+      accessToken: token,
+      refreshToken: "refresh-test",
+      jwtExpiresAt: now + 15 * 60 * 1000,
+      identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
+      roles: ["M6_CAMPO_CUADRILLA"],
       now,
-      devJwt: token,
-      backendOrigin: "https://backend.internal",
     });
     const cookie = sealSession(session, secret);
     const unsealed = getSessionFromCookieValue(cookie, secret, now);
 
     expect(unsealed?.accessToken).toBe(token);
     expect(cookie).not.toContain(token);
+    expect(publicSession(session)).not.toHaveProperty("accessToken");
   });
 
   it.each([
-    { sessionMode: "mock", runtimeMode: "backend-development" },
-    { sessionMode: "backend-development", runtimeMode: "mock" },
+    { sessionMode: "mock", runtimeMode: "real-m1" },
+    { sessionMode: "real-m1", runtimeMode: "mock" },
   ] as const)("rejects a $sessionMode cookie after switching to $runtimeMode mode", ({ sessionMode, runtimeMode }) => {
     vi.stubEnv("M6_AUTH_MODE", sessionMode);
-    const session = createSession("office-duty-queue", sessionMode === "mock"
-      ? { mode: sessionMode, now }
-      : {
-          mode: sessionMode,
+    const session = sessionMode === "mock"
+      ? createSession("office-duty-queue", { mode: "mock", now })
+      : createM1Session({
+          accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+          refreshToken: "refresh-test",
+          jwtExpiresAt: now + 15 * 60 * 1000,
+          identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
+          roles: ["M6_ADMIN"],
           now,
-          devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
-          backendOrigin: "https://backend.internal",
         });
     const cookie = sealSession(session, secret);
 
@@ -176,34 +163,13 @@ describe("owned BFF session", () => {
     expect(getSessionFromCookieValue(cookie, secret, session.absoluteExpiresAt)).toBeUndefined();
   });
 
-  it("fails closed for real M1 authentication", () => {
-    expect(() => createSession("office-duty-queue", { mode: "real-m1", now })).toThrow(
-      "La autenticación solicitada no está disponible.",
-    );
-  });
-
-  it("fails closed when backend-development has no backend origin", () => {
-    expect(() => createSession("field-crew-leader-route", {
-      mode: "backend-development",
-      now,
-      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
-    })).toThrow("La autenticación solicitada no está disponible.");
-  });
-
-  it("keeps authentication diagnostics in the server log and exposes a generic message", () => {
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const error = new AuthUnavailableError("M6_DEV_JWT no tiene una expiración válida.");
-
-    expect(error.message).toBe("La autenticación solicitada no está disponible.");
-    expect(log).toHaveBeenCalledWith("[m6-auth-unavailable]", "M6_DEV_JWT no tiene una expiración válida.");
-  });
-
-  it("forces real M1 for production demo modes unless the demo override is explicit", () => {
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe("real-m1");
+  it("accepts only real M1 in production, without a demo override", () => {
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "real-m1" })).toBe("real-m1");
     expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock" })).toBe("real-m1");
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development", M6_ALLOW_DEMO: "true" })).toBe("backend-development");
-    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "mock", M6_ALLOW_DEMO: "true" })).toBe("mock");
+    expect(isProductionAuthModeMisconfigured({ NODE_ENV: "production", M6_AUTH_MODE: "real-m1" })).toBe(false);
+    expect(isProductionAuthModeMisconfigured({ NODE_ENV: "production", M6_AUTH_MODE: "mock" })).toBe(true);
+    expect(isProductionAuthModeMisconfigured({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe(true);
+    expect(getAuthMode({ NODE_ENV: "production", M6_AUTH_MODE: "backend-development" })).toBe("real-m1");
   });
 
   it("fails closed to real M1 in production when M6_AUTH_MODE is unset", () => {

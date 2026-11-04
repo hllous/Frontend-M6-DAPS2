@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GET, POST } from "./route";
-import { loginAs, loginWithMe as login } from "@/test/session";
+import { POST as login } from "@/app/api/session/login/route";
+import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -17,7 +18,7 @@ const inspection = { id: "INS-1", reportId: "REP-1", serviceId: null, checklistI
 
 describe("inspection assignment", () => {
   it("forwards the optional numeric inspector assignment, but no frontend agenda fields", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(inspection), { status: 201, headers: { "content-type": "application/json" } }));
     const response = await POST(new Request("http://localhost/api/environmental-reports/REP-1/inspections", {
       method: "POST", headers: { cookie }, body: JSON.stringify({
@@ -32,7 +33,7 @@ describe("inspection assignment", () => {
 
 describe("GET /api/environmental-reports/:id/inspections", () => {
   it("adds each inspection's evidence from GET /evidence (InspectionResponseDto does not carry it)", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     const attachment = { id: "att-1", url: "https://r2/att-1.jpg", filename: "acta.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-21T10:00:00.000Z" };
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const body = String(input).includes("/evidence?ownerType=INSPECTION&ownerId=INS-1") ? [attachment] : [inspection];
@@ -45,7 +46,7 @@ describe("GET /api/environmental-reports/:id/inspections", () => {
   });
 
   it("returns the inspections without attachments when the evidence cannot be read", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
       String(input).includes("/evidence")
         ? new Response("{}", { status: 503 })
@@ -58,7 +59,7 @@ describe("GET /api/environmental-reports/:id/inspections", () => {
   });
 
   it("keeps the shared 503 and 409 error labels on a route with status-specific envelopes", async () => {
-    const backendSession = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const backendSession = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     delete process.env.M6_BACKEND_ORIGIN;
     const unavailable = await GET(
       new Request("http://localhost/api/environmental-reports/REP-1/inspections", { headers: { cookie: backendSession } }),

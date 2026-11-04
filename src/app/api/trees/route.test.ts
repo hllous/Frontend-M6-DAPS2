@@ -5,7 +5,7 @@ import { GET, POST } from "./route";
 import { loginAs } from "@/test/session";
 
 beforeEach(() => resetTreeFixtures());
-afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
+afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M1_TEST_ACCESS_TOKEN; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
 
 
 
@@ -35,8 +35,8 @@ describe("/api/trees", () => {
   });
 
   it("forwards filtered backend tree lists with the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0, page: 2, pageSize: 25, totalPages: 0 } }));
 
     const response = await GET(new Request("http://localhost/api/trees?active=false&zoneId=zone-2&search=parque+centro&page=2&pageSize=25", { headers: { cookie } }));
@@ -44,12 +44,12 @@ describe("/api/trees", () => {
     expect(response.status).toBe(200);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees?active=false&zoneId=zone-2&search=parque+centro&page=2&pageSize=25");
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 
   it("forwards validated backend tree creation with the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const input = { surveyCode: "ARB-BFF-1", zoneId: "zone-2", species: "Ceibo", address: "Av. de prueba 120", lat: -34.6, lng: -58.38, heightM: 7.5, diameterCm: 24 };
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "tree-backend-1", ...input }, { status: 201 }));
 
@@ -62,7 +62,7 @@ describe("/api/trees", () => {
     expect(response.status).toBe(201);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees");
     expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
     expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("content-type")).toBe("application/json");
     expect(JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body))).toEqual(input);
   });

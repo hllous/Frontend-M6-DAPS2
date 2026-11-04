@@ -5,7 +5,7 @@ import { DELETE, GET, PATCH } from "./route";
 import { loginAs } from "@/test/session";
 
 beforeEach(() => resetTreeFixtures());
-afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
+afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M1_TEST_ACCESS_TOKEN; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
 
 
 
@@ -38,8 +38,8 @@ describe("/api/trees/[id]", () => {
   });
 
   it("forwards backend tree detail with the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "tree-backend-1", surveyCode: "ARB-1000" }));
 
     const response = await GET(new Request("http://localhost/api/trees/tree-backend-1", { headers: { cookie } }), { params: Promise.resolve({ id: "tree-backend-1" }) });
@@ -47,12 +47,12 @@ describe("/api/trees/[id]", () => {
     expect(response.status).toBe(200);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees/tree-backend-1");
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 
   it("forwards backend tree updates with the validated body and session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const input = { species: "Ceibo", heightM: 14.5 };
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "tree-backend-1", ...input }));
 
@@ -65,13 +65,13 @@ describe("/api/trees/[id]", () => {
     expect(response.status).toBe(200);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees/tree-backend-1");
     expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("PATCH");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
     expect(JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body))).toEqual(input);
   });
 
   it("forwards backend tree deactivation with DELETE and the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
 
     const response = await DELETE(new Request("http://localhost/api/trees/tree-backend-1", { method: "DELETE", headers: { cookie } }), { params: Promise.resolve({ id: "tree-backend-1" }) });
@@ -79,6 +79,6 @@ describe("/api/trees/[id]", () => {
     expect(response.status).toBe(204);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees/tree-backend-1");
     expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("DELETE");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 });

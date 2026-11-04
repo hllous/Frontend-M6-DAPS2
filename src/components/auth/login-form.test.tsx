@@ -54,13 +54,10 @@ describe("LoginForm", () => {
     expect(screen.queryByText("Su sesión terminó. Vuelva a ingresar.")).not.toBeInTheDocument();
   });
 
-  it("shows the seed id of the profile only against the real backend", () => {
-    const { rerender } = render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
-    expect(screen.getByText(/Entorno de demostración/)).not.toHaveTextContent("del seed del backend");
-
-    rerender(<LoginForm scenarios={Object.values(scenarios)} authMode="backend-development" redirectTo="/app" />);
-    expect(screen.getByText(/Entorno de demostración/)).toHaveTextContent("id 10000 del seed del backend");
-    expect(screen.getByRole("combobox", { name: "Perfil" })).toHaveAccessibleDescription(/Entorno de demostración/);
+  it("explains that profile selection is for local tests", () => {
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
+    expect(screen.getByRole("combobox", { name: "Perfil" })).toHaveAccessibleDescription(/Entorno local de pruebas/);
+    expect(screen.queryByText(/seed del backend/)).not.toBeInTheDocument();
   });
 
   it("announces a server error from the BFF without leaving the form", async () => {

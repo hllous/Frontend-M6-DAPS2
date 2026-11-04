@@ -14,7 +14,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -157,8 +157,8 @@ describe("street closure request BFF routes", () => {
   });
 
   it("forwards an authorized backend closure list with its filters and GET method", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0, page: 2, pageSize: 50 } }));
 
     const response = await GET(new Request("http://localhost/api/street-closure-requests?page=2&pageSize=50", { headers: { cookie } }));
@@ -166,12 +166,12 @@ describe("street closure request BFF routes", () => {
     expect(response.status).toBe(200);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/street-closure-requests?page=2&pageSize=50");
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 
   it("forwards closure type and each section direction to the backend", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "SCR-1003" }));
 
     const response = await POST(new Request("http://localhost/api/street-closure-requests", {

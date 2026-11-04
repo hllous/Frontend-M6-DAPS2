@@ -1,5 +1,4 @@
 import type { Session } from "./session";
-import { DEMO_IDENTITIES } from "./demo-identities";
 import { actorKindForRoles, capabilitiesForRoles, type M6Role } from "./m6-roles";
 
 export type Capability =
@@ -82,12 +81,12 @@ export type OperationalScenario = {
     crewId?: string;
     crewName?: string;
     /**
-     * Nombre exacto de la cuadrilla en el backend (el seed no le da código y el id cambia con cada seed).
-     * En modo backend el login lo resuelve contra GET /crews y la sesión guarda el id real.
+   * Nombre exacto de la cuadrilla en Backend (el seed no le da código y el id cambia con cada seed).
+   * En real-m1, el login lo resuelve contra GET /me y la sesión guarda el id real.
      */
     backendCrewName?: string;
   };
-  /** Roles de M6 del actor: en modo backend salen de GET /me; en mock, de este fixture. */
+  /** Roles de M6 del actor: en real-m1 salen de GET /me; en mock, de este fixture. */
   roles: M6Role[];
   /** Derivadas de `roles` (nunca declaradas a mano): lo que la UI muestra u oculta. */
   capabilities: Capability[];
@@ -201,15 +200,10 @@ export function getScenario(
 ): OperationalScenario {
   if (typeof ref === "string") return scenariosById[ref];
   let scenario = ref.scenarioId ? scenariosById[ref.scenarioId] : scenarios.employeeNoRole;
-  if (ref.mode === "backend-development" || ref.mode === "real-m1") {
+  if (ref.mode === "real-m1") {
     scenario = { ...scenario, actor: { ...scenario.actor, crewId: ref.crew?.id, crewName: ref.crew?.name, fieldRole: ref.fieldRole } };
   }
   if (ref.roles) scenario = scenarioForRoles(scenario, ref.roles);
-  // Sesión de demo firmada: el actor es la persona real del seed, no el nombre de fixture del escenario.
-  if (ref.source === "demo" && ref.scenarioId) {
-    const { sub, name } = DEMO_IDENTITIES[ref.scenarioId];
-    scenario = { ...scenario, actor: { ...scenario.actor, userId: sub, name } };
-  }
   if (!ref.crew) return scenario;
   return { ...scenario, actor: { ...scenario.actor, crewId: ref.crew.id, crewName: ref.crew.name } };
 }

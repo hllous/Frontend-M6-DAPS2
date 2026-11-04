@@ -13,7 +13,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_AUTH_MODE;
   resetEnvironmentalInspectionFixtures();
   resetServiceFixtures();
@@ -41,14 +41,14 @@ describe("repair request BFF collection routes", () => {
     };
 
     beforeEach(() => {
-      process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+      process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
       process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     });
 
     it.each(["SERVICE", "INSPECTION"])("conserva el 404 local para un origen %s desconocido", async (detectedInType) => {
       const backendFetch = vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(Response.json({ message: "Not found" }, { status: 404 }));
-      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+      const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
       const response = await POST(createRequest(cookie, { ...body, detectedInType }));
 
       expect(response.status).toBe(404);
@@ -65,7 +65,7 @@ describe("repair request BFF collection routes", () => {
     it.each([401, 403, 500, 503])("conserva el error %s del origen sin crear la derivación", async (status) => {
       const error = { statusCode: status, message: "No se pudo consultar el origen." };
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(error, { status }));
-      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+      const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
       const response = await POST(createRequest(cookie, body));
 
       expect(response.status).toBe(status);
@@ -76,7 +76,7 @@ describe("repair request BFF collection routes", () => {
 
     it("rechaza payloads del origen sin el contrato mínimo", async () => {
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ crewId: 42 }));
-      const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+      const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
       const response = await POST(createRequest(cookie, body));
 
       expect(response.status).toBe(500);
@@ -84,7 +84,7 @@ describe("repair request BFF collection routes", () => {
     });
 
     it("Campo no crea derivaciones: el rol de Campo no alcanza y no se consulta el origen (Backend #161)", async () => {
-      const cookie = createSessionCookie("field-crew-leader-route", { mode: "backend-development" });
+      const cookie = createSessionCookie("field-crew-leader-route", { mode: "real-m1" });
       const backendFetch = vi.spyOn(globalThis, "fetch");
       const response = await POST(createRequest(cookie, body));
 
@@ -95,7 +95,7 @@ describe("repair request BFF collection routes", () => {
   });
 
   it("Oficina crea una derivación desde un servicio real tras consultar su origen", async () => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const body = {
       damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW",
@@ -105,7 +105,7 @@ describe("repair request BFF collection routes", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json({ crewId: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516" }))
       .mockResolvedValueOnce(Response.json({ id: "derivacion-real", ...body }, { status: 201 }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
 
     const response = await POST(createRequest(cookie, { ...body, ignored: "not forwarded" }));
 
@@ -119,7 +119,7 @@ describe("repair request BFF collection routes", () => {
   });
 
   it("permite consultar derivaciones de un servicio real de la cuadrilla de Campo", async () => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json({
@@ -131,7 +131,7 @@ describe("repair request BFF collection routes", () => {
         vehicleId: null, windowFrom: "08:00", windowTo: "12:00",
       }))
       .mockResolvedValueOnce(Response.json({ data: [], meta: { total: 0, page: 1, pageSize: 20 } }));
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -144,11 +144,11 @@ describe("repair request BFF collection routes", () => {
 
   it.each(["901159c1-3230-440a-ba3d-d7baf55fab24", "crew-b", null])(
     "rechaza servicios reales sin la cuadrilla de la sesión (%s)", async (crewId) => {
-      process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+      process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
       process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
       const backendFetch = vi.spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(Response.json({ id: "ceec08ae-67e7-4739-9677-150f5085bb1a", crewId }));
-      const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
+      const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
 
       const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -159,12 +159,12 @@ describe("repair request BFF collection routes", () => {
   );
 
   it.each([401, 404, 503])("conserva el error %s al consultar el servicio real", async (status) => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const error = { statusCode: status, message: "No se pudo consultar el servicio." };
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json(error, { status }));
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "c1ba1a57-6f23-4871-b6b3-1d7ce231a516", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" } });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=ceec08ae-67e7-4739-9677-150f5085bb1a", { headers: { cookie } }));
 
@@ -174,11 +174,11 @@ describe("repair request BFF collection routes", () => {
   });
 
   it("Oficina consulta el backend sin validar la cuadrilla del servicio", async () => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const payload = { data: [{ id: "derivacion-real", detectedInId: "servicio-real" }], meta: { total: 1 } };
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(payload));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
 
     const response = await GET(new Request("http://localhost/api/repair-requests?detectedInId=servicio-real", { headers: { cookie } }));
 

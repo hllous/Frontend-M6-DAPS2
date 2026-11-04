@@ -1,15 +1,15 @@
 import type { ScenarioId } from "./scenarios";
 
-// Datos puros (sin node:crypto): los lee también el navegador. La firma vive en demo-jwt.ts, solo servidor.
+// Identidades de los fixtures de escenarios locales y pruebas; no se usan para firmar ni autenticar tokens.
 
-/** Persona del seed del backend (prisma/seed.ts): `sub` numérico de M1 y el rol de M1 que le permite sus roles de M6. */
-export type DemoIdentity = { sub: string; m1Role: "RESPONSABLE_AREA" | "ADMINISTRATIVO" | "AUDITOR" | "CIUDADANO"; name: string };
+/** Identidad de fixture asociada a un escenario: `sub` numérico de M1 y rol de M1 para los roles de M6 del ejemplo. */
+export type ScenarioIdentity = { sub: string; m1Role: "RESPONSABLE_AREA" | "ADMINISTRATIVO" | "AUDITOR" | "CIUDADANO"; name: string };
 
 /**
  * Perfil del login -> persona. Las 12 cuentas de M1 (10000 a 10011) existen en el seed del backend; 900 y 901 no tienen filas de roles:
  * el empleado sin rol recibe `roles: []` de GET /me y el ciudadano un 403 por `sub_type`.
  */
-export const DEMO_IDENTITIES: Record<ScenarioId, DemoIdentity> = {
+export const SCENARIO_IDENTITIES: Record<ScenarioId, ScenarioIdentity> = {
   "office-duty-queue": { sub: "10000", m1Role: "RESPONSABLE_AREA", name: "Carlos Rodríguez" },
   "office-operations": { sub: "10002", m1Role: "ADMINISTRATIVO", name: "Julián López" },
   "office-environmental": { sub: "10004", m1Role: "ADMINISTRATIVO", name: "Diego Sosa" },

@@ -1,14 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { DEMO_IDENTITIES } from "@/lib/demo-identities";
+import { SCENARIO_IDENTITIES } from "@/lib/scenario-identities";
 import { backendEnv, createSessionCookie } from "@/test/session";
 import { AUTH_COOKIE_NAME, createM1Session, getSessionFromRequest, sealSession } from "@/lib/session";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import { resetRoleAssignmentFixtures } from "./role-assignment-fixtures";
 import { handlers } from "./handlers";
 const server = setupServer(...handlers);
-const demoAdminId = DEMO_IDENTITIES["office-duty-queue"].sub;
+const demoAdminId = SCENARIO_IDENTITIES["office-duty-queue"].sub;
 const field = createSessionCookie("field-crew-leader-route", { mode: "mock" });
 const auditor = createSessionCookie("office-limited-intake", { mode: "mock" });
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -96,22 +96,23 @@ describe("respuestas del backend", () => {
     }
   });
 
-  it("reconoce el propio usuario del demo por el subject del perfil", async () => {
+  it("reconoce a la propia persona por el subject del token M1", async () => {
     const restore = backendEnv();
     try {
-      const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", roles: ["M6_ADMIN"] });
-      const demoUserId = DEMO_IDENTITIES["office-duty-queue"].sub;
+      const scenarioUserId = SCENARIO_IDENTITIES["office-duty-queue"].sub;
+      const accessToken = `header.${Buffer.from(JSON.stringify({ sub: scenarioUserId, exp: Math.floor(Date.now() / 1000) + 3_600 })).toString("base64url")}.signature`;
+      const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1", roles: ["M6_ADMIN"], accessToken });
       server.use(
-        http.put(`https://backend.internal/role-assignments/${demoUserId}`, () => HttpResponse.json({ userId: demoUserId, roles: ["M6_ADMIN"] })),
+        http.put(`https://backend.internal/role-assignments/${scenarioUserId}`, () => HttpResponse.json({ userId: scenarioUserId, roles: ["M6_ADMIN"] })),
         http.get("https://backend.internal/me", () => HttpResponse.json({
-          userId: demoUserId,
+          userId: scenarioUserId,
           subType: "EMPLEADO",
           m1Role: "RESPONSABLE_AREA",
           roles: ["M6_OFICINA_AMBIENTAL"],
         })),
       );
 
-      const response = await call("PUT", `/${demoUserId}`, { roles: ["M6_ADMIN"] }, cookie);
+      const response = await call("PUT", `/${scenarioUserId}`, { roles: ["M6_ADMIN"] }, cookie);
       const renewedCookie = response.headers.get("set-cookie")?.split(";")[0];
 
       expect(response.status).toBe(200);
@@ -124,7 +125,13 @@ describe("respuestas del backend", () => {
   it("reenvía estados y contenido de las cuatro operaciones", async () => {
     const restore = backendEnv();
     try {
-      const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+      const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
+      server.use(http.get("https://backend.internal/me", () => HttpResponse.json({
+        userId: "42",
+        subType: "EMPLEADO",
+        m1Role: "ADMINISTRATIVO",
+        roles: ["M6_ADMIN"],
+      })));
       for (const status of [200, 400, 403, 404, 409]) {
         server.use(...["https://backend.internal/role-assignments", "https://backend.internal/role-assignments/:userId"].map((path) => http.all(path, () => HttpResponse.json({ message: `backend ${status}` }, { status }))));
         for (const [method, path] of [["GET", ""], ["GET", "/42"], ["PUT", "/42"], ["DELETE", "/42"]]) {

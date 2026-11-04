@@ -3,63 +3,47 @@ import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import {
   AUTH_COOKIE_NAME,
   createSession,
+  createM1Session,
   getAuthMode,
+  readJwtExpiry,
+  readJwtSubject,
   sealSession,
   type SupportedAuthMode,
+  type Session,
 } from "@/lib/session";
 import type { M6Role } from "@/lib/m6-roles";
 import { getScenario, isScenarioId, type ScenarioCrew, type ScenarioId } from "@/lib/scenarios";
 
+type TestCrew = ScenarioCrew & { role?: "LEADER" | "MEMBER" };
+
 export type LoginAsOptions = {
   mode?: SupportedAuthMode;
-  devJwt?: string;
+  accessToken?: string;
   backendOrigin?: string;
   /** Roles que devuelve el GET /me de prueba; por defecto, los del fixture del escenario. */
   roles?: readonly M6Role[];
-  crew?: ScenarioCrew & { role: "LEADER" | "MEMBER" };
+  crew?: TestCrew | null;
 };
 
 function configureSessionEnvironment(options: Omit<LoginAsOptions, "crew">): void {
   if (options.mode !== undefined) process.env.M6_AUTH_MODE = options.mode;
-  if (options.devJwt !== undefined) process.env.M6_DEV_JWT = options.devJwt;
   if (options.backendOrigin !== undefined) process.env.M6_BACKEND_ORIGIN = options.backendOrigin;
 }
 
-/** Responde GET /me aparte mientras corre `run`, sin tocar la cola de respuestas que el test armó para el resto. */
-async function withMeStub<T>(roles: readonly M6Role[], scenarioId: ScenarioId | undefined, crew: LoginAsOptions["crew"], run: () => Promise<T>): Promise<T> {
-  const actor = scenarioId ? getScenario(scenarioId).actor : undefined;
-  const crews = crew ? [crew] : actor?.crewId && actor.crewName ? [{ id: actor.crewId, name: actor.crewName, role: actor.fieldRole === "CREW_MEMBER" ? "MEMBER" : "LEADER" }] : [];
-  const currentFetch = globalThis.fetch;
-  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = input instanceof Request ? input.url : String(input);
-    if (new URL(url, "http://localhost").pathname === "/me") {
-      return Promise.resolve(Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO", roles, crews }));
-    }
-    return currentFetch(input, init);
-  }) as typeof fetch;
-  try {
-    return await run();
-  } finally {
-    globalThis.fetch = currentFetch;
-  }
-}
-
-/** El handler de login con un GET /me de prueba: por defecto, los roles del fixture del escenario pedido. */
-export async function loginWithMe(request: Request, roles?: readonly M6Role[], crew?: LoginAsOptions["crew"]): Promise<Response> {
-  const body = (await request.clone().json().catch(() => ({}))) as { scenarioId?: unknown };
-  const meRoles = roles ?? (isScenarioId(body.scenarioId) ? getScenario(body.scenarioId).roles : []);
-  return withMeStub(meRoles, isScenarioId(body.scenarioId) ? body.scenarioId : undefined, crew, () => login(request));
-}
-
-/** Uses the login handler with a stubbed backend identity. */
+/** Uses the mock login handler; real-M1 route tests seed a sealed session instead. */
 export async function loginAs(scenarioId: string, options: LoginAsOptions = {}): Promise<string> {
   configureSessionEnvironment(options);
 
-  const response = await loginWithMe(new Request("http://localhost/api/session/login", {
+  if ((options.mode ?? getAuthMode()) === "real-m1") {
+    if (!isScenarioId(scenarioId)) throw new Error(`Escenario de prueba desconocido: ${scenarioId}`);
+    return createSessionCookie(scenarioId, options);
+  }
+
+  const response = await login(new Request("http://localhost/api/session/login", {
     method: "POST",
     headers: SESSION_MUTATION_HEADERS,
     body: JSON.stringify({ scenarioId }),
-  }), options.roles, options.crew);
+  }));
   const cookie = response.headers.get("set-cookie")?.split(";")[0];
   if (!response.ok || !cookie) {
     throw new Error(`No se pudo iniciar la sesión de prueba (HTTP ${response.status}).`);
@@ -70,23 +54,43 @@ export async function loginAs(scenarioId: string, options: LoginAsOptions = {}):
 /** Creates a sealed session directly when a test needs a state the login route cannot select. */
 export function createSessionCookie(
   scenarioId: ScenarioId,
-  options: Omit<LoginAsOptions, "crew"> & { crew?: ScenarioCrew },
+  options: Omit<LoginAsOptions, "crew"> & { crew?: TestCrew | null } = {},
 ): string {
   configureSessionEnvironment(options);
-  const session = createSession(scenarioId, {
-    mode: options.mode ?? getAuthMode(),
-    devJwt: options.devJwt ?? process.env.M6_DEV_JWT,
-    backendOrigin: options.backendOrigin ?? process.env.M6_BACKEND_ORIGIN,
-    roles: options.roles,
-  });
+  const mode = options.mode ?? getAuthMode();
+  const session = mode === "mock"
+    ? createSession(scenarioId, { mode, roles: options.roles })
+    : testM1Session(scenarioId, options);
   return `${AUTH_COOKIE_NAME}=${sealSession(options.crew ? { ...session, crew: options.crew, fieldRole: getScenario(scenarioId).actor.fieldRole } : session)}`;
+}
+
+export const TEST_M1_ACCESS_TOKEN = `header.${Buffer.from(JSON.stringify({ sub: "42", exp: Math.floor(Date.now() / 1000) + 3_600 })).toString("base64url")}.signature`;
+
+function testM1Session(scenarioId: ScenarioId, options: Omit<LoginAsOptions, "crew"> & { crew?: TestCrew | null }): Session {
+  const accessToken = options.accessToken ?? process.env.M1_TEST_ACCESS_TOKEN ?? TEST_M1_ACCESS_TOKEN;
+  const scenario = getScenario(scenarioId);
+  const session = createM1Session({
+    accessToken,
+    refreshToken: "test-refresh-token",
+    jwtExpiresAt: readJwtExpiry(accessToken) ?? Date.now() + 3_600_000,
+    identity: { userId: readJwtSubject(accessToken) ?? "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
+    roles: options.roles ?? scenario.roles,
+  });
+  return {
+    ...session,
+    scenarioId,
+    crew: options.crew === null ? undefined : options.crew ?? (scenario.actor.crewId && scenario.actor.crewName
+      ? { id: scenario.actor.crewId, name: scenario.actor.crewName }
+      : undefined),
+    fieldRole: options.crew?.role === "MEMBER" ? "CREW_MEMBER" : options.crew?.role === "LEADER" ? "CREW_LEADER" : scenario.actor.fieldRole,
+  };
 }
 
 /** Configure beforeEach with this helper and invoke its returned teardown in afterEach. */
 export function backendEnv(): () => void {
   const values = {
-    M6_AUTH_MODE: "backend-development",
-    M6_DEV_JWT: `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.signature`,
+    M6_AUTH_MODE: "real-m1",
+    M1_TEST_ACCESS_TOKEN: TEST_M1_ACCESS_TOKEN,
     M6_BACKEND_ORIGIN: "https://backend.internal",
   };
   const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));

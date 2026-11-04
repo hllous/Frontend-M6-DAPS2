@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     return response;
   }
 
-  // En modo backend el pulso de actividad también releé los roles de M6: un cambio de asignación rige sin volver a ingresar.
+  // En real-m1 el pulso de actividad también releé los roles de M6: un cambio de asignación rige sin volver a ingresar.
   let refreshed = session;
   if (session.mode !== "mock") {
     try {

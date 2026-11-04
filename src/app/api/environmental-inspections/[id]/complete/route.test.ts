@@ -5,7 +5,7 @@ import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -16,7 +16,7 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
   it("translates the form command to the documented backend DTO", async () => {
     let backendBody: unknown;
     const urls: string[] = [];
-    // El mock va antes del login: en modo backend, Campo resuelve su cuadrilla real contra GET /crews (#293).
+    // El mock va antes del login: en real-m1, Campo resuelve su cuadrilla real contra GET /crews (#293).
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.includes("/crews")) {
@@ -41,7 +41,7 @@ describe("POST /api/environmental-inspections/:id/complete", () => {
       if (init?.body) backendBody = JSON.parse(String(init.body));
       return new Response(JSON.stringify({ id: "INS-TEST-1" }), { status: 200, headers: { "content-type": "application/json" } });
     });
-    const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
 
     const response = await POST(new Request("http://localhost/api/environmental-inspections/INS-TEST-1/complete", {
       method: "POST",

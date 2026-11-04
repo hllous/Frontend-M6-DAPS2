@@ -7,7 +7,7 @@ import { loginAs } from "@/test/session";
 afterEach(() => {
   resetRouteFixtures();
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -180,8 +180,8 @@ describe("authenticated routes [id] BFF route", () => {
 
     it("forwards an authorized backend route deactivation with its id and DELETE method", async () => {
       const id = "route_42.3~";
-      const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-      const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+      const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+      const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
       const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, active: false }));
 
       const response = await DELETE(
@@ -192,7 +192,7 @@ describe("authenticated routes [id] BFF route", () => {
       expect(response.status).toBe(200);
       expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/routes/${id}`);
       expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("DELETE");
-      expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+      expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
     });
   });
 });

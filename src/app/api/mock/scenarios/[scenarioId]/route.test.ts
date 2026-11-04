@@ -5,7 +5,7 @@ import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -40,11 +40,11 @@ describe("authorized scenario BFF route", () => {
     expect(response.status).toBe(403);
   });
 
-  it("forwards a backend-development session before serving its fixture", async () => {
+  it("forwards a real-m1 session before serving its fixture", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
       Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "RESPONSABLE_AREA", roles: ["M6_ADMIN"] }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await GET(new Request("http://localhost/api/mock/scenarios/office-duty-queue", { headers: { cookie } }), {
       params: Promise.resolve({ scenarioId: "office-duty-queue" }),
     });
@@ -61,7 +61,7 @@ describe("authorized scenario BFF route", () => {
   describe("backend failures while validating the session (#240)", () => {
     async function getWithBackend(respond: () => Promise<Response>) {
       process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-      const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+      const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
       vi.spyOn(globalThis, "fetch").mockImplementation(respond);
       return GET(new Request("http://localhost/api/mock/scenarios/office-duty-queue", { headers: { cookie } }), {
         params: Promise.resolve({ scenarioId: "office-duty-queue" }),

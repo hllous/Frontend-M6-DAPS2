@@ -15,7 +15,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -45,10 +45,10 @@ describe("referral workspace BFF", () => {
   });
 
   it("forwards backend referral collections with GET and the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     const cookie = await loginAs("office-duty-queue", {
-      mode: "backend-development",
-      devJwt,
+      mode: "real-m1",
+      accessToken,
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({
@@ -65,14 +65,14 @@ describe("referral workspace BFF", () => {
     ]));
     expect(backendFetch.mock.calls).toHaveLength(2);
     expect(backendFetch.mock.calls.every(([, init]) =>
-      new Headers(init?.headers).get("authorization") === `Bearer ${devJwt}`,
+      new Headers(init?.headers).get("authorization") === `Bearer ${accessToken}`,
     )).toBe(true);
   });
 
   it("fails closed when backend referral mode has no backend origin", async () => {
     const cookie = createSessionCookie("office-duty-queue", {
-      mode: "backend-development",
-      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      mode: "real-m1",
+      accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
       backendOrigin: "https://backend.internal",
     });
     delete process.env.M6_BACKEND_ORIGIN;

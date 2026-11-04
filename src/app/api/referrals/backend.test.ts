@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { GET as detail } from "./[id]/route";
 import { GET as list } from "./route";
-import { loginAs } from "@/test/session";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 const repairId = "15c86465-54d3-4e0a-83a5-26a3cc510017";
 const closureId = "ce0bbfaa-8720-4566-b9d1-738cb37a689b";
@@ -31,14 +30,14 @@ const closure = {
 };
 
 beforeEach(() => {
-  process.env.M6_AUTH_MODE = "backend-development";
-  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+  process.env.M6_AUTH_MODE = "real-m1";
+  process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
   process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
 });
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -204,11 +203,11 @@ describe("referrals against the backend", () => {
 
   it("denies Field collection and detail without a resolved crew before backend calls", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch");
-    const session = createSession("field-crew-leader-route", {
-      mode: "backend-development", devJwt: process.env.M6_DEV_JWT,
+    const cookie = createSessionCookie("field-crew-leader-route", {
+      mode: "real-m1", accessToken: process.env.M1_TEST_ACCESS_TOKEN,
       backendOrigin: process.env.M6_BACKEND_ORIGIN,
+      crew: null,
     });
-    const cookie = `${AUTH_COOKIE_NAME}=${sealSession(session)}`;
     expect((await list(new Request("http://localhost/api/referrals", { headers: { cookie } }))).status).toBe(403);
     expect((await getDetail(cookie)).status).toBe(403);
     expect(backendFetch).not.toHaveBeenCalled();

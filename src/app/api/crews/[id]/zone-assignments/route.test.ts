@@ -49,9 +49,9 @@ describe("crew zone-assignments BFF route", () => {
     expect((await post(cookie, { ...move, validTo: "2099-02-01" })).status).toBe(400);
   });
 
-  it("forwards both calls in backend mode and maps the backend 409", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-operations", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+  it("forwards both calls in real-m1 mode and maps the backend 409", async () => {
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-operations", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json([]))
       .mockResolvedValueOnce(Response.json({ statusCode: 409, message: "Conflict", error: "Conflict" }, { status: 409 }));

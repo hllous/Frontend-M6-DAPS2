@@ -33,7 +33,7 @@ export async function readMeResponse(response: Response): Promise<Me> {
   return parsed.data;
 }
 
-/** Login: todavía no hay sesión, así que se pide con el token de demo. */
+/** Login: todavía no hay sesión, así que se pide con el token recién emitido por M1. */
 export async function fetchMeWithToken(
   origin: string,
   accessToken: string,

@@ -1,12 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { DEMO_IDENTITIES } from "../src/lib/demo-identities";
+import { SCENARIO_IDENTITIES } from "../src/lib/scenario-identities";
 import { loginViaApi } from "./support/auth";
 
 test("administra roles con teclado y mouse y pasa axe", async ({ page }) => {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app/access");
-  await expect(page.getByText(`${DEMO_IDENTITIES["office-duty-queue"].sub} (vos)`)).toBeVisible();
+  await expect(page.getByText(`${SCENARIO_IDENTITIES["office-duty-queue"].sub} (vos)`)).toBeVisible();
   await page.getByLabel("Identificador de usuario M1").fill("98765");
   await page.getByLabel("Identificador de usuario M1").press("Tab");
   await page.keyboard.press("Enter");

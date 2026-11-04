@@ -7,7 +7,7 @@ import { loginAs } from "@/test/session";
 beforeEach(() => resetServiceTypeFixtures());
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -51,8 +51,8 @@ describe("/api/service-types/[id]", () => {
 
   it("forwards an authorized backend service-type deactivation with its id and DELETE method", async () => {
     const id = "st-encoded_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, active: false }));
 
     const response = await DELETE(
@@ -63,13 +63,13 @@ describe("/api/service-types/[id]", () => {
     expect(response.status).toBe(200);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/service-types/${id}`);
     expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("DELETE");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 
   it("denies a backend session without serviceType:manage before forwarding", async () => {
     const cookie = await loginAs("office-limited-intake", {
-      mode: "backend-development",
-      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      mode: "real-m1",
+      accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch");

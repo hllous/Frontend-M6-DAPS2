@@ -12,7 +12,7 @@ import {
   AUTH_COOKIE_NAME,
   BackendUnavailableError,
   InvalidSessionError,
-  createSession,
+  createM1Session,
   getSessionFromCookieValue,
   getSessionFromRequest,
   publicSession,
@@ -37,9 +37,13 @@ type Overrides = Partial<Session>;
 function build(expSeconds: number, overrides: Overrides = {}) {
   const accessToken = jwt(expSeconds);
   const session: Session = {
-    ...createSession("office-duty-queue", { mode: "backend-development", devJwt: accessToken, backendOrigin: BACKEND }),
-    source: "m1",
-    refreshToken: `refresh-${++n}`,
+    ...createM1Session({
+      accessToken,
+      refreshToken: `refresh-${++n}`,
+      jwtExpiresAt: expSeconds * 1000,
+      identity: { userId: "42", subType: "EMPLEADO", m1Role: "ADMINISTRATIVO" },
+      roles: ["M6_ADMIN"],
+    }),
     ...overrides,
   };
   const request = new Request("http://localhost/api/services", { headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session)}` } });
@@ -62,7 +66,7 @@ const me = (roles: string[]) => Response.json({ userId: "42", subType: "EMPLEADO
 const twinOf = (request: Request) => new Request(request.url, { headers: request.headers });
 
 beforeEach(() => {
-  process.env.M6_AUTH_MODE = "backend-development";
+  process.env.M6_AUTH_MODE = "real-m1";
   process.env.M6_BACKEND_ORIGIN = BACKEND;
   process.env.M1_BASE_URL = M1;
   cookieStore.set.mockReset();
@@ -296,25 +300,6 @@ describe("cuándo se renueva", () => {
     expect(m1Calls(fetchSpy)).toHaveLength(renews ? 1 : 0);
   });
 
-  it("una sesión de desarrollo con access token vencido no está activa y va al login", async () => {
-    const { request } = build(inSeconds(600), { jwtExpiresAt: Date.now() - 5_000, source: undefined });
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-
-    await expect(fetchBackend(request, "/services")).rejects.toBeInstanceOf(InvalidSessionError);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["sin refresh token", () => near({ refreshToken: undefined })],
-    ["sin origen m1 (camino M6_DEV_JWT)", () => near({ source: undefined })],
-  ])("%s: no llama a M1 y deja pasar el 401", async (_name, setup) => {
-    const { request } = setup();
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 401 }));
-
-    expect((await fetchBackend(request, "/services")).status).toBe(401);
-    expect(m1Calls(fetchSpy)).toHaveLength(0);
-  });
-
   it.each([
     ["sin M1_BASE_URL", undefined],
     ["URL inválida", "no es una url"],
@@ -334,7 +319,6 @@ describe("cuándo se renueva", () => {
 
   it("en producción exige https", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("M6_ALLOW_DEMO", "true");
     vi.stubEnv("M6_SESSION_SECRET", "test-secret");
     const { request } = near();
     process.env.M1_BASE_URL = "http://m1.internal";
@@ -347,7 +331,6 @@ describe("cuándo se renueva", () => {
 
   it("en producción rechaza el M1 falso incluso si usa HTTPS", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("M6_ALLOW_DEMO", "true");
     vi.stubEnv("M6_SESSION_SECRET", "test-secret");
     process.env.M1_BASE_URL = "https://m1.internal";
     process.env.M1_FAKE_ENABLED = "true";

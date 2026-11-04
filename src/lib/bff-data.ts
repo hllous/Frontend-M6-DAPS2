@@ -5,7 +5,7 @@ import { getScenario, type OperationalScenario, type ScenarioId } from "./scenar
 import { ForbiddenSessionError, getRequiredSession, type Session } from "./session";
 
 /**
- * El escenario de la sesión con los roles de M6 al día. En modo backend salen de GET /me (única fuente);
+ * El escenario de la sesión con los roles de M6 al día. En real-m1 salen de GET /me (única fuente);
  * un usuario sin roles recibe el escenario igual, con `capabilities` vacías: la UI explica que falta asignarle uno.
  */
 export async function loadAuthorizedScenario(

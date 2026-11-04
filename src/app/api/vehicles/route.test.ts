@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GET, POST } from "./route";
-import { loginAs, loginWithMe as login } from "@/test/session";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -57,18 +57,17 @@ describe("vehicles BFF route", () => {
 
 describe("vehicles BFF route pagination limits (#248)", () => {
   async function forwardedUrl(query: string) {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_AUTH_MODE = "real-m1";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async () => new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "content-type": "application/json" } }));
-    const loginResponse = await login(new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
-      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-    }));
-    const cookie = loginResponse.headers.get("set-cookie") ?? "";
+    const cookie = createSessionCookie("office-duty-queue", {
+      mode: "real-m1",
+      accessToken: process.env.M1_TEST_ACCESS_TOKEN,
+      backendOrigin: process.env.M6_BACKEND_ORIGIN,
+    });
     backendFetch.mockClear();
     await GET(new Request(`http://localhost/api/vehicles${query}`, { headers: { cookie } }));
     const url = backendFetch.mock.calls[0]?.[0] as URL;

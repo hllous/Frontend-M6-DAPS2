@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Spinner } from "@/components/ui/spinner";
 import type { AuthMode } from "@/lib/session";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
-import { DEMO_IDENTITIES } from "@/lib/demo-identities";
 import type { OperationalScenario, ScenarioId } from "@/lib/scenarios";
 
 export function LoginForm({
@@ -141,8 +140,7 @@ export function LoginForm({
                       </SelectContent>
                     </Select>
                     <FieldDescription id="operational-scenario-note">
-                      Entorno de demostración: cualquier persona puede elegir un perfil. Este perfil corresponde a
-                      {" "}{DEMO_IDENTITIES[scenarioId].name} {authMode === "backend-development" ? ` (id ${DEMO_IDENTITIES[scenarioId].sub} del seed del backend)` : null}.
+                      Entorno local de pruebas: cualquier persona puede elegir un perfil.
                     </FieldDescription>
                   </Field>
                 )}

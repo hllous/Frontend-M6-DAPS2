@@ -6,16 +6,16 @@ import { forwardResponse } from "./bff-route";
 import { createSessionCookie } from "@/test/session";
 
 const backendOrigin = "https://backend.internal";
-const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
 
 function backendRequest() {
-  const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin });
+  const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin });
   return new Request("http://localhost/api/services/service-1/start", { headers: { cookie } });
 }
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });

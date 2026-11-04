@@ -25,7 +25,7 @@ import { loginAs } from "@/test/session";
 
 const invalidIds = ["..", "a/b", "a?b=c", "a#b", "%2e%2e"];
 const backendOrigin = "https://backend.internal";
-const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
 
 type RouteContext = { params: Promise<Record<string, string>> };
 type RouteHandler = (request: Request, context: RouteContext) => Promise<Response>;
@@ -64,14 +64,14 @@ const routeCases: RouteCase[] = [
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
 
 describe("backend path ids", () => {
   it.each(routeCases)("rejects invalid ids for $family before a backend call", async ({ handler, method, idParams }) => {
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: devJwt, backendOrigin: backendOrigin });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: accessToken, backendOrigin: backendOrigin });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected backend call"));
 
     for (const idParam of idParams) {

@@ -5,7 +5,7 @@ import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -14,7 +14,7 @@ afterEach(() => {
 
 describe("authenticated routes [id]/references BFF route", () => {
   it("reads active frequencies for a real route from every backend page", async () => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const id = "ceec08ae-67e7-4739-9677-150f5085bb1a";
     const frequency = { id: "frequency-real", serviceTypeId: "type-real", routeId: id, weekdays: [1, 3], shift: "MORNING", validFrom: "2026-01-01", validTo: null, serviceType: { name: "Recolección" } };
@@ -22,7 +22,7 @@ describe("authenticated routes [id]/references BFF route", () => {
       .mockResolvedValueOnce(Response.json({ id }))
       .mockResolvedValueOnce(Response.json({ data: [frequency], meta: { total: 2, page: 1, pageSize: 100, totalPages: 2 } }))
       .mockResolvedValueOnce(Response.json({ data: [{ ...frequency, id: "frequency-two" }], meta: { total: 2, page: 2, pageSize: 100, totalPages: 2 } }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
     const response = await GET(new Request(`http://localhost/api/routes/${id}/references`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ routeId: id, totalReferences: 2, activeServiceFrequencies: [
@@ -41,10 +41,10 @@ describe("authenticated routes [id]/references BFF route", () => {
 
 
   it.each([404, 503])("preserves missing records and fails closed on backend detail errors (%s)", async (status) => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({}, { status }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
     const id = "ceec08ae-67e7-4739-9677-150f5085bb1a";
     const response = await GET(new Request(`http://localhost/api/routes/${id}/references`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
     expect(response.status).toBe(status);
@@ -53,13 +53,13 @@ describe("authenticated routes [id]/references BFF route", () => {
   });
 
   it.each(["http", "malformed", "network"])("never returns a zero report when a sub-query fails (%s)", async (failure) => {
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const id = "ceec08ae-67e7-4739-9677-150f5085bb1a";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id }));
     if (failure === "network") backendFetch.mockRejectedValueOnce(new Error("offline"));
     else backendFetch.mockResolvedValueOnce(Response.json(failure === "malformed" ? { data: [] } : {}, { status: failure === "http" ? 503 : 200 }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
     const response = await GET(new Request(`http://localhost/api/routes/${id}/references`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
     expect(response.status).toBeGreaterThanOrEqual(500);
     expect(await response.json()).not.toHaveProperty("totalReferences");

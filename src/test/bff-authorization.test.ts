@@ -62,7 +62,7 @@ describe("requireCrewScope", () => {
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/services/${serviceId}`);
     const init = backendFetch.mock.calls[0]?.[1];
     expect(init?.method ?? "GET").toBe("GET");
-    expect(new Headers(init?.headers).get("authorization")).toBe(`Bearer ${process.env.M6_DEV_JWT}`);
+    expect(new Headers(init?.headers).get("authorization")).toBe(`Bearer ${process.env.M1_TEST_ACCESS_TOKEN}`);
     expect(new Headers(init?.headers).has("cookie")).toBe(false);
   });
 

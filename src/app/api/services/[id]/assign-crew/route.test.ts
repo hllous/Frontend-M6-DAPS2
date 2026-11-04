@@ -13,7 +13,7 @@ beforeEach(() => {
 afterEach(() => {
   resetCrewFixtures();
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -165,10 +165,10 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
     expect((await accepted.json()).crewName).toBe("Cuadrilla C · Ibáñez");
   });
 
-  it("forwards overrideNote to the backend in backend-development mode", async () => {
+  it("forwards overrideNote to the backend in real-m1 mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const input = { crewId: "d907516e-ddb7-46d4-a7d4-cd235cbb1529", vehicleId: null, overrideNote: "Coordinado con el jefe de cuadrilla." };
 
     const response = await POST(
@@ -206,10 +206,10 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
   });
 });
 
-it.each(["mock", "backend-development"] as const)("denies limited Office planning before forwarding (%s)", async (mode) => {
+it.each(["mock", "real-m1"] as const)("denies limited Office planning before forwarding (%s)", async (mode) => {
   process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
   const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
-  const cookie = await loginAs("office-limited-intake", { mode: mode, devJwt: ((mode) === "backend-development") ? ("header.eyJleHAiOjE4MDAwMDAwMDB9.signature") : undefined });
+  const cookie = await loginAs("office-limited-intake", { mode: mode, accessToken: ((mode) === "real-m1") ? ("header.eyJleHAiOjE4MDAwMDAwMDB9.signature") : undefined });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/assign-crew", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ crewId: "crew-a" }),
@@ -235,7 +235,7 @@ it.each([401, 403, 409, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+  const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/assign-crew", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ crewId: "crew-real" }),

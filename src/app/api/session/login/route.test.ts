@@ -24,7 +24,7 @@ function request(body: unknown) {
 }
 
 describe("POST /api/session/login", () => {
-  it("fails closed for a production demo mode unless the override is explicit", async () => {
+  it("fails closed for production mock mode without an override", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("M6_AUTH_MODE", "mock");
     vi.stubEnv("M6_ALLOW_DEMO", "false");
@@ -38,12 +38,39 @@ describe("POST /api/session/login", () => {
     expect(log).toHaveBeenCalledWith("[m6-auth-mode-misconfigured]", "mock");
 
     vi.stubEnv("M6_ALLOW_DEMO", "true");
-    vi.stubEnv("M6_SESSION_SECRET", "production-test-session-secret");
-    const allowed = await login(request({ scenarioId: "office-duty-queue" }));
+    const stillRejected = await login(request({ scenarioId: "office-duty-queue" }));
 
-    expect(allowed.status).toBe(200);
-    expect(allowed.headers.get("cache-control")).toBe("no-store");
-    expect(allowed.headers.get("set-cookie")).toMatch(/Secure/i);
+    expect(stillRejected.status).toBe(503);
+    expect(stillRejected.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects legacy real-m1 scenario login", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
+    vi.stubEnv("M6_DEV_JWT", `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 900 })).toString("base64url")}.signature`);
+    vi.stubEnv("M6_BACKEND_ORIGIN", "https://backend.test");
+    server.use(
+      http.get("https://backend.test/health", () => HttpResponse.json({ status: "ok" })),
+      http.get("https://backend.test/me", () => HttpResponse.json({
+        userId: "42",
+        subType: "EMPLEADO",
+        m1Role: "ADMINISTRATIVO",
+        roles: ["M6_ADMIN"],
+      })),
+    );
+
+    const response = await login(request({ scenarioId: "office-duty-queue" }));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("rejects scenario bodies when real M1 is configured", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
+
+    const response = await login(request({ scenarioId: "office-duty-queue" }));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("rejects a body over the request-size limit before validating credentials", async () => {
@@ -234,8 +261,94 @@ describe("POST /api/session/login", () => {
     );
 
     const response = await login(request({ email: "persona@example.test", password: "secret" }));
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect((await response.json()).session.identity.userId).toBe("42");
+    expect(body.session.identity.userId).toBe("42");
+    expect(body.session.roles).toEqual(["M6_ADMIN"]);
+    expect(body.session).not.toHaveProperty("accessToken");
+    expect(JSON.stringify(body)).not.toContain(token);
+    expect(setCookie).toContain("m6_session=");
+    expect(setCookie).not.toContain(token);
+  });
+
+  it("seals the preferred M1 crew and field role returned by /me", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
+    vi.stubEnv("M1_BASE_URL", "https://m1.test/api/v1/");
+    vi.stubEnv("M6_BACKEND_ORIGIN", "https://backend.test");
+    const token = `header.${Buffer.from(JSON.stringify({
+      iss: "modulo1-ciudadanos",
+      typ: "access",
+      sub: "42",
+      sub_type: "EMPLEADO",
+      rol: "ADMINISTRATIVO",
+      exp: Math.floor(Date.now() / 1000) + 900,
+    })).toString("base64url")}.signature`;
+    server.use(
+      http.get("https://backend.test/health", () => HttpResponse.json({ status: "ok" })),
+      http.post("https://m1.test/api/v1/auth/usuario/login", () => new HttpResponse("{}", {
+        status: 200,
+        headers: {
+          authorization: `Bearer ${token}`,
+          "x-refresh-token": "refresh-token",
+          "x-token-expires-in": "900",
+          "content-type": "application/json",
+        },
+      })),
+      http.get("https://backend.test/me", () => HttpResponse.json({
+        userId: "42",
+        subType: "EMPLEADO",
+        m1Role: "ADMINISTRATIVO",
+        roles: ["M6_CAMPO_CUADRILLA"],
+        crews: [
+          { id: "crew-other", name: "Otra cuadrilla", role: "MEMBER" },
+          { id: "crew-preferred", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" },
+        ],
+      })),
+    );
+
+    const response = await login(request({ email: "campo@example.test", password: "secret" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.session).toMatchObject({
+      scenarioId: "field-crew-leader-route",
+      roles: ["M6_CAMPO_CUADRILLA"],
+      crew: { id: "crew-preferred", name: "Cuadrilla Belgrano — Recolección" },
+      fieldRole: "CREW_LEADER",
+    });
+  });
+
+  it("does not open a session when Backend rejects the M1 token", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
+    vi.stubEnv("M1_BASE_URL", "https://m1.test/api/v1/");
+    vi.stubEnv("M6_BACKEND_ORIGIN", "https://backend.test");
+    const token = `header.${Buffer.from(JSON.stringify({
+      iss: "modulo1-ciudadanos",
+      typ: "access",
+      sub: "42",
+      sub_type: "EMPLEADO",
+      rol: "ADMINISTRATIVO",
+      exp: Math.floor(Date.now() / 1000) + 900,
+    })).toString("base64url")}.signature`;
+    server.use(
+      http.get("https://backend.test/health", () => HttpResponse.json({ status: "ok" })),
+      http.post("https://m1.test/api/v1/auth/usuario/login", () => new HttpResponse("{}", {
+        status: 200,
+        headers: {
+          authorization: `Bearer ${token}`,
+          "x-refresh-token": "refresh-token",
+          "x-token-expires-in": "900",
+          "content-type": "application/json",
+        },
+      })),
+      http.get("https://backend.test/me", () => HttpResponse.json({ message: "Unauthorized" }, { status: 401 })),
+    );
+
+    const response = await login(request({ email: "persona@example.test", password: "secret" }));
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 });

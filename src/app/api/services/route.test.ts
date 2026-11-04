@@ -4,12 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ServiceRequestError, servicesAdapter } from "@/lib/services";
 import { GET, POST } from "./route";
-import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
+import { createSessionCookie } from "@/test/session";
 import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -64,7 +64,7 @@ describe("authenticated services BFF route", () => {
     expect(body.meta.total).toBe(0);
   });
 
-  it("forwards a backend-development session through the BFF before serving real backend data", async () => {
+  it("forwards a real-m1 session through the BFF before serving real backend data", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 0 } }), {
@@ -72,7 +72,7 @@ describe("authenticated services BFF route", () => {
         headers: { "content-type": "application/json" },
       }),
     );
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await GET(new Request("http://localhost/api/services?mode=ROUTE", { headers: { cookie } }));
 
     expect(response.status).toBe(200);
@@ -91,7 +91,7 @@ describe("authenticated services BFF route", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       Response.json({ data: [known, { ...known, id: "svc-future", status: "FUTURE_STATUS" }], meta: { total: 9, page: 1, pageSize: 2, totalPages: 5 } }),
     );
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const body = await (await GET(new Request("http://localhost/api/services", { headers: { cookie } }))).json();
     expect(body.data).toHaveLength(1);
     expect(body.meta.dropped).toBe(1);
@@ -208,7 +208,7 @@ describe("authenticated services BFF route", () => {
     expect(created.notes).toBe("Recolección matutina");
   });
 
-  it("POST forwards to backend in backend-development mode", async () => {
+  it("POST forwards to backend in real-m1 mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
@@ -230,7 +230,7 @@ describe("authenticated services BFF route", () => {
         { status: 201, headers: { "content-type": "application/json" } },
       ),
     );
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
     const response = await POST(
       new Request("http://localhost/api/services", {
         method: "POST",
@@ -271,15 +271,15 @@ describe("authenticated services BFF route", () => {
 });
 
 function listRequest(query = "") {
-  process.env.M6_AUTH_MODE = "backend-development";
+  process.env.M6_AUTH_MODE = "real-m1";
   process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-  process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-  const session = createSession("office-duty-queue", {
-    mode: "backend-development",
-    devJwt: process.env.M6_DEV_JWT,
+  process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+  const cookie = createSessionCookie("office-duty-queue", {
+    mode: "real-m1",
+    accessToken: process.env.M1_TEST_ACCESS_TOKEN,
     backendOrigin: process.env.M6_BACKEND_ORIGIN,
   });
-  return new Request(`http://localhost/api/services${query}`, { headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session)}` } });
+  return new Request(`http://localhost/api/services${query}`, { headers: { cookie } });
 }
 const envelope = { data: [], meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 } };
 describe("Services list backend contract", () => {
@@ -314,13 +314,13 @@ describe("Services list pagination and crew scope", () => {
   });
   it("overrides an arbitrary crewId with the Field session crew", async () => {
     listRequest();
-    const session = createSession("field-crew-leader-route", {
-      mode: "backend-development", devJwt: process.env.M6_DEV_JWT, backendOrigin: process.env.M6_BACKEND_ORIGIN,
+    const cookie = createSessionCookie("field-crew-leader-route", {
+      mode: "real-m1", accessToken: process.env.M1_TEST_ACCESS_TOKEN, backendOrigin: process.env.M6_BACKEND_ORIGIN,
+      crew: { id: "crew-real", name: "Cuadrilla real", role: "LEADER" },
     });
-    session.crew = { id: "crew-real", name: "Cuadrilla real" };
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(envelope));
     const response = await GET(new Request("http://localhost/api/services?crewId=crew-other", {
-      headers: { cookie: `${AUTH_COOKIE_NAME}=${sealSession(session)}` },
+      headers: { cookie },
     }));
     expect(response.status).toBe(200);
     expect(String(fetch.mock.calls[0][0])).toBe("https://backend.internal/services?crewId=crew-real");

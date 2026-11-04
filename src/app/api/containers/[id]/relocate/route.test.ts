@@ -10,7 +10,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
   resetContainerFixtures();
@@ -105,10 +105,10 @@ describe("POST /api/containers/[id]/relocate BFF route", () => {
 
   it("forwards an authorized backend relocation request with its id and method", async () => {
     const id = "container_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     const cookie = await loginAs("office-duty-queue", {
-      mode: "backend-development",
-      devJwt,
+      mode: "real-m1",
+      accessToken,
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "RELOCATING" }));
@@ -121,6 +121,6 @@ describe("POST /api/containers/[id]/relocate BFF route", () => {
     expect(response.status).toBe(200);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/containers/${id}/relocate`);
     expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 });

@@ -17,6 +17,7 @@ import { DELETE as deleteVehicle } from "@/app/api/vehicles/[id]/route";
 import { DELETE as deleteZone } from "@/app/api/zones/[id]/route";
 import { POST as scheduleInspection } from "@/app/api/environmental-reports/[id]/inspections/route";
 import { POST as uploadEvidence } from "@/app/api/evidence/route";
+import { POST as login } from "@/app/api/session/login/route";
 import * as containerFixtures from "@/lib/containers-fixtures";
 import * as crewFixtures from "@/lib/crew-fixtures";
 import * as disposalSiteFixtures from "@/lib/disposal-site-fixtures";
@@ -33,7 +34,7 @@ import * as treeFixtures from "@/lib/tree-fixtures";
 import * as vehicleFixtures from "@/lib/vehicles-fixtures";
 import * as zoneFixtures from "@/lib/zones-fixtures";
 import * as environmentalFixtures from "@/lib/environmental-report-fixtures";
-import { createSessionCookie, loginWithMe as login } from "@/test/session";
+import { createSessionCookie } from "@/test/session";
 
 const fixtureModules = [
   containerFixtures,
@@ -159,8 +160,8 @@ const mutationCases: MutationCase[] = [
     // La evidencia de un contenedor solo la sube la cuadrilla (Backend #161): el Admin de `backendCookie` no puede.
     invoke: async () => {
       const cookie = createSessionCookie("field-crew-leader-route", {
-        mode: "backend-development",
-        devJwt: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+        mode: "real-m1",
+        accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
         backendOrigin: "https://backend.internal",
       });
       delete process.env.M6_BACKEND_ORIGIN;
@@ -182,8 +183,8 @@ let backendCookie = "";
 beforeEach(() => {
   delete process.env.M6_BACKEND_ORIGIN;
   backendCookie = createSessionCookie("office-duty-queue", {
-    mode: "backend-development",
-    devJwt: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+    mode: "real-m1",
+    accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
     backendOrigin: "https://backend.internal",
   });
   delete process.env.M6_BACKEND_ORIGIN;
@@ -191,7 +192,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -209,17 +210,34 @@ describe("backend origin fail-closed behavior", () => {
     expect(fixtureSnapshot()).toBe(before);
   });
 
-  it("fails backend-development login with 503 when the origin is missing", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+  it("fails real-m1 login with 503 when the origin is missing", async () => {
+    process.env.M6_AUTH_MODE = "real-m1";
+    process.env.M1_BASE_URL = "https://m1.test/api/v1/";
+    const token = `header.${Buffer.from(JSON.stringify({
+      iss: "modulo1-ciudadanos",
+      typ: "access",
+      sub: "42",
+      sub_type: "EMPLEADO",
+      rol: "ADMINISTRATIVO",
+      exp: Math.floor(Date.now() / 1000) + 900,
+    })).toString("base64url")}.signature`;
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("{}", {
+      status: 200,
+      headers: {
+        authorization: `Bearer ${token}`,
+        "x-refresh-token": "refresh-token",
+        "x-token-expires-in": "900",
+        "content-type": "application/json",
+      },
+    }));
 
     const response = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
       headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
-      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
+      body: JSON.stringify({ email: "persona@example.test", password: "clave" }),
     }));
 
     expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ message: "La autenticación solicitada no está disponible." });
+    expect(await response.json()).toEqual({ message: "El servicio de Ambiente no está disponible. Intente nuevamente en unos minutos." });
   });
 });

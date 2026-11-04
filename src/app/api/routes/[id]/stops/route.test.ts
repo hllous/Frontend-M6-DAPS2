@@ -9,7 +9,7 @@ afterEach(() => {
   resetRouteFixtures();
   resetZoneFixtures();
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -169,9 +169,9 @@ describe("authenticated routes [id]/stops BFF route", () => {
     expect(updated?.stops).toEqual([]);
   });
 
-  it("proxies request to backend origin in backend-development mode", async () => {
+  it("proxies request to backend origin in real-m1 mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "http://backend-test";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(

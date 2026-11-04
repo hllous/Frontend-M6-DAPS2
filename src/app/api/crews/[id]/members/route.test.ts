@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "./route";
 import { DELETE } from "./[userId]/route";
-import { loginAs, loginWithMe as login } from "@/test/session";
+import { createSessionCookie, loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_BACKEND_ORIGIN;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   vi.restoreAllMocks();
 });
 
@@ -27,17 +27,16 @@ describe("crew membership BFF route", () => {
 
   it("forwards the members to the real backend as { userIds } (AddCrewMembersDto), not memberUserIds (#251)", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_AUTH_MODE = "real-m1";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     const backendFetch = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async () => new Response(JSON.stringify({ id: "crew-membership" }), { status: 200, headers: { "content-type": "application/json" } }));
-    const login_ = await login(new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
-      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-    }));
-    const sessionCookie = login_.headers.get("set-cookie") ?? "";
+    const sessionCookie = createSessionCookie("office-duty-queue", {
+      mode: "real-m1",
+      accessToken: process.env.M1_TEST_ACCESS_TOKEN,
+      backendOrigin: process.env.M6_BACKEND_ORIGIN,
+    });
     backendFetch.mockClear();
 
     const response = await POST(new Request("http://localhost/api/crews/crew-membership/members", {
@@ -55,13 +54,17 @@ describe("crew membership BFF route", () => {
 
   it("forwards named members alongside plain ids", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_AUTH_MODE = "real-m1";
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
-    const loginResponse = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" }, body: JSON.stringify({ scenarioId: "office-duty-queue" }) }));
+    const loginResponse = createSessionCookie("office-duty-queue", {
+      mode: "real-m1",
+      accessToken: process.env.M1_TEST_ACCESS_TOKEN,
+      backendOrigin: process.env.M6_BACKEND_ORIGIN,
+    });
     backendFetch.mockClear();
     const body = { userIds: ["101"], members: [{ userId: "102", displayName: "Ana" }] };
-    const response = await POST(new Request("http://localhost/api/crews/crew-b/members", { method: "POST", headers: { cookie: loginResponse.headers.get("set-cookie") ?? "", "content-type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ id: "crew-b" }) });
+    const response = await POST(new Request("http://localhost/api/crews/crew-b/members", { method: "POST", headers: { cookie: loginResponse, "content-type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ id: "crew-b" }) });
     expect(response.status).toBe(200);
     expect(JSON.parse(String(backendFetch.mock.calls[0][1]?.body))).toEqual(body);
   });
@@ -87,25 +90,24 @@ describe("crew membership BFF route", () => {
   });
 
   it("renames memberUserIds to the userIds the backend expects (#239)", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_AUTH_MODE = "real-m1";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const session = await login(new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
-      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-    }));
+    process.env.M1_TEST_ACCESS_TOKEN = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const session = createSessionCookie("office-duty-queue", {
+      mode: "real-m1",
+      accessToken: process.env.M1_TEST_ACCESS_TOKEN,
+      backendOrigin: process.env.M6_BACKEND_ORIGIN,
+    });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 201, headers: { "content-type": "application/json" } }));
 
     await POST(new Request("http://localhost/api/crews/crew-real/members", {
       method: "POST",
-      headers: { cookie: session.headers.get("set-cookie") ?? "", "content-type": "application/json" },
+      headers: { cookie: session, "content-type": "application/json" },
       body: JSON.stringify({ memberUserIds: ["usr-m1-0299"] }),
     }), { params: Promise.resolve({ id: "crew-real" }) });
 
     const init = backendFetch.mock.calls[0]?.[1] as RequestInit;
     expect(JSON.parse(String(init.body))).toEqual({ userIds: ["usr-m1-0299"] });
-    delete process.env.M6_DEV_JWT;
   });
 
   it("keeps membership management Office-only, including for a Field actor's own crew", async () => {

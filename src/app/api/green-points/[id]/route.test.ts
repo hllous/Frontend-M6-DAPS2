@@ -5,7 +5,7 @@ import { DELETE, GET, PATCH } from "./route";
 import { loginAs } from "@/test/session";
 
 beforeEach(() => resetGreenPointFixtures());
-afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
+afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M1_TEST_ACCESS_TOKEN; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
 
 
 
@@ -38,8 +38,8 @@ describe("/api/green-points/[id]", () => {
 
   it("forwards an authorized backend green-point deactivation with its id and DELETE method", async () => {
     const id = "green-point_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
 
     const response = await DELETE(
@@ -50,6 +50,6 @@ describe("/api/green-points/[id]", () => {
     expect(response.status).toBe(204);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe(`https://backend.internal/green-points/${id}`);
     expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("DELETE");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 });

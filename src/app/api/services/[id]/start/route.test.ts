@@ -34,7 +34,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
+  delete process.env.M1_TEST_ACCESS_TOKEN;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -239,9 +239,9 @@ describe("POST /api/services/[id]/start backend forward path", () => {
     const serviceId = "field-service_42.3~";
     const backendFetch = mockFieldBackend();
     const cookie = await loginAs("field-crew-leader-route", {
-      mode: "backend-development",
+      mode: "real-m1",
       crew: { ...backendCrew, role: "LEADER" },
-      devJwt: backendDevJwt,
+      accessToken: backendDevJwt,
       backendOrigin,
     });
     backendFetch.mockClear();
@@ -265,9 +265,9 @@ describe("POST /api/services/[id]/start backend forward path", () => {
     const serviceId = "field-service-out-of-scope";
     const backendFetch = mockFieldBackend("22222222-2222-4222-8222-222222222222");
     const cookie = await loginAs("field-crew-leader-route", {
-      mode: "backend-development",
+      mode: "real-m1",
       crew: { ...backendCrew, role: "LEADER" },
-      devJwt: backendDevJwt,
+      accessToken: backendDevJwt,
       backendOrigin,
     });
     backendFetch.mockClear();
@@ -286,9 +286,9 @@ describe("POST /api/services/[id]/start backend forward path", () => {
   it("denies a Field member without service:execute before making a backend request", async () => {
     const backendFetch = mockFieldBackend();
     const cookie = await loginAs("field-crew-member-route", {
-      mode: "backend-development",
+      mode: "real-m1",
       crew: { ...backendCrew, role: "MEMBER" },
-      devJwt: backendDevJwt,
+      accessToken: backendDevJwt,
       backendOrigin,
     });
     backendFetch.mockClear();
@@ -302,11 +302,11 @@ describe("POST /api/services/[id]/start backend forward path", () => {
     expect(backendFetch).not.toHaveBeenCalled();
   });
 
-  it("fails closed when backend mode has no backend origin", async () => {
+  it("fails closed when real-m1 mode has no backend origin", async () => {
     const cookie = createSessionCookie("field-crew-leader-route", {
-      mode: "backend-development",
+      mode: "real-m1",
       crew: backendCrew,
-      devJwt: backendDevJwt,
+      accessToken: backendDevJwt,
       backendOrigin,
     });
     delete process.env.M6_BACKEND_ORIGIN;

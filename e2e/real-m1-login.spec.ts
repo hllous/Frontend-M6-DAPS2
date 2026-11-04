@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { DEMO_IDENTITIES } from "../src/lib/demo-identities";
+import { SCENARIO_IDENTITIES } from "../src/lib/scenario-identities";
 
 const PASSWORD = "m6-dev-796";
 
@@ -43,7 +43,7 @@ test.describe("Ingreso real con M1", () => {
     await enterCredentials(page, "carlos.rodriguez@m6.local");
 
     await expect(page).toHaveURL(/\/app\?destination=work$/, { timeout: 20_000 });
-    await expect(page.getByText(`Empleado M1 · ${DEMO_IDENTITIES["office-duty-queue"].sub}`)).toBeVisible();
+    await expect(page.getByText(`Empleado M1 · ${SCENARIO_IDENTITIES["office-duty-queue"].sub}`)).toBeVisible();
   });
 
   test("muestra un error genérico para una contraseña incorrecta y conserva el correo", async ({ page, context }) => {

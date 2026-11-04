@@ -8,7 +8,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
 
 describe("GET /api/neighborhoods", () => {
   it("requires an active session", async () => {
@@ -26,7 +26,7 @@ describe("GET /api/neighborhoods", () => {
   });
 
   it("forwards the filters to the backend and relays its 503 when the M9 catalog is not loaded", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       Response.json({ statusCode: 503, message: "Catálogo de barrios no disponible" }, { status: 503 }),
     );

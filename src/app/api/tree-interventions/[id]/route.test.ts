@@ -8,13 +8,14 @@ import { POST as reject } from "./reject/route";
 import { POST as submitForAuthorization } from "./submit-for-authorization/route";
 import { POST as assignService } from "./assign-service/route";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
-import { loginAs, loginWithMe as login } from "@/test/session";
+import { POST as login } from "@/app/api/session/login/route";
+import { loginAs } from "@/test/session";
 
 beforeEach(() => {
   resetTreeInterventionFixtures();
   resetServiceFixtures();
 });
-afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
+afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M1_TEST_ACCESS_TOKEN; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
 
 
 
@@ -28,8 +29,8 @@ function transitionRequest(id: string, action: string, cookie: string, body?: un
 
 describe("/api/tree-interventions/[id]", () => {
   it("forwards backend intervention detail with the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "intervention-backend-1" }));
 
     const response = await GET(new Request("http://localhost/api/tree-interventions/intervention-backend-1", { headers: { cookie } }), {
@@ -39,12 +40,12 @@ describe("/api/tree-interventions/[id]", () => {
     expect(response.status).toBe(200);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/tree-interventions/intervention-backend-1");
     expect(backendFetch.mock.calls[0]?.[1]?.method ?? "GET").toBe("GET");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 
   it("forwards backend intervention transitions with their action paths and bodies", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json({ status: "PENDING_AUTHORIZATION" }))
       .mockResolvedValueOnce(Response.json({ status: "AUTHORIZED" }))
@@ -62,13 +63,13 @@ describe("/api/tree-interventions/[id]", () => {
       ["https://backend.internal/tree-interventions/intervention-backend-1/reject", "POST", undefined],
     ]);
     expect(backendFetch.mock.calls.every(([, init]) =>
-      new Headers(init?.headers).get("authorization") === `Bearer ${devJwt}`,
+      new Headers(init?.headers).get("authorization") === `Bearer ${accessToken}`,
     )).toBe(true);
   });
 
   it("forwards backend service assignment with the validated body and bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const accessToken = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken, backendOrigin: "https://backend.internal" });
     const input = { serviceId: "SVC-1043" };
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "intervention-backend-1", ...input }));
 
@@ -79,7 +80,7 @@ describe("/api/tree-interventions/[id]", () => {
     expect(response.status).toBe(200);
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/tree-interventions/intervention-backend-1/assign-service");
     expect(backendFetch.mock.calls[0]?.[1]?.method).toBe("POST");
-    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${devJwt}`);
+    expect(new Headers(backendFetch.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${accessToken}`);
     expect(JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body))).toEqual(input);
   });
 

@@ -7,13 +7,13 @@ import type { ScenarioId } from "@/lib/scenarios";
 export const integrationMonitorBackend = setupServer();
 
 const backendOrigin = "https://backend.internal";
-const devJwt = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.signature`;
+const accessToken = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.signature`;
 
 export function configureIntegrationMonitorBackend(): () => void {
-  const keys = ["M6_AUTH_MODE", "M6_DEV_JWT", "M6_BACKEND_ORIGIN"] as const;
+  const keys = ["M6_AUTH_MODE", "M1_TEST_ACCESS_TOKEN", "M6_BACKEND_ORIGIN"] as const;
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
-  process.env.M6_AUTH_MODE = "backend-development";
-  process.env.M6_DEV_JWT = devJwt;
+  process.env.M6_AUTH_MODE = "real-m1";
+  process.env.M1_TEST_ACCESS_TOKEN = accessToken;
   process.env.M6_BACKEND_ORIGIN = backendOrigin;
 
   return () => {
@@ -30,8 +30,8 @@ export function integrationMonitorCookie(
   roles?: readonly M6Role[],
 ): string {
   return createSessionCookie(scenarioId, {
-    mode: "backend-development",
-    devJwt,
+    mode: "real-m1",
+    accessToken,
     backendOrigin,
     roles,
   });
