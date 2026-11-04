@@ -4,8 +4,8 @@ import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Equal } from "lucide-react";
 
 import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IndicatorData } from "@/lib/indicators";
@@ -126,18 +126,18 @@ function SignalCard({ signal, status, onRetry }: { signal: AttentionSignal; stat
   const comparison = change === null ? "Sin período anterior para comparar."
     : `${changeText(change).replace("que antes", "que el período anterior")}${change === 0 ? "" : worse ? ", empeora" : ", mejora"}.`;
   return (
-    <Card size="sm" className={cn("h-full", worse && "ring-1 ring-destructive/40")} role="group" aria-labelledby={titleId} aria-describedby={descriptionId}>
+    <Card size="sm" className="h-full" role="group" aria-labelledby={titleId} aria-describedby={descriptionId}>
       <CardHeader>
         <CardTitle id={titleId}>{signal.label}</CardTitle>
-        <CardAction><Trend change={change} /></CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-1">
-        <p className={cn("text-4xl font-semibold tabular-nums tracking-tight", worse && "text-destructive")} aria-hidden="true">{plainNumber(signal.value)}</p>
+        <p className="text-4xl font-semibold tabular-nums tracking-tight" aria-hidden="true">{plainNumber(signal.value)}</p>
+        <Trend change={change} />
         <CardDescription aria-hidden="true">{signal.context}</CardDescription>
         <span className="sr-only" id={descriptionId}>{`${plainNumber(signal.value)}. ${comparison} ${signal.context}.`}</span>
-        <Link href={signal.href} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2 min-h-11 self-start sm:min-h-0")} aria-label={signal.linkLabel}>
+        <Button render={<Link href={signal.href} aria-label={signal.linkLabel} />} nativeButton={false} role="link" variant="outline" size="sm" className="mt-2 min-h-11 self-start sm:min-h-0">
           Ver lista<ArrowRight data-icon="inline-end" aria-hidden="true" />
-        </Link>
+        </Button>
       </CardContent>
     </Card>
   );
