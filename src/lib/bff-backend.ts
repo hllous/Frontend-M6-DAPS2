@@ -28,6 +28,24 @@ export function pathId(id: string): string {
   return encodeURIComponent(id);
 }
 
+async function clarifyBackendError(response: Response, method: string): Promise<Response> {
+  if (response.ok || !response.headers.get("content-type")?.toLowerCase().includes("application/json")) return response;
+  const payload: unknown = await response.clone().json().catch(() => null);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return response;
+  const record = payload as Record<string, unknown>;
+  const message = record.message;
+  const values = Array.isArray(message) ? message : [message];
+  if (!values.some((value) => typeof value === "string" && /\bm[oó]dulo\s+[1-9]\b|\bM[1-9]\b|backend|\b(?:workOrderId|closureId|ticketId|serviceId|zoneId)\b/i.test(value))) return response;
+  const replacement = ["GET", "HEAD"].includes(method.toUpperCase())
+    ? "No se pudo obtener la información. Reintente en unos segundos."
+    : "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar.";
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+  void response.body?.cancel().catch(() => undefined);
+  return new Response(JSON.stringify({ ...record, message: replacement }), { status: response.status, statusText: response.statusText, headers });
+}
+
 export async function fetchBackend(
   request: Request,
   resourcePath: string,
@@ -104,7 +122,7 @@ export async function fetchBackend(
         response = await send(accessToken);
       }
     }
-    return finish(response);
+    return finish(await clarifyBackendError(response, init.method ?? "GET"));
   } catch (error) {
     if (init.signal?.aborted) throw error;
     if (error instanceof InvalidSessionError || error instanceof BackendUnavailableError) throw error;
