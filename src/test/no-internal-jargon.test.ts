@@ -17,6 +17,7 @@ describe("expectNoInternalJargon", () => {
   });
 
   it.each([
+    ["a module name", "<p>Módulo 6</p>", "Módulo 6"],
     ["a module code", "<p>Disponible en M3</p>", "M3"],
     ["the word backend", "<p>Error del Backend</p>", "Backend"],
     ["workOrderId", "<p>workOrderId faltante</p>", "workOrderId"],

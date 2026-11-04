@@ -52,7 +52,7 @@ test.describe("M6 roles from GET /me @smoke", () => {
 
     await expect(page).toHaveURL(/\/no-role$/);
     await expect(page.getByRole("heading", { name: "Sin rol asignado" })).toBeVisible();
-    await expect(page.getByText(/todavía no tiene un rol de M6 asignado en Ambiente/)).toBeVisible();
+    await expect(page.getByText(/Su usuario todavía no tiene un rol en Ambiente e Higiene/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
   });
 

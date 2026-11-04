@@ -490,7 +490,7 @@ export function IntegrationMonitor({
   return (
     <section aria-labelledby="integration-monitor-title" className="flex min-w-0 flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <h1 id="integration-monitor-title" className="text-2xl font-bold tracking-tight">Monitor de integración</h1>
+        <h1 id="integration-monitor-title" className="text-2xl font-bold tracking-tight">Eventos</h1>
       </header>
 
       <Tabs value={activeTab} onValueChange={changeTab} className="min-w-0">

@@ -71,7 +71,7 @@ export async function GET(request: Request) {
         return errorResponse(502, "La respuesta de cuadrilla no contiene JSON válido.", path);
       }
       const parsedCrew = crewSchema.safeParse(normalizeCrewPayload(payload));
-      if (!parsedCrew.success) return errorResponse(502, "La respuesta de cuadrilla no respeta el contrato documentado.", path);
+      if (!parsedCrew.success) return errorResponse(502, "No se pudo obtener información válida de cuadrilla. Reintente en unos segundos.", path);
 
       const crew = parsedCrew.data;
       const matches = (query.active === undefined || crew.active === query.active)

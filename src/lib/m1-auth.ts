@@ -15,14 +15,14 @@ export type M1AccessClaims = {
 
 export class M1CredentialsRejectedError extends Error {
   constructor() {
-    super("M1 rechazó las credenciales.");
+    super("Usuario o contraseña incorrectos.");
     this.name = "M1CredentialsRejectedError";
   }
 }
 
 export class M1AccountBlockedError extends Error {
   constructor() {
-    super("M1 no permite el ingreso de esta cuenta.");
+    super("Esta cuenta no puede iniciar sesión. Comuníquese con el administrador del sistema.");
     this.name = "M1AccountBlockedError";
   }
 }
@@ -36,14 +36,14 @@ export class M1ServiceUnavailableError extends Error {
 
 export class M1LoginTimeoutError extends Error {
   constructor() {
-    super("M1 no respondió dentro del tiempo de espera.");
+    super("El servicio de ingreso no responde. Reintente en unos segundos.");
     this.name = "M1LoginTimeoutError";
   }
 }
 
 export class M1InvalidResponseError extends Error {
   constructor() {
-    super("M1 devolvió una respuesta inválida.");
+    super("El servicio de ingreso no responde. Reintente en unos segundos.");
     this.name = "M1InvalidResponseError";
   }
 }

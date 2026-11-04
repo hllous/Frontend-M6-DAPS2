@@ -4,7 +4,7 @@ import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
 import { GET } from "./route";
 import { loginAs } from "@/test/session";
 
-const backendUnavailableMessage = "El backend no responde. Reintente en unos segundos.";
+const backendUnavailableMessage = "El sistema no responde. Reintente en unos segundos.";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;

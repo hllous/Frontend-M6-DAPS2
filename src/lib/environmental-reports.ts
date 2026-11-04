@@ -269,7 +269,7 @@ export type EnvironmentalInspectionCompleteInput = z.infer<typeof environmentalI
 // Hypothesis: schedule fields are kept explicit at this adapter seam until OpenAPI
 // exposes the authoritative request and response nesting.
 export const environmentalInspectionScheduleInputSchema = z.object({
-  inspectorId: z.string().trim().regex(/^\d{1,19}$/, "El inspector debe tener un identificador numérico de M1.").optional(),
+  inspectorId: z.string().trim().regex(/^\d{1,19}$/, "El legajo debe ser numérico.").optional(),
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
   timeWindow: z.object({
     start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
@@ -491,7 +491,7 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
     payload = await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
-    throw new EnvironmentalReportContractError("La respuesta del control ambiental no es JSON válido.", { cause });
+    throw new EnvironmentalReportContractError("No se pudo obtener información válida del control ambiental. Reintente en unos segundos.", { cause });
   }
 
   if (!response.ok) {
@@ -542,7 +542,7 @@ export const environmentalReportsAdapter = {
     const parsed = violationNoticeSchema.safeParse(resourcePayload(payload));
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
-      throw new EnvironmentalReportContractError("La respuesta de emisión del acta no respeta el contrato esperado.", { cause: parsed.error });
+      throw new EnvironmentalReportContractError("No se pudo obtener información válida de la emisión del acta. Reintente en unos segundos.", { cause: parsed.error });
     }
     return parsed.data;
   },
@@ -554,7 +554,7 @@ export const environmentalReportsAdapter = {
     const parsed = violationNoticeSchema.safeParse(resourcePayload(payload));
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
-      throw new EnvironmentalReportContractError("La respuesta del acta no respeta el contrato esperado.", { cause: parsed.error });
+      throw new EnvironmentalReportContractError("No se pudo obtener información válida del acta. Reintente en unos segundos.", { cause: parsed.error });
     }
     return parsed.data;
   },
@@ -567,7 +567,7 @@ export const environmentalReportsAdapter = {
       meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number(), dropped: z.number().int().nonnegative().optional() }),
       sanctionOutcomeIntegrationExceptions: z.array(sanctionOutcomeIntegrationExceptionSchema).optional(),
     }).safeParse(payload);
-    if (!parsed.success) throw new EnvironmentalReportContractError("La lista de expedientes no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new EnvironmentalReportContractError("No se pudo obtener información válida de la lista de expedientes. Reintente en unos segundos.", { cause: parsed.error });
     return {
       environmentalReports: parsed.data.data,
       dropped: droppedRecords(parsed.data.data) + (parsed.data.meta.dropped ?? 0),
@@ -580,7 +580,7 @@ export const environmentalReportsAdapter = {
   },
 
   async get(id: string): Promise<EnvironmentalReport> {
-    return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}`), "El detalle del expediente no respeta el contrato esperado.");
+    return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}`), "No se pudo obtener información válida del detalle del expediente. Reintente en unos segundos.");
   },
 
   async create(input: CreateEnvironmentalReportInput): Promise<EnvironmentalReport> {
@@ -590,17 +590,17 @@ export const environmentalReportsAdapter = {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(parsedInput.data),
-    }), "La respuesta de creación del expediente no respeta el contrato esperado.");
+    }), "No se pudo obtener información válida de la creación del expediente. Reintente en unos segundos.");
   },
 
   async startReview(id: string): Promise<EnvironmentalReport> {
-    return transition(id, "start-review", "La respuesta de inicio de revisión no respeta el contrato esperado.");
+    return transition(id, "start-review", "No se pudo obtener información válida del inicio de revisión. Reintente en unos segundos.");
   },
   async forward(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
-    return transition(id, "forward", "La respuesta de derivación no respeta el contrato esperado.", decisionBody(input));
+    return transition(id, "forward", "No se pudo obtener información válida de derivación. Reintente en unos segundos.", decisionBody(input));
   },
   async dismiss(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
-    return transition(id, "dismiss", "La respuesta de desestimación no respeta el contrato esperado.", decisionBody(input));
+    return transition(id, "dismiss", "No se pudo obtener información válida de desestimación. Reintente en unos segundos.", decisionBody(input));
   },
   async requestInformation(id: string, input: RequestInformationInput): Promise<EnvironmentalReport> {
     const parsed = requestInformationInputSchema.safeParse(input);
@@ -609,10 +609,10 @@ export const environmentalReportsAdapter = {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(parsed.data),
-    }), "La respuesta del pedido de información no respeta el contrato esperado.");
+    }), "No se pudo obtener información válida del pedido de información. Reintente en unos segundos.");
   },
   async close(id: string): Promise<EnvironmentalReport> {
-    return transition(id, "close", "La respuesta de cierre no respeta el contrato esperado.");
+    return transition(id, "close", "No se pudo obtener información válida de cierre. Reintente en unos segundos.");
   },
 
   async schedule(reportId: string, input: EnvironmentalInspectionScheduleInput): Promise<EnvironmentalInspection> {
@@ -624,7 +624,7 @@ export const environmentalReportsAdapter = {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(parsedInput.data),
-    }), "La respuesta de programación de inspección no respeta el contrato esperado.");
+    }), "No se pudo obtener información válida de la programación de inspección. Reintente en unos segundos.");
   },
 
   async listInspections(reportId: string): Promise<EnvironmentalInspection[]> {
@@ -635,7 +635,7 @@ export const environmentalReportsAdapter = {
     const parsed = z.array(environmentalInspectionSchema).safeParse(raw);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
-      throw new EnvironmentalReportContractError("La historia de inspecciones no respeta el contrato esperado.", { cause: parsed.error });
+      throw new EnvironmentalReportContractError("No se pudo obtener información válida de la historia de inspecciones. Reintente en unos segundos.", { cause: parsed.error });
     }
     return parsed.data;
   },
@@ -649,11 +649,11 @@ export const environmentalReportsAdapter = {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(parsedInput.data),
-    }), "La respuesta de finalizaci\u00f3n de inspecci\u00f3n no respeta el contrato esperado.");
+    }), "No se pudo obtener información válida de la finalizaci\u00f3n de inspecci\u00f3n. Reintente en unos segundos.");
   },
 
   async getInspection(id: string): Promise<EnvironmentalInspection> {
-    return parseInspection(await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}`), "El detalle de inspección no respeta el contrato esperado.");
+    return parseInspection(await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}`), "No se pudo obtener información válida del detalle de inspección. Reintente en unos segundos.");
   },
 };
 

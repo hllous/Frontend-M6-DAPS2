@@ -102,7 +102,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
-    throw new GreenSpaceContractError("La respuesta de espacios verdes no es JSON válido.", { cause });
+    throw new GreenSpaceContractError("No se pudo obtener información válida de espacios verdes. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -110,7 +110,7 @@ function requestError(payload: unknown): GreenSpaceRequestError | GreenSpaceCont
   const parsed = errorResponseSchema.safeParse(payload);
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
-    return new GreenSpaceContractError("La respuesta de error de espacios verdes no respeta el contrato documentado.", {
+    return new GreenSpaceContractError("No se pudo obtener información válida de espacios verdes. Reintente en unos segundos.", {
       cause: parsed.error,
     });
   }
@@ -148,7 +148,7 @@ export const greenSpacesAdapter = {
     const parsed = greenSpacesEnvelopeSchema.safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
-      throw new GreenSpaceContractError("La respuesta de espacios verdes no respeta el contrato esperado.", {
+      throw new GreenSpaceContractError("No se pudo obtener información válida de espacios verdes. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }
@@ -162,7 +162,7 @@ export const greenSpacesAdapter = {
   },
 
   async get(id: string): Promise<GreenSpace> {
-    return parseGreenSpace(await send(`/api/green-spaces/${id}`), "El detalle de espacio verde no respeta el contrato esperado.");
+    return parseGreenSpace(await send(`/api/green-spaces/${id}`), "No se pudo obtener información válida del detalle de espacio verde. Reintente en unos segundos.");
   },
 
   async create(input: CreateGreenSpaceInput): Promise<GreenSpace> {
@@ -176,7 +176,7 @@ export const greenSpacesAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de creación de espacio verde no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la creación de espacio verde. Reintente en unos segundos.",
     );
     notifyMapInventoryChanged();
     return saved;
@@ -193,7 +193,7 @@ export const greenSpacesAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de actualización de espacio verde no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la actualización de espacio verde. Reintente en unos segundos.",
     );
     notifyMapInventoryChanged();
     return saved;
@@ -202,7 +202,7 @@ export const greenSpacesAdapter = {
   async remove(id: string): Promise<GreenSpace> {
     return parseGreenSpace(
       await send(`/api/green-spaces/${id}`, { method: "DELETE" }),
-      "La respuesta de baja de espacio verde no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la baja de espacio verde. Reintente en unos segundos.",
     );
   },
 };

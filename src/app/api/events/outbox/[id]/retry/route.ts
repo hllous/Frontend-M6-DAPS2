@@ -27,7 +27,7 @@ export async function POST(request: Request, context: RouteContext) {
         "integrationMonitor:manage",
         { method: "POST", cache: "no-store" },
       );
-      return validatedBackendResponse(response, outboxEventSchema, path, "La respuesta del reintento no respeta el contrato documentado.");
+      return validatedBackendResponse(response, outboxEventSchema, path, "No se pudo obtener información válida del reintento. Reintente en unos segundos.");
     }
 
     const current = getOutboxFixture(id);

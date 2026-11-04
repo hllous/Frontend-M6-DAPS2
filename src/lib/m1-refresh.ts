@@ -100,7 +100,7 @@ async function callM1(
   timeoutMs: number,
   now: number,
 ): Promise<Renewal | null> {
-  const unavailable = () => new BackendUnavailableError(503, "M1 no responde. Reintente en unos segundos.");
+  const unavailable = () => new BackendUnavailableError(503, "El servicio de ingreso no responde. Reintente en unos segundos.");
   const base = m1BaseUrl();
   if (!base) throw unavailable();
   let response: Response;
@@ -167,7 +167,7 @@ export async function renewRequestSession<T extends RenewableSession>(
     if (options.tolerateUnavailable && error instanceof BackendUnavailableError) return session;
     throw error;
   }
-  if (!next) throw new InvalidSessionError("M1 rechazó la renovación de la sesión.");
+  if (!next) throw new InvalidSessionError("No pudimos confirmar su sesión. Vuelva a ingresar.");
   rememberRenewedSession(request, next);
   await persistRenewedSession(next, request);
   return next as T;

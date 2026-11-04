@@ -1,4 +1,5 @@
 const FORBIDDEN: ReadonlyArray<{ label: string; pattern: RegExp }> = [
+  { label: "module name", pattern: /\bm[oó]dulo\s+[1-9]\b/gi },
   { label: "module code", pattern: /\bM[1-9]\b/g },
   { label: "the word backend", pattern: /backend/gi },
   { label: "API field name", pattern: /\b(?:workOrderId|closureId|ticketId|serviceId|zoneId)\b/g },

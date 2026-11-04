@@ -26,7 +26,7 @@ export async function GET(request: Request, context: RouteContext) {
         "integrationMonitor:manage",
         { cache: "no-store" },
       );
-      return validatedBackendResponse(response, outboxDetailSchema, path, "El detalle del evento no respeta el contrato documentado.");
+      return validatedBackendResponse(response, outboxDetailSchema, path, "No se pudo obtener información válida del detalle del evento. Reintente en unos segundos.");
     }
 
     const detail = getOutboxFixture(id);

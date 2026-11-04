@@ -59,6 +59,21 @@ describe("pathId", () => {
   );
 });
 
+describe("backend error copy", () => {
+  it.each([
+    ["GET", 422, "El backend de M4 rechazó el pedido.", "No se pudo obtener la información. Reintente en unos segundos."],
+    ["POST", 422, ["Error de M4", "Otro error"], "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."],
+    ["POST", 400, "El backend rechazó el pedido.", "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."],
+    ["POST", 500, "Error de M4", "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar."],
+    ["POST", 422, "La fecha es obligatoria.", "La fecha es obligatoria."],
+  ])("preserves status and code for %s errors", async (method, status, message, expected) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ statusCode: status, message, code: "INVALID", error: "Error" }, { status }));
+    const response = await fetchBackend(backendRequest(), "/services", undefined, { method });
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ message: expected, code: "INVALID", statusCode: status });
+  });
+});
+
 describe("fetchBackend availability", () => {
   it.each([[200, 502], [201, 502], [503, 503]])(
     "wraps non-JSON upstream %s as status %s and uses the calling BFF path",
@@ -82,7 +97,7 @@ describe("fetchBackend availability", () => {
     await expect(fetchBackend(backendRequest(), "/services/service-1")).rejects.toMatchObject({
       name: "BackendUnavailableError",
       status: 503,
-      message: "El backend no responde. Reintente en unos segundos.",
+      message: "El sistema no responde. Reintente en unos segundos.",
     });
   });
 

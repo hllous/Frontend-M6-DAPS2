@@ -32,7 +32,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const current = getEnvironmentalReportFixture(id);
     if (!current) return errorResponse(404, "Expediente ambiental no encontrado.", path);
-    if (current.status !== "UNDER_REVIEW" || !current.ticketId) return errorResponse(409, "Solo se puede pedir información en un expediente en revisión con reclamo de M2.", path);
+    if (current.status !== "UNDER_REVIEW" || !current.ticketId) return errorResponse(409, "Solo se puede pedir información en un expediente en revisión con reclamo ciudadano.", path);
     if (current.informationRequestPending) return errorResponse(409, "Ya hay una solicitud de información pendiente.", path);
     return NextResponse.json(updateEnvironmentalReportFixture(id, {
       informationRequestPending: true,

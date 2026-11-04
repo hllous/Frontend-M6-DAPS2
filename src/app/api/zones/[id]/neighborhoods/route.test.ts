@@ -72,6 +72,7 @@ describe("POST /api/zones/[id]/neighborhoods", () => {
       );
 
       expect(response.status).toBe(400);
+      expect((await response.json()).message).toBe("Algún barrio no figura en el catálogo de barrios de la ciudad.");
     }
     expect(getZoneFixture("zone-1")?.neighborhoodIds).toEqual([barrioId("belgrano")]);
   });

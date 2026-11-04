@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as navigation from "next/navigation";
 
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 import { NoRoleScreen } from "./no-role-screen";
 
 afterEach(() => {
@@ -12,11 +13,12 @@ afterEach(() => {
 
 describe("NoRoleScreen", () => {
   it("explains the missing M6 role, identifies the signed-in employee, and offers sign-out", () => {
-    render(<NoRoleScreen identity="Empleado M1 · 900" />);
+    const { container } = render(<NoRoleScreen identity="Legajo 900" />);
 
     expect(screen.getByRole("heading", { name: "Sin rol asignado" })).toBeVisible();
-    expect(screen.getByText("Empleado M1 · 900")).toBeVisible();
-    expect(screen.getByText(/Solicite a un administrador de M6 que le asigne un rol/)).toBeVisible();
+    expect(screen.getByText("Legajo 900")).toBeVisible();
+    expectNoInternalJargon(container);
+    expect(screen.getByText(/Su usuario todavía no tiene un rol en Ambiente e Higiene/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeEnabled();
   });
 

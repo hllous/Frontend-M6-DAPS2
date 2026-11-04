@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 import { IntegrationMonitor } from "./integration-monitor";
 
 const server = setupServer(...handlers);
@@ -27,6 +28,9 @@ describe("IntegrationMonitor", () => {
     expect(within(list).getByText("containerDamaged")).toBeVisible();
     expect(within(list).queryByText(/damageType|containerId/)).not.toBeInTheDocument();
     expect(await screen.findByLabelText("Eventos fallidos")).toHaveTextContent("2 eventos fallidos");
+    const heading = screen.getByRole("heading", { name: "Eventos" });
+    expect(heading).toBeVisible();
+    expectNoInternalJargon(heading);
   });
 
   it("announces calendar days in Spanish", async () => {

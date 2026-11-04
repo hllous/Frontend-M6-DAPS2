@@ -192,7 +192,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
-      message: expect.stringMatching(/corte.*pendiente|pendiente.*corte/i),
+      message: "No se puede iniciar el Servicio: la solicitud de corte de calle sigue pendiente de respuesta de Tránsito.",
     });
     expect(serviceFixtures.find((service) => service.id === "SVC-1050")?.status).toBe("SCHEDULED");
   });
@@ -227,7 +227,7 @@ describe("POST /api/services/[id]/start BFF route", () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
-      message: expect.stringMatching(/rechaz|reprogramar.*cancelar|cancelar.*reprogramar/i),
+      message: "Tránsito rechazó el corte de calle. Oficina debe elegir explícitamente entre reprogramar o cancelar el Servicio.",
     });
     expect(serviceFixtures.find((service) => service.id === "SVC-1050")?.status).toBe("SCHEDULED");
   });

@@ -12,7 +12,7 @@ async function handle(request: Request, context: Context, method: "GET" | "PUT" 
   try {
     const { session } = authorize(request, { capability: "role:manage", throwOnError: true });
     const { userId } = await context.params;
-    if (!validUserId(userId)) return errorResponse(400, "El identificador de M1 debe ser numérico.", path);
+    if (!validUserId(userId)) return errorResponse(400, "El legajo debe ser numérico.", path);
     let roles: ReturnType<typeof getRoles> = [];
     if (method === "PUT") {
       let body: unknown;

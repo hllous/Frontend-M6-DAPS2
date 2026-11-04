@@ -141,7 +141,7 @@ export const vehiclesAdapter = {
     const parsed = vehiclesEnvelopeSchema.safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "vehicles" });
-      throw new VehicleContractError("La respuesta de vehículos no respeta el contrato esperado.", {
+      throw new VehicleContractError("No se pudo obtener información válida de vehículos. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }
@@ -155,7 +155,7 @@ export const vehiclesAdapter = {
   },
 
   async get(id: string): Promise<Vehicle> {
-    return parseVehicle(await send(`/api/vehicles/${id}`), "El detalle de vehículo no respeta el contrato esperado.");
+    return parseVehicle(await send(`/api/vehicles/${id}`), "No se pudo obtener información válida del detalle de vehículo. Reintente en unos segundos.");
   },
 
   async create(input: CreateVehicleInput): Promise<Vehicle> {
@@ -169,7 +169,7 @@ export const vehiclesAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de creación de vehículo no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la creación de vehículo. Reintente en unos segundos.",
     );
   },
 
@@ -184,14 +184,14 @@ export const vehiclesAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de actualización de vehículo no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la actualización de vehículo. Reintente en unos segundos.",
     );
   },
 
   async remove(id: string): Promise<Vehicle> {
     return parseVehicle(
       await send(`/api/vehicles/${id}`, { method: "DELETE" }),
-      "La respuesta de baja de vehículo no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la baja de vehículo. Reintente en unos segundos.",
     );
   },
 };

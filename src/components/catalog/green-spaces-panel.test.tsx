@@ -101,7 +101,7 @@ describe("GreenSpacesPanel", () => {
 
     render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
 
-    expect(await screen.findByText(/contrato documentado/)).toBeVisible();
+    expect(await screen.findByText(/No se pudo obtener información válida de espacios verdes/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Reintentar carga" })).toBeVisible();
   });
 

@@ -113,8 +113,8 @@ async function handleLoginRequest(request: Request, body: Record<string, unknown
       return sessionResponse(request, sessionFromMe(created, me));
     } catch (error) {
       if (error instanceof M1CredentialsRejectedError) return loginFailure(401, "El correo o la contraseña no son correctos.");
-      if (error instanceof M1AccountBlockedError) return loginFailure(403, "La cuenta no puede iniciar sesión. Contacte al soporte de M1.");
-      if (error instanceof CitizenForbiddenError) return loginFailure(403, "Esta cuenta no tiene acceso a M6.");
+      if (error instanceof M1AccountBlockedError) return loginFailure(403, "La cuenta no puede iniciar sesión. Comuníquese con el administrador del sistema.");
+      if (error instanceof CitizenForbiddenError) return loginFailure(403, "Esta cuenta no tiene acceso a Ambiente e Higiene.");
       if (error instanceof InvalidSessionError) return loginFailure(401, "No se pudo validar el ingreso con Ambiente. Intente nuevamente.");
       if (error instanceof M1InvalidResponseError) return loginFailure(502, "El servicio de ingreso devolvió una respuesta inválida.");
       if (error instanceof M1LoginTimeoutError) return loginFailure(504, "El servicio de ingreso no respondió dentro de un minuto y medio. Intente nuevamente.");

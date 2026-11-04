@@ -196,7 +196,7 @@ describe("referrals against the backend", () => {
     const body = await response.json();
 
     expect(response.status).toBe(502);
-    expect(body.message).toContain("no reconoce");
+    expect(body.message).toBe("No se pudo mostrar la derivación. Comuníquese con el administrador del sistema.");
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(repairId), expect.anything());
   });
 
@@ -379,7 +379,7 @@ describe("referrals against the backend", () => {
     const response = await getDetail(await loginAs("office-duty-queue"));
 
     expect(response.status).toBe(status);
-    expect(await response.json()).toEqual(payload);
+    expect(await response.json()).toEqual({ ...payload, message: "No se pudo obtener la información. Reintente en unos segundos." });
     expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 

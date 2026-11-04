@@ -158,7 +158,7 @@ export async function requireCrewScope(
       const payload: unknown = await response.json().catch(() => undefined);
       const parsed = crewScopedServiceSchema.safeParse(payload);
       if (!parsed.success) {
-        return errorResponse(502, "La respuesta del servicio no respeta el contrato documentado.", path);
+        return errorResponse(502, "No se pudo obtener información válida del servicio. Reintente en unos segundos.", path);
       }
       service = parsed.data;
     } else {
@@ -179,7 +179,7 @@ export async function requireCrewScope(
 export function backendMode(session: Pick<Session, "mode">): boolean {
   if (session.mode === "mock") return false;
   if (!process.env.M6_BACKEND_ORIGIN) {
-    throw new AuthUnavailableError("El backend de desarrollo no está configurado.");
+    throw new AuthUnavailableError("El sistema no está disponible. Comuníquese con el administrador del sistema.");
   }
   return true;
 }
@@ -228,7 +228,7 @@ export function forwardResponse(response: Response, path = bffPathForResponse(re
   if (!bodyless && contentType !== null && contentType.split(";")[0].trim().toLowerCase() !== "application/json") {
     void response.body?.cancel().catch(() => undefined);
     const errorStatus = response.status >= 200 && response.status < 300 ? 502 : response.status;
-    const error = errorResponse(errorStatus, "La respuesta del backend no tiene un tipo de contenido JSON válido.", path);
+    const error = errorResponse(errorStatus, "El sistema devolvió una respuesta que no se pudo leer. Reintente en unos segundos.", path);
     error.headers.set("X-Content-Type-Options", "nosniff");
     return error;
   }
