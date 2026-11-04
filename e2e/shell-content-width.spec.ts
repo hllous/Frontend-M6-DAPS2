@@ -13,6 +13,11 @@ test("el shell asigna ancho según la pantalla y respeta el límite", async ({ p
       await page.goto(route);
       const main = page.getByRole("main");
       await expect(main.getByRole("heading").first()).toBeVisible();
+      if (route === "/app?destination=referrals") {
+        const list = main.getByRole("region", { name: "Lista de derivaciones" });
+        await expect(list).toBeVisible();
+        expect((await list.boundingBox())!.width).toBeGreaterThan(1500);
+      }
       const box = await main.boundingBox();
       expect(box).not.toBeNull();
       if (dataRoutes.includes(route)) {
