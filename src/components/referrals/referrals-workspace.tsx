@@ -360,7 +360,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-canvas)]">
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl items-end justify-between gap-4">
+        <div className="mx-auto flex w-full items-end justify-between gap-4">
           <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Derivaciones</h1>
           {loadState.status === "ready" ? (
             <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-text-secondary)]">
@@ -390,7 +390,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
         </div>
       )}
       {loadState.status === "ready" && loadState.invalid > 0 && (
-        <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full px-4 pt-4 sm:px-6 lg:px-8">
           <Alert role="status" aria-label="Derivaciones sin mostrar" className="rounded-xl border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
             <ShieldAlert aria-hidden />
             <AlertDescription className="text-[var(--color-text)]">
@@ -401,7 +401,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
       )}
       {loadState.status === "ready" && loadState.referrals.length === 0 && <EmptyState />}
       {loadState.status === "ready" && loadState.referrals.length > 0 && (
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
+        <div className="mx-auto flex w-full flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
           <ReferralReconciliationSummary referrals={loadState.referrals} anomalies={anomalies} />
           <section className="w-full" aria-label="Lista de derivaciones">
             <ItemGroup className="grid min-w-0 grid-cols-1 gap-3" aria-label="Derivaciones">

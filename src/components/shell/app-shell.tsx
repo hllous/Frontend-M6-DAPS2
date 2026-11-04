@@ -141,7 +141,7 @@ export function AppShell({
           : requestedDestination && navigation.some((item) => item.id === requestedDestination)
             ? requestedDestination
             : "work";
-  const dataWidth = ["services", "referrals", "map", "catalog", "dashboards", "integration-monitor"].includes(destination) || (destination === "environment" && !searchParams.has("detail"));
+  const dataWidth = ["map", "catalog", "dashboards", "integration-monitor"].includes(destination) || (["services", "environment", "referrals"].includes(destination) && !searchParams.has("detail"));
   const mainRef = useRef<HTMLElement>(null);
   const previousDestination = useRef(destination);
   const [isCollapsed, setIsCollapsed] = useState(false);
