@@ -106,7 +106,7 @@
   },
   "src/components/services/services-workspace.tsx": {
     "@typescript-eslint/no-unused-vars": {
-      "count": 3
+      "count": 2
     }
   },
   "src/components/services/zone-execution-panel.test.tsx": {

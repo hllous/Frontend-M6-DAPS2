@@ -20,7 +20,11 @@ test.describe("shared control density", () => {
 
       await expect.poll(() => heightOf(page.getByRole("button", { name: "Cerrar sesión" }))).toBe(expected);
       await expect.poll(() => heightOf(page.getByRole("button", { name: "Programar servicio" }))).toBe(expected);
-      await expect.poll(() => heightOf(page.getByRole("searchbox", { name: "Buscar servicios" }))).toBe(expected);
+      // On phones the search lives in the «Filtros (n)» sheet; its trigger carries the touch target.
+      const searchTarget = width === 760
+        ? page.getByRole("button", { name: /^Filtros \(\d+\)$/ })
+        : page.getByRole("searchbox", { name: "Buscar servicios" });
+      await expect.poll(() => heightOf(searchTarget)).toBe(expected);
 
       if (width === 760) {
         await page.goto("/app?destination=dashboards");
