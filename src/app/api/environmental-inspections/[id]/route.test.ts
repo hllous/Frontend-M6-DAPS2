@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AUTH_COOKIE_NAME, createSession, sealSession } from "@/lib/session";
+import { AUTH_COOKIE_NAME, sealSession } from "@/lib/session";
 import { GET } from "./route";
-import { loginAs, loginWithMe as login } from "@/test/session";
+import { createTestSession, loginAs, loginWithMe as login } from "@/test/session";
 
 const inspectionId = "0b5bd4d8-179b-4de7-82aa-a83524012097";
 const serviceId = "ceec08ae-67e7-4739-9677-150f5085bb1a";
@@ -21,7 +21,6 @@ const inspection = {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -38,14 +37,11 @@ function fieldBackend() {
   return vi.spyOn(globalThis, "fetch");
 }
 
-describe("GET /api/environmental-inspections/:id en backend-development", () => {
+describe("GET /api/environmental-inspections/:id en real-m1", () => {
   it("Campo sin cuadrilla resuelta no recibe la inspección", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_AUTH_MODE = "real-m1";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    const session = createSession("field-crew-leader-route", {
-      mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
-      backendOrigin: process.env.M6_BACKEND_ORIGIN,
-    });
+    const session = createTestSession("field-crew-leader-route");
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(inspection));
     const response = await detail(`${AUTH_COOKIE_NAME}=${sealSession(session)}`);
 
@@ -59,7 +55,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
       .mockResolvedValueOnce(Response.json({ ...inspection, serviceId: "servicio-real-1" }))
       .mockResolvedValueOnce(Response.json({ crewId }))
       .mockResolvedValueOnce(Response.json({ message: "Evidencia no disponible." }, { status: 503 }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -75,7 +71,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
     const backendFetch = fieldBackend()
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: otherCrewId }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
@@ -88,7 +84,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
 
   it.each([null, undefined])("Campo no recibe una inspección sin servicio (%s)", async (missingServiceId) => {
     const backendFetch = fieldBackend().mockResolvedValueOnce(Response.json({ ...inspection, serviceId: missingServiceId }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect((await response.json()).message).toBe("Inspección no encontrada.");
@@ -99,7 +95,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json([]));
-    const response = await detail(await loginAs("office-duty-queue", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("office-duty-queue", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ...inspection, attachments: [] });
@@ -112,7 +108,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
   it("conserva el 404 del backend sin consultar servicio ni evidencia", async () => {
     const error = { statusCode: 404, message: "Inspección no encontrada en el backend." };
     const backendFetch = fieldBackend().mockResolvedValueOnce(Response.json(error, { status: 404 }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual(error);
@@ -121,7 +117,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
 
   it("returns 503 with the shared message when the backend request fails", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
-    const response = await detail(await loginAs("office-duty-queue", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("office-duty-queue", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
@@ -134,7 +130,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
   it.each(["field-crew-leader-route", "office-duty-queue"])("rechaza un payload inválido para %s", async (scenarioId) => {
     const backendFetch = scenarioId.startsWith("field") ? fieldBackend() : vi.spyOn(globalThis, "fetch");
     backendFetch.mockResolvedValueOnce(Response.json({ ...inspection, reportId: 123 }));
-    const response = await detail(await loginAs(scenarioId, { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs(scenarioId, { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
@@ -147,7 +143,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
 
   it("rechaza JSON malformado sin reenviarlo a Campo", async () => {
     const backendFetch = fieldBackend().mockResolvedValueOnce(new Response('{"inspectorId":"reservado"'));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(502);
     expect((await response.json()).message).toBe("La respuesta del backend no contiene una inspección válida.");
@@ -160,7 +156,7 @@ describe("GET /api/environmental-inspections/:id en backend-development", () => 
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json({ id: serviceId, crewId }))
       .mockResolvedValueOnce(Response.json(evidence));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({

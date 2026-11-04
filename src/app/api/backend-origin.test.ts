@@ -33,7 +33,7 @@ import * as treeFixtures from "@/lib/tree-fixtures";
 import * as vehicleFixtures from "@/lib/vehicles-fixtures";
 import * as zoneFixtures from "@/lib/zones-fixtures";
 import * as environmentalFixtures from "@/lib/environmental-report-fixtures";
-import { createSessionCookie, loginWithMe as login } from "@/test/session";
+import { createSessionCookie } from "@/test/session";
 
 const fixtureModules = [
   containerFixtures,
@@ -159,8 +159,8 @@ const mutationCases: MutationCase[] = [
     // La evidencia de un contenedor solo la sube la cuadrilla (Backend #161): el Admin de `backendCookie` no puede.
     invoke: async () => {
       const cookie = createSessionCookie("field-crew-leader-route", {
-        mode: "backend-development",
-        devJwt: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+        mode: "real-m1",
+        accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
         backendOrigin: "https://backend.internal",
       });
       delete process.env.M6_BACKEND_ORIGIN;
@@ -182,8 +182,8 @@ let backendCookie = "";
 beforeEach(() => {
   delete process.env.M6_BACKEND_ORIGIN;
   backendCookie = createSessionCookie("office-duty-queue", {
-    mode: "backend-development",
-    devJwt: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+    mode: "real-m1",
+    accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
     backendOrigin: "https://backend.internal",
   });
   delete process.env.M6_BACKEND_ORIGIN;
@@ -191,7 +191,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -207,19 +206,5 @@ describe("backend origin fail-closed behavior", () => {
     expect(await response.json()).toMatchObject({ statusCode: 503, message: "La autenticación solicitada no está disponible." });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(fixtureSnapshot()).toBe(before);
-  });
-
-  it("fails backend-development login with 503 when the origin is missing", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
-
-    const response = await login(new Request("http://localhost/api/session/login", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
-      body: JSON.stringify({ scenarioId: "office-duty-queue" }),
-    }));
-
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ message: "La autenticación solicitada no está disponible." });
   });
 });

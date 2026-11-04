@@ -22,7 +22,7 @@ describe("GET /api/communes", () => {
   });
 
   it("proxies GET /communes to the backend", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json([]));
 
     const response = await GET(new Request("http://localhost/api/communes?active=true", { headers: { cookie } }));

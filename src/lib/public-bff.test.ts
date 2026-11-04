@@ -71,7 +71,7 @@ describe("fetchPublicBackend BFF_SHARED_KEY", () => {
   it("never sends the key on authenticated routes", async () => {
     restoreEnv = backendEnv();
     vi.stubEnv("BFF_SHARED_KEY", KEY);
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
 
     await getCrews(new Request("http://localhost/api/crews", { headers: { cookie } }));

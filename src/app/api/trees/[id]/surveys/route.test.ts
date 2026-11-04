@@ -5,7 +5,7 @@ import { GET, POST } from "./route";
 import { createSessionCookie, loginAs } from "@/test/session";
 
 beforeEach(() => resetTreeSurveyFixtures());
-afterEach(() => { vi.restoreAllMocks(); delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
+afterEach(() => { vi.restoreAllMocks(); delete process.env.M6_AUTH_MODE; delete process.env.M6_BACKEND_ORIGIN; });
 
 
 
@@ -25,11 +25,10 @@ describe("/api/trees/[id]/surveys", () => {
     ["?page=0&pageSize=abc", "?page=1"],
     ["?healthStatus=HEALTHY&evil=1", "?healthStatus=HEALTHY"],
   ])("normalises backend list queries %s", async (query, expected) => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    process.env.M6_DEV_JWT = devJwt;
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0 } }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const response = await GET(new Request(`http://localhost/trees/abc/surveys${query}`, { headers: { cookie } }), { params: Promise.resolve({ id: "abc" }) });
     expect(response.status).toBe(200);
     expect(backendFetch).toHaveBeenCalledTimes(1);
@@ -40,12 +39,11 @@ describe("/api/trees/[id]/surveys", () => {
 
 
   it.each(["GET", "POST"])("uses a valid tree path id for backend %s", async (method) => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    process.env.M6_DEV_JWT = devJwt;
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
     // El relevamiento lo carga la cuadrilla (Backend #161); la cookie sellada evita resolver la cuadrilla contra /crews.
-    const cookie = createSessionCookie("field-crew-leader-route", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const cookie = createSessionCookie("field-crew-leader-route", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const request = new Request("http://localhost/api/trees/arbol-abc/surveys", { method, headers: { cookie, "content-type": "application/json" }, ...(method === "POST" ? { body: JSON.stringify(validInput) } : {}) });
     await (method === "GET" ? GET : POST)(request, { params: Promise.resolve({ id: "arbol-abc" }) });
     expect(String(backendFetch.mock.calls[0]?.[0])).toBe("https://backend.internal/trees/arbol-abc/surveys");

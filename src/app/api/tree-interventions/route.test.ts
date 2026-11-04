@@ -5,7 +5,7 @@ import { GET, POST } from "./route";
 import { loginAs } from "@/test/session";
 
 beforeEach(() => resetTreeInterventionFixtures());
-afterEach(() => { vi.restoreAllMocks(); delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; });
+afterEach(() => { vi.restoreAllMocks(); delete process.env.M6_AUTH_MODE; delete process.env.M6_BACKEND_ORIGIN; });
 
 
 
@@ -28,11 +28,10 @@ describe("/api/tree-interventions", () => {
     ["?status=APPROVED&evil=1", ""],
     ["?status=AUTHORIZED&evil=1", "?status=AUTHORIZED"],
   ])("normalises backend list queries %s", async (query, expected) => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    process.env.M6_DEV_JWT = devJwt;
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [], meta: { total: 0 } }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const response = await GET(new Request(`http://localhost/tree-interventions${query}`, { headers: { cookie } }));
     expect(response.status).toBe(200);
     expect(backendFetch).toHaveBeenCalledTimes(1);
@@ -67,8 +66,8 @@ describe("/api/tree-interventions", () => {
   });
 
   it("forwards validated backend intervention creation with the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "intervention-backend-1", ...validInput }, { status: 201 }));
 
     const response = await POST(new Request("http://localhost/api/tree-interventions", {

@@ -7,7 +7,6 @@ import { loginAs, loginWithMe as login } from "@/test/session";
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
   delete process.env.M6_BACKEND_ORIGIN;
-  delete process.env.M6_DEV_JWT;
   vi.restoreAllMocks();
 });
 
@@ -27,8 +26,7 @@ describe("crew membership BFF route", () => {
 
   it("forwards the members to the real backend as { userIds } (AddCrewMembersDto), not memberUserIds (#251)", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_AUTH_MODE = "real-m1";
     const backendFetch = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async () => new Response(JSON.stringify({ id: "crew-membership" }), { status: 200, headers: { "content-type": "application/json" } }));
@@ -55,8 +53,7 @@ describe("crew membership BFF route", () => {
 
   it("forwards named members alongside plain ids", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    process.env.M6_AUTH_MODE = "backend-development";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    process.env.M6_AUTH_MODE = "real-m1";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
     const loginResponse = await login(new Request("http://localhost/api/session/login", { method: "POST", headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" }, body: JSON.stringify({ scenarioId: "office-duty-queue" }) }));
     backendFetch.mockClear();
@@ -87,9 +84,8 @@ describe("crew membership BFF route", () => {
   });
 
   it("renames memberUserIds to the userIds the backend expects (#239)", async () => {
-    process.env.M6_AUTH_MODE = "backend-development";
+    process.env.M6_AUTH_MODE = "real-m1";
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-    process.env.M6_DEV_JWT = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
     const session = await login(new Request("http://localhost/api/session/login", {
       method: "POST",
       headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
@@ -105,7 +101,6 @@ describe("crew membership BFF route", () => {
 
     const init = backendFetch.mock.calls[0]?.[1] as RequestInit;
     expect(JSON.parse(String(init.body))).toEqual({ userIds: ["usr-m1-0299"] });
-    delete process.env.M6_DEV_JWT;
   });
 
   it("keeps membership management Office-only, including for a Field actor's own crew", async () => {

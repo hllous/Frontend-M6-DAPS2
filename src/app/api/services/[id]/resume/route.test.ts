@@ -5,7 +5,7 @@ import { POST } from "./route";
 import { loginAs } from "@/test/session";
 
 const backendOrigin = "https://backend.internal";
-const backendDevJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+const backendDevJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
 const backendCrew = {
   id: "11111111-1111-4111-8111-111111111111",
   name: "Cuadrilla Belgrano — Recolección",
@@ -29,7 +29,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -144,7 +143,7 @@ it.each([403, 409, 500, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ id: "real-service", crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await loginAs("field-crew-leader-route", { mode: "backend-development", crew: { ...backendCrew, role: "LEADER" }, devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+  const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { ...backendCrew, role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/resume", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(undefined),
@@ -161,9 +160,9 @@ describe("POST /api/services/[id]/resume backend forward path", () => {
     const serviceId = "field-service_42.3~";
     const backendFetch = mockFieldBackend();
     const cookie = await loginAs("field-crew-leader-route", {
-      mode: "backend-development",
+      mode: "real-m1",
       crew: { ...backendCrew, role: "LEADER" },
-      devJwt: backendDevJwt,
+      accessToken: backendDevJwt,
       backendOrigin,
     });
     backendFetch.mockClear();
@@ -187,9 +186,9 @@ describe("POST /api/services/[id]/resume backend forward path", () => {
     const serviceId = "field-service-out-of-scope";
     const backendFetch = mockFieldBackend("22222222-2222-4222-8222-222222222222");
     const cookie = await loginAs("field-crew-leader-route", {
-      mode: "backend-development",
+      mode: "real-m1",
       crew: { ...backendCrew, role: "LEADER" },
-      devJwt: backendDevJwt,
+      accessToken: backendDevJwt,
       backendOrigin,
     });
     backendFetch.mockClear();
