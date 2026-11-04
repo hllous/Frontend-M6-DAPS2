@@ -160,7 +160,7 @@ jobs:
   # Cada shard arranca solo el frontend mock (E2E_TARGET=mock): el servidor real-m1
   # y el fake M1 los usa únicamente el job "e2e real-m1".
   e2e-shard:
-    name: e2e shard ${{ matrix.shard }}/10
+    name: e2e shard ${{ matrix.shard }}/11
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
@@ -169,7 +169,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
