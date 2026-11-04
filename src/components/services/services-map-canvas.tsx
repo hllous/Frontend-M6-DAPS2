@@ -9,7 +9,9 @@ import type { Service } from "@/lib/services";
 import type { MapCoordinate } from "@/lib/operational-zones";
 import { summarizeServiceZones, type ServiceMapLocation } from "@/lib/services-map";
 
-import { MapBoundaryControl, MapBoundaryLayers, useMapBoundaries } from "@/components/map/map-boundaries";
+import { MapBoundaryLayers, useMapBoundaries } from "@/components/map/map-boundaries";
+
+import { ServicesMapLinesControl } from "./services-map-lines-control";
 
 import { SERVICE_MODE_LABEL } from "./service-ui-labels";
 import styles from "./services-map.module.css";
@@ -263,14 +265,10 @@ export function ServicesMapCanvas({
   // Every zone with a service gets its outline, so neighbouring barrios stay distinguishable.
   const serviceZones = useMemo(() => summarizeServiceZones(locations), [locations]);
   const boundaries = useMapBoundaries();
-  const { isPointVisible } = boundaries;
   const visibleMarkers = services.flatMap((service) => {
     const location = locationsByServiceId.get(service.id);
     const markerNumber = serviceOrdinals.get(service.id);
     if (!location || !location.coordinates || markerNumber === undefined) return [];
-    // La visibilidad de comunas y barrios también filtra los marcadores (#720); el servicio seleccionado
-    // nunca se oculta, para no dejar su panel de detalle abierto sobre algo invisible.
-    if (service.id !== selectedId && !isPointVisible(location.coordinates)) return [];
 
     return [{ service, location, markerNumber }];
   });
@@ -323,7 +321,7 @@ export function ServicesMapCanvas({
           );
         })}
       </MapContainer>
-      <MapBoundaryControl state={boundaries} />
+      <ServicesMapLinesControl state={boundaries} />
     </div>
   );
 }

@@ -10,21 +10,11 @@ import {
 } from "react";
 import { useGroupRef } from "react-resizable-panels";
 import { useSearchParams } from "next/navigation";
-import {
-  FilterX,
-  Plus,
-  RefreshCw,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 
 import { InventoryMapDrawer, type InventoryMapDrawerSnapState } from "@/components/map/inventory-map-drawer";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Input } from "@/components/ui/input";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -37,7 +27,6 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
 import {
   ServiceRequestError,
-  STATUS_LABEL,
   servicesAdapter,
   type Service,
   type ServiceOrigin,
@@ -68,17 +57,31 @@ import {
 } from "./services-table";
 import { createServiceOrdinals, sortServices } from "./service-sorting";
 import { CatalogPager } from "@/components/catalog/catalog-pager";
-import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { servicesMobileBreakpoint } from "@/lib/services-layout";
+import { zonesAdapter } from "@/lib/zones";
 import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import styles from "./services-workspace.module.css";
+import { ServicesFilterBar } from "./services-filter-bar";
+import {
+  type ServicesListPeriod,
+  readServicesListCache,
+  servicesListCacheKey,
+  writeServicesListCache,
+} from "./services-list-cache";
+import {
+  buildZoneGroups,
+  countActiveFilters,
+  emptyColumnFilters,
+  zoneGroupsFromServices,
+  type ZoneGroup,
+} from "./services-filters";
 import {
   ServicesColumnEditor,
   useServicesColumnPreferences,
 } from "./services-column-editor";
 
-type Period = "semana" | "mes" | "todo";
+type Period = ServicesListPeriod;
 
 const SERVICES_PAGE_SIZE = 25;
 
@@ -108,7 +111,7 @@ const periodItems: Record<Period, string> = {
 };
 
 function getWorkspaceSplitStorageKey(userId: string): string {
-  return `m6:services-workspace-split:v1:${encodeURIComponent(userId)}`;
+  return `m6:services-workspace-split:v2:${encodeURIComponent(userId)}`;
 }
 
 function readWorkspaceSplit(storageKey: string): Record<string, number> | null {
@@ -164,17 +167,30 @@ export function ServicesWorkspace({
     return [];
   }, [nextSearchParams]);
 
-  // Load state
-  const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
-  const loadedScopeRef = useRef<string | null>(null);
-  const [reloadVersion, setReloadVersion] = useState(0);
-  const [periodChoice, setPeriodChoice] = useState<Period | null>(() => {
+  // Quién pide la lista: la oficina entera o una cuadrilla. Con la misma clave se reusa la lista ya cargada en esta sesión.
+  const listScope = scenario?.actor.kind === "FIELD" ? `field:${scenario.actor.crewId ?? ""}` : "office";
+  const listUserId = scenario?.actor.userId ?? "user-lucia";
+  const [initialPeriodChoice] = useState<Period | null>(() => {
     const value = getParam("periodo");
     return value === "semana" || value === "mes" || value === "todo" ? value : null;
   });
-  const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? "todo");
+  const listKey = servicesListCacheKey(listUserId, listScope);
+  const [initialCached] = useState(() => readServicesListCache(listKey, initialPeriodChoice));
+  // Lista y período con los que se cargó lo que se muestra; la copia de la sesión se actualiza con cada cambio.
+  const loadedRef = useRef<{ key: string; choice: Period | null; period: Period } | null>(
+    initialCached ? { key: listKey, choice: initialPeriodChoice, period: initialCached.period } : null,
+  );
+
+  // Load state
+  const [loadState, setLoadState] = useState<LoadState>(
+    initialCached ? { status: "ready", services: initialCached.services, dropped: initialCached.dropped } : { status: "loading" },
+  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const loadedScopeRef = useRef<string | null>(initialCached ? listScope : null);
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const [periodChoice, setPeriodChoice] = useState<Period | null>(initialPeriodChoice);
+  const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? initialCached?.period ?? "todo");
   const handlePeriodChoiceChange = useCallback((period: Period) => {
     setActivePeriod(period);
     setPeriodChoice(period);
@@ -308,9 +324,11 @@ export function ServicesWorkspace({
   // Fetch all services
   useEffect(() => {
     let isCurrent = true;
-    const scopeKey = scenario?.actor.kind === "FIELD"
-      ? `field:${scenario.actor.crewId ?? ""}`
-      : "office";
+    const scopeKey = listScope;
+    // Volver a la pantalla no vuelve a pedir la lista (ya se muestra la de la visita anterior); «Reintentar» sí.
+    if (reloadVersion === 0 && loadedRef.current?.key === listKey && readServicesListCache(listKey, periodChoice)) {
+      return () => { isCurrent = false; };
+    }
     const keepCurrentWorkspace = loadedScopeRef.current === scopeKey;
     if (keepCurrentWorkspace) {
       setIsRefreshing(true);
@@ -367,6 +385,7 @@ export function ServicesWorkspace({
         if (totalPages > 20) throw new RangeError("Hay demasiados servicios en el período. Elija un período más corto.");
         if (isCurrent) {
           loadedScopeRef.current = scopeKey;
+          loadedRef.current = { key: listKey, choice: periodChoice, period };
           setLoadState({ status: "ready", services, dropped });
           setIsRefreshing(false);
           setRefreshError(null);
@@ -389,7 +408,15 @@ export function ServicesWorkspace({
     return () => {
       isCurrent = false;
     };
-  }, [reloadVersion, scenario, periodChoice]);
+  }, [reloadVersion, scenario, periodChoice, listScope, listKey]);
+
+  // Crear, asignar o editar un servicio cambia `loadState`: la copia de la sesión acompaña esos cambios.
+  useEffect(() => {
+    const loaded = loadedRef.current;
+    if (loadState.status === "ready" && loaded) {
+      writeServicesListCache(loaded.key, loaded.choice, { services: loadState.services, dropped: loadState.dropped, period: loaded.period });
+    }
+  }, [loadState]);
 
   const focusSelectedServiceAction = useCallback((id = selectedId) => {
     if (!id || typeof document === "undefined") return;
@@ -497,7 +524,7 @@ export function ServicesWorkspace({
 
       // Column: Zones
       if (columnFilters.zones.size > 0) {
-        const matchesAnyZone = service.zoneNames.some((zn) => columnFilters.zones.has(zn));
+        const matchesAnyZone = service.zoneIds.some((zoneId) => columnFilters.zones.has(zoneId));
         if (!matchesAnyZone) return false;
       }
 
@@ -694,13 +721,7 @@ export function ServicesWorkspace({
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
-    setColumnFilters({
-      zones: new Set(),
-      statuses: new Set(),
-      crews: new Set(),
-      timeFrom: "",
-      timeTo: "",
-    });
+    setColumnFilters(emptyColumnFilters());
   }, []);
 
   const handleScheduleOpenChange = useCallback((open: boolean) => {
@@ -884,16 +905,11 @@ export function ServicesWorkspace({
     setCancelingServiceId(null);
   }, []);
 
-  const hasActiveFilters =
-    Boolean(search.trim()) ||
-    columnFilters.zones.size > 0 ||
-    columnFilters.statuses.size > 0 ||
-    columnFilters.crews.size > 0 ||
-    Boolean(columnFilters.timeFrom || columnFilters.timeTo);
+  const activeFilterCount = countActiveFilters(search, columnFilters);
+  const hasActiveFilters = activeFilterCount > 0;
 
   const servicesTableProps = {
     services: pagedServices,
-    filterOptionsServices: loadState.status === "ready" ? loadState.services : [],
     serviceOrdinals,
     selectedId,
     onSelect: handleSelect,
@@ -914,105 +930,65 @@ export function ServicesWorkspace({
     </div>
   );
 
-  const periodBar = (
-    <div className={cn(
-      "flex items-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]",
-      isNarrow ? "min-w-0 flex-1 flex-nowrap gap-2 px-2 py-1 text-xs" : "flex-wrap gap-3 px-4 py-2 text-sm",
-    )} aria-busy={isRefreshing}>
-      <div className="flex min-w-0 items-center gap-2">
-        <Label htmlFor="services-period">Período</Label>
-        <Select
-          value={activePeriod}
-          items={periodItems}
-          onValueChange={(value) => handlePeriodChoiceChange(value as Period)}
-        >
-          <SelectTrigger
-            id="services-period"
-            size={isNarrow ? "sm" : "default"}
-            className={cn("w-auto", isNarrow && "min-w-0 px-1 [@media(max-width:760px)]:text-sm")}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="semana">{periodItems.semana}</SelectItem>
-              <SelectItem value="mes">{periodItems.mes}</SelectItem>
-              <SelectItem value="todo">{periodItems.todo}</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </div>
-      <span
-        className="inline-flex size-6 items-center justify-center"
-        role="status"
-        aria-live="polite"
-        title={refreshError ?? undefined}
-      >
-        <span className="sr-only">{isRefreshing ? "Actualizando servicios" : refreshError ? "No se pudieron actualizar los servicios" : ""}</span>
-        {isRefreshing ? <Spinner aria-hidden="true" role="presentation" /> : null}
-        {refreshError ? <span aria-hidden="true" className="font-bold text-[var(--color-danger)]">!</span> : null}
-      </span>
-    </div>
+  const periodStatus = (
+    <span
+      className="inline-flex size-6 items-center justify-center"
+      role="status"
+      aria-live="polite"
+      title={refreshError ?? undefined}
+    >
+      <span className="sr-only">{isRefreshing ? "Actualizando servicios" : refreshError ? "No se pudieron actualizar los servicios" : ""}</span>
+      {isRefreshing ? <Spinner aria-hidden="true" role="presentation" /> : null}
+      {refreshError ? <span aria-hidden="true" className="font-bold text-[var(--color-danger)]">!</span> : null}
+    </span>
   );
 
-  const zoneNames = useMemo(
-    () => loadState.status === "ready" ? [...new Set(loadState.services.flatMap((service) => service.zoneNames))].sort((a, b) => a.localeCompare(b, "es-AR")) : [],
-    [loadState],
-  );
-  const ALL = "__all";
-  const MULTI = "__multi";
-  const quickFilters = (
-    <div role="group" aria-label="Filtros rápidos" className={cn("flex items-center gap-6", isNarrow && "gap-3")}>
-     <div className="flex items-center gap-2">
-      <Label htmlFor="services-status-filter">Estado</Label>
-      <Select
-        value={columnFilters.statuses.size === 1 ? [...columnFilters.statuses][0] : columnFilters.statuses.size > 1 ? MULTI : ALL}
-        onValueChange={(value) => setColumnFilters((current) => ({ ...current, statuses: value === ALL ? new Set() : new Set([value as ServiceStatus]) }))}
-      >
-        <SelectTrigger id="services-status-filter" size={isNarrow ? "sm" : "default"} className="w-auto"><SelectValue>{columnFilters.statuses.size === 1 ? STATUS_LABEL[[...columnFilters.statuses][0]] : columnFilters.statuses.size > 1 ? `${columnFilters.statuses.size} estados` : "Todos"}</SelectValue></SelectTrigger>
-        <SelectContent><SelectGroup>
-          <SelectItem value={ALL}>Todos</SelectItem>
-          {columnFilters.statuses.size > 1 ? <SelectItem value={MULTI} disabled>{columnFilters.statuses.size} estados</SelectItem> : null}
-          {(Object.keys(STATUS_LABEL) as ServiceStatus[]).map((status) => <SelectItem key={status} value={status}>{STATUS_LABEL[status]}</SelectItem>)}
-        </SelectGroup></SelectContent>
-      </Select>
-     </div>
-     <div className="flex items-center gap-2">
-      <Label htmlFor="services-zone-filter">Zona</Label>
-      <Select
-        value={columnFilters.zones.size === 1 ? [...columnFilters.zones][0] : columnFilters.zones.size > 1 ? MULTI : ALL}
-        onValueChange={(value) => setColumnFilters((current) => ({ ...current, zones: value === ALL ? new Set() : new Set([String(value)]) }))}
-      >
-        <SelectTrigger id="services-zone-filter" size={isNarrow ? "sm" : "default"} className="w-auto"><SelectValue>{columnFilters.zones.size === 1 ? [...columnFilters.zones][0] : columnFilters.zones.size > 1 ? `${columnFilters.zones.size} zonas` : "Todas"}</SelectValue></SelectTrigger>
-        <SelectContent><SelectGroup>
-          <SelectItem value={ALL}>Todas</SelectItem>
-          {columnFilters.zones.size > 1 ? <SelectItem value={MULTI} disabled>{columnFilters.zones.size} zonas</SelectItem> : null}
-          {zoneNames.map((zone) => <SelectItem key={zone} value={zone}>{zone}</SelectItem>)}
-        </SelectGroup></SelectContent>
-      </Select>
-     </div>
-    </div>
-  );
+  // Barrios por comuna, del catálogo de zonas. Sin catálogo, las zonas de los servicios cargados.
+  const [zoneCatalog, setZoneCatalog] = useState<ZoneGroup[] | null>(null);
+  useEffect(() => {
+    let isCurrent = true;
+    zonesAdapter.list({ active: true, page: 1, pageSize: 100 })
+      .then((page) => { if (isCurrent) setZoneCatalog(buildZoneGroups(page.zones)); })
+      .catch(() => { if (isCurrent) setZoneCatalog([]); });
+    return () => { isCurrent = false; };
+  }, []);
+  const zoneGroups = useMemo(() => {
+    if (zoneCatalog && zoneCatalog.length > 0) return zoneCatalog;
+    return loadState.status === "ready" ? zoneGroupsFromServices(loadState.services) : [];
+  }, [zoneCatalog, loadState]);
+  const crewOptions = useMemo(() => {
+    const names = new Set<string>(columnFilters.crews);
+    if (loadState.status === "ready") loadState.services.forEach((service) => names.add(service.crewName ?? "Sin asignar"));
+    return [...names].sort((a, b) => a.localeCompare(b, "es-AR"));
+  }, [loadState, columnFilters.crews]);
 
   const filterToolbar = (
-  <div
-    data-services-filter-toolbar
-    hidden={isNarrow && Boolean(selectedService)}
-    className={cn(
-      "flex flex-wrap items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] py-1.5 text-xs text-[var(--color-text-secondary)]",
-      // On phones the period selector shrinks so it never pushes «Categorías» onto a second row.
-      isNarrow ? "gap-2 px-2" : "gap-3 px-4",
-    )}
-  >
-    {periodBar}
-    {refreshError && (
-      <p role="alert" className={cn("px-4 py-1.5 text-xs text-[var(--color-danger)]", isNarrow && "basis-full")}>
-        No se pudo actualizar. Se muestran los datos anteriores.
-      </p>
-    )}
-    {!isNarrow && quickFilters}
-    <ServicesColumnEditor controller={columnPreferences} />
-  </div>
+    <ServicesFilterBar
+      search={search}
+      onSearchChange={setSearch}
+      period={activePeriod}
+      periodItems={periodItems}
+      onPeriodChange={handlePeriodChoiceChange}
+      periodStatus={periodStatus}
+      filters={columnFilters}
+      onFiltersChange={setColumnFilters}
+      zoneGroups={zoneGroups}
+      crewOptions={crewOptions}
+      activeCount={activeFilterCount}
+      onClear={handleClearFilters}
+      isNarrow={isNarrow}
+      hidden={isNarrow && Boolean(selectedService)}
+      trailing={(
+        <>
+          {refreshError ? (
+            <p role="alert" className="text-xs text-[var(--color-danger)]">
+              No se pudo actualizar. Se muestran los datos anteriores.
+            </p>
+          ) : null}
+          <ServicesColumnEditor controller={columnPreferences} />
+        </>
+      )}
+    />
   );
 
   const tableSkeleton = (
@@ -1175,45 +1151,6 @@ export function ServicesWorkspace({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Global search */}
-            <div className="relative flex-1 sm:w-64">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden />
-              <Input
-                type="search"
-                value={search}
-                maxLength={MAX_SEARCH_LENGTH}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={isNarrow ? "Buscar" : "Buscar servicio, zona o cuadrilla…"}
-                aria-label="Buscar servicios"
-                className="rounded-xl pl-8 pr-8 text-xs"
-              />
-              {search && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={() => setSearch("")}
-                  aria-label="Borrar búsqueda"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearFilters}
-                className="text-xs text-[var(--color-action)] font-semibold"
-                aria-label="Limpiar filtros"
-              >
-                <FilterX data-icon="inline-start" aria-hidden />
-                <span>Limpiar filtros</span>
-              </Button>
-            )}
-
             {canSchedule && (
               <Button
                 variant="default"
@@ -1255,7 +1192,7 @@ export function ServicesWorkspace({
         </div>
       )}
 
-      {loadState.status === "error" && periodBar}
+      {loadState.status === "error" && filterToolbar}
 
       {/* Loading and ready states share one region so the table lands where the skeleton was. */}
       <p role="status" className="sr-only">{loadState.status === "ready" ? (sortedServices.length === 0 ? "Sin servicios para los filtros elegidos." : `${sortedServices.length} servicios`) : ""}</p>
@@ -1266,20 +1203,19 @@ export function ServicesWorkspace({
           <div className={cn("relative min-h-0 min-w-0 flex-1", isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout)}>
             <ResizablePanelGroup
               orientation="horizontal"
-              defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+              defaultLayout={{ "map-pane": 38, "table-pane": 62 }}
               className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
             >
-              <ResizablePanel id="map-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}>
+              <ResizablePanel id="map-pane" defaultSize="38%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}>
                 <div className={cn("h-full min-h-0 min-w-0", !isNarrow && "p-3")}><MapPaneSkeleton className="rounded-2xl" /></div>
               </ResizablePanel>
               <ResizableHandle withHandle={false} disabled aria-label="Ajustar ancho del mapa" className={cn(styles.mobileResizeHandle, isNarrow && "hidden")} />
-              <ResizablePanel id="table-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}>
+              <ResizablePanel id="table-pane" defaultSize="62%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}>
                 {isNarrow ? (
                   <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Listado" snapState="half" className={styles.mobileServiceDrawer}>
                     <div className={styles.mobileDrawerContent}>
                       <div className={styles.mobileTablePane}>
                         <div className="flex h-full min-h-0 flex-col">
-                          <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-secondary)]">{quickFilters}</div>
                           <div className="min-h-0 flex-1">{tableSkeleton}</div>
                         </div>
                       </div>
@@ -1311,7 +1247,7 @@ export function ServicesWorkspace({
               <ResizablePanelGroup
                 groupRef={panelGroupRef}
                 orientation="horizontal"
-                defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+                defaultLayout={{ "map-pane": 38, "table-pane": 62 }}
                 onLayoutChanged={handlePanelLayoutChanged}
                 className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
                 aria-hidden={Boolean(isNarrow && selectedService) || undefined}
@@ -1319,7 +1255,7 @@ export function ServicesWorkspace({
               >
                 <ResizablePanel
                   id="map-pane"
-                  defaultSize="50%"
+                  defaultSize="38%"
                   minSize="30%"
                   style={{ overflow: "hidden" }}
                   aria-hidden={Boolean(isNarrow && mobileDrawerSnap === "full") || undefined}
@@ -1348,7 +1284,7 @@ export function ServicesWorkspace({
 
                 <ResizablePanel
                   id="table-pane"
-                  defaultSize="50%"
+                  defaultSize="62%"
                   minSize="30%"
                   style={{ overflow: "hidden" }}
                   className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}
@@ -1371,7 +1307,6 @@ export function ServicesWorkspace({
                             inert={Boolean(selectedService)}
                           >
                             <div className="flex h-full min-h-0 flex-col">
-                              <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-secondary)]">{quickFilters}</div>
                               <div className="min-h-0 flex-1">{servicesTable}</div>
                             </div>
                           </div>
