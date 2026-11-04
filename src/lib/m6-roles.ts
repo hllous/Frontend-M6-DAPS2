@@ -15,6 +15,11 @@ export type M6Role = (typeof M6_ROLES)[number];
 
 export const m6RoleSchema = z.enum(M6_ROLES);
 
+export function hasOfficeFieldRoleMix(roles: readonly M6Role[]): boolean {
+  const hasOfficeRole = roles.some((role) => role === "M6_ADMIN" || role.startsWith("M6_OFICINA_"));
+  return hasOfficeRole && roles.some((role) => role.startsWith("M6_CAMPO_"));
+}
+
 /** `GET /me` del backend: identidad del token y roles de M6 efectivos (asignados ∩ lo que permite el rol de M1). */
 export const meSchema = z.object({
   userId: z.string(),

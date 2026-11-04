@@ -53,6 +53,31 @@ describe("asignaciones mediante las rutas BFF", () => {
 });
 
 describe("respuestas del backend", () => {
+  it("rechaza respuestas de asignación que no respetan los DTO del backend", async () => {
+    const restore = backendEnv();
+    try {
+      const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", roles: ["M6_ADMIN"] });
+      const invalidAssignment = { userId: "42", roles: ["ROLE_DESCONOCIDO"] };
+      const invalidPage = {
+        data: [invalidAssignment],
+        meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+      };
+      server.use(
+        http.get("https://backend.internal/role-assignments", () => HttpResponse.json(invalidPage)),
+        http.get("https://backend.internal/role-assignments/42", () => HttpResponse.json(invalidAssignment)),
+        http.put("https://backend.internal/role-assignments/42", () => HttpResponse.json(invalidAssignment)),
+      );
+
+      const responses = await Promise.all([
+        call("GET", "", undefined, cookie),
+        call("GET", "/42", undefined, cookie),
+        call("PUT", "/42", { roles: ["M6_ADMIN"] }, cookie),
+      ]);
+
+      expect(responses.map((response) => response.status)).toEqual([502, 502, 502]);
+    } finally { restore(); }
+  });
+
   it("usa la identidad M1 para reconocer a la persona propia y vuelve a sellar los roles efectivos de /me", async () => {
     const restore = backendEnv();
     const previousM1BaseUrl = process.env.M1_BASE_URL;
@@ -126,11 +151,25 @@ describe("respuestas del backend", () => {
     try {
       const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
       for (const status of [200, 400, 403, 404, 409]) {
-        server.use(...["https://backend.internal/role-assignments", "https://backend.internal/role-assignments/:userId"].map((path) => http.all(path, () => HttpResponse.json({ message: `backend ${status}` }, { status }))));
+        server.use(
+          http.all("https://backend.internal/role-assignments", () => status === 200
+            ? HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 10, totalPages: 0 } })
+            : HttpResponse.json({ message: `backend ${status}` }, { status })),
+          http.all("https://backend.internal/role-assignments/:userId", ({ request, params }) => {
+            if (status !== 200) return HttpResponse.json({ message: `backend ${status}` }, { status });
+            if (request.method === "DELETE") return new HttpResponse(null, { status: 204 });
+            return HttpResponse.json({ userId: String(params.userId), roles: ["M6_AUDITOR"] });
+          }),
+        );
         for (const [method, path] of [["GET", ""], ["GET", "/42"], ["PUT", "/42"], ["DELETE", "/42"]]) {
           const response = await call(method, path, method === "PUT" ? { roles: ["M6_AUDITOR"] } : undefined, cookie);
-          expect(response.status).toBe(status);
-          expect(await response.json()).toMatchObject({ message: `backend ${status}` });
+          expect(response.status).toBe(status === 200 && method === "DELETE" ? 204 : status);
+          if (response.status !== 204) {
+            const body = await response.json();
+            if (status === 200 && path) expect(body).toMatchObject({ userId: "42", roles: ["M6_AUDITOR"] });
+            else if (status === 200) expect(body).toMatchObject({ data: [], meta: { page: 1, pageSize: 10 } });
+            else expect(body).toMatchObject({ message: `backend ${status}` });
+          }
         }
       }
     } finally { restore(); }

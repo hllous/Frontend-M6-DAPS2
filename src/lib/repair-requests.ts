@@ -32,8 +32,8 @@ export type ReferralContext = z.infer<typeof referralContextSchema>;
 
 export const createRepairRequestInputSchema = z.object({
   damageType: repairDamageTypeSchema,
-  // Hypothesis pending the Backend source-DTO confirmation: the documented
-  // `address` field is sent directly alongside the polymorphic source pair.
+  // Backend's CreateRepairRequestDto accepts optional `address` (outbound-requests/dto/dtos.ts at 448a538);
+  // M6 requires it for a usable location.
   address: z.string().trim().min(1, "Debe indicar la ubicación del daño."),
   severity: repairSeveritySchema,
   publicSafetyRisk: z.boolean(),
