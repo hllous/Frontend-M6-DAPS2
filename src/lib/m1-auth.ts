@@ -15,7 +15,7 @@ export type M1AccessClaims = {
 
 export class M1CredentialsRejectedError extends Error {
   constructor() {
-    super("M1 rechazó las credenciales.");
+    super("Usuario o contraseña incorrectos.");
     this.name = "M1CredentialsRejectedError";
   }
 }

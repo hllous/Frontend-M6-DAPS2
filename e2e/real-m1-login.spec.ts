@@ -60,7 +60,7 @@ test.describe("Ingreso real con M1", () => {
     await page.goto("/login");
     await enterCredentials(page, "ciudadano@m6.local");
 
-    await expect(page.getByText("Esta cuenta no tiene acceso a M6.")).toBeVisible();
+    await expect(page.getByText("Esta cuenta no tiene acceso a Ambiente e Higiene.")).toBeVisible();
     await expectNoSessionCookie(context);
   });
 
@@ -68,7 +68,7 @@ test.describe("Ingreso real con M1", () => {
     await page.goto("/login");
     await enterCredentials(page, "inactivo@m6.local");
 
-    await expect(page.getByText("La cuenta no puede iniciar sesión. Contacte al soporte de M1.")).toBeVisible();
+    await expect(page.getByText("La cuenta no puede iniciar sesión. Comuníquese con el administrador del sistema.")).toBeVisible();
     await expectNoSessionCookie(context);
   });
 

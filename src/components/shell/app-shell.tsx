@@ -75,7 +75,7 @@ const navigation: NavigationItem[] = [
   { id: "catalog", label: "Catálogo", capability: "catalog:view", icon: Settings2 },
   { id: "dashboards", label: "Tableros", capability: "indicator:view", icon: BarChart3 },
   { id: "access", label: "Accesos", capability: "role:manage", icon: ShieldCheck },
-  { id: "integration-monitor", label: "Monitor de integración", capability: "integrationMonitor:view", icon: Activity },
+  { id: "integration-monitor", label: "Conexiones con otras áreas", capability: "integrationMonitor:view", icon: Activity },
 ];
 
 // Una sola URL por pantalla: cada destino vive en /app?destination=<id>. Las rutas
@@ -170,7 +170,7 @@ export function AppShell({
           <span className={styles.brandMark} aria-hidden="true"><Sprout /></span>
           <span className={styles.brandText}>Ambiente<br />y Servicios</span>
         </div>
-        <nav className={styles.moduleNav} aria-label="Módulos">
+        <nav className={styles.moduleNav} aria-label="Navegación principal">
           <LoadingRegion label="Navegación" isLoading={!scenario} className="flex flex-col gap-1.5">
             {!scenario ? navigation.map((item) => (
               <Button key={item.id} variant="sidebar" className={styles.navigationButton} disabled aria-hidden="true">
@@ -250,7 +250,7 @@ export function AppShell({
         ) : destination === "map" ? (
           <MapaOperativo scenario={scenario} />
         ) : (
-          <p role="status" className="text-sm text-muted-foreground">No hay un módulo disponible para su sesión.</p>
+          <p role="status" className="text-sm text-muted-foreground">No hay secciones disponibles para su usuario.</p>
         )}
       </main>
 
@@ -331,7 +331,7 @@ function NavigationLink({
   const link = (
     <Button
       variant={compact ? (selected ? "default" : "ghost") : "sidebar"}
-      className={compact ? styles.mobileNavigationButton : styles.navigationButton}
+      className={compact ? styles.mobileNavigationButton : cn(styles.navigationButton, "whitespace-normal text-left")}
       nativeButton={false}
       role="link"
       render={<Link href={destinationHref(item.id)} aria-current={selected ? "page" : undefined} aria-label={item.label} />}

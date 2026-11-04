@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm } from "./login-form";
 import { scenarios } from "@/lib/scenarios";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const originalLocation = window.location;
 
@@ -13,6 +14,11 @@ afterEach(() => {
 });
 
 describe("LoginForm", () => {
+  it.each(["mock", "real-m1"] as const)("uses plain language in %s login", (authMode) => {
+    const { container } = render(<LoginForm scenarios={Object.values(scenarios)} authMode={authMode} redirectTo="/app" />);
+    expectNoInternalJargon(container);
+  });
+
   it("lets an operator choose a profile and enter through the BFF", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -114,9 +120,9 @@ describe("LoginForm", () => {
   it("presents the institutional portal without options M1 may not support", () => {
     render(<LoginForm scenarios={Object.values(scenarios)} authMode="real-m1" redirectTo="/app" />);
 
-    expect(screen.getByText("Módulo 6")).toBeInTheDocument();
+    expect(screen.queryByText("Módulo 6")).not.toBeInTheDocument();
     expect(screen.getByText("Acceso para empleados municipales y empresas contratistas")).toBeVisible();
-    expect(screen.getByText("Ingrese con sus credenciales del Módulo 1.")).toBeVisible();
+    expect(screen.getByText("Ingrese con su usuario y contraseña municipal.")).toBeVisible();
     expect(screen.getByText("Desarrollo de Aplicaciones II · UADE · Grupo 4")).toBeInTheDocument();
     expect(screen.queryByText("Mantener sesión iniciada")).not.toBeInTheDocument();
     expect(screen.queryByText("¿Olvidó su contraseña?")).not.toBeInTheDocument();

@@ -25,7 +25,7 @@ test("monitor de integración: admin, auditor, filtros, reintentos y acceso @smo
   await resetMockData(page);
   await page.goto("/app/admin/integration-monitor");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Monitor de integración" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Conexiones con otras áreas" })).toBeVisible();
   await expect(page.getByLabel("Eventos fallidos", { exact: true })).toContainText("2 eventos fallidos");
   const eventsTable = page.getByRole("table", { name: "Eventos salientes" });
   await expect(eventsTable).toContainText("containerDamaged");
@@ -70,7 +70,7 @@ test("monitor de integración: admin, auditor, filtros, reintentos y acceso @smo
   await expect(announcement).toContainText("Se reencoló 1 evento; no quedan eventos fallidos.");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("heading", { level: 1, name: "Monitor de integración" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Conexiones con otras áreas" })).toBeVisible();
   const viewport = await page.evaluate(() => ({ width: window.innerWidth, documentWidth: document.documentElement.scrollWidth }));
   expect(viewport.documentWidth).toBeLessThanOrEqual(viewport.width);
   await expectNoViolations(page);
@@ -89,7 +89,7 @@ test("monitor de integración: admin, auditor, filtros, reintentos y acceso @smo
   await page.setViewportSize({ width: 1440, height: 900 });
   await loginViaApi(page, "field-crew-leader-route");
   await page.goto("/app");
-  await expect(page.getByRole("navigation", { name: "Módulos" }).getByRole("link", { name: "Monitor de integración" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Navegación principal" }).getByRole("link", { name: "Conexiones con otras áreas" })).toHaveCount(0);
   await page.goto("/app/admin/integration-monitor");
   await expect(page.getByRole("heading", { name: "Sin acceso" })).toBeVisible();
 });

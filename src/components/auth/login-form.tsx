@@ -105,9 +105,6 @@ export function LoginForm({
           </p>
         </div>
         <div className="relative my-auto pt-7 min-[761px]:pt-16">
-          <p className="mb-5 inline-block rounded-full border border-[var(--color-on-institutional-secondary)]/50 px-3.5 py-1.5 text-xs font-semibold text-[var(--color-on-institutional-secondary)] max-[760px]:hidden">
-            Módulo 6
-          </p>
           <p className="max-w-[15ch] text-[26px] font-bold leading-8 min-[761px]:text-[38px] min-[761px]:leading-[44px]">
             Ambiente, Higiene y Servicios Urbanos
           </p>
@@ -144,7 +141,7 @@ export function LoginForm({
                 Ingresar
               </h1>
               {realM1 ? (
-                <p className="mt-2 text-base leading-6 text-[var(--color-text-secondary)]">Ingrese con sus credenciales del Módulo 1.</p>
+                <p className="mt-2 text-base leading-6 text-[var(--color-text-secondary)]">Ingrese con su usuario y contraseña municipal.</p>
               ) : null}
             </CardHeader>
             <CardContent className="mt-5 px-0">
@@ -271,7 +268,7 @@ export function LoginForm({
 
           {realM1 ? (
             <p className="text-center text-xs text-[var(--color-text-secondary)]">
-              ¿Problemas para ingresar? Comuníquese con el administrador del Módulo 1.
+              ¿Problemas para ingresar? Comuníquese con el administrador del sistema.
             </p>
           ) : null}
         </div>

@@ -152,7 +152,7 @@ export const streetClosureRequestSchema = z.preprocess(fromWireShape, streetClos
 export type StreetClosureRequest = z.infer<typeof streetClosureRequestSchema>;
 
 export const approveStreetClosureRequestInputSchema = z.object({
-  closureId: z.string().trim().min(1, "El identificador de M7 es obligatorio"),
+  closureId: z.string().trim().min(1, "El número de corte de Tránsito es obligatorio"),
 });
 export type ApproveStreetClosureRequestInput = z.infer<
   typeof approveStreetClosureRequestInputSchema
@@ -368,7 +368,7 @@ export const streetClosureRequestsAdapter = {
   async approve(id: string, input: ApproveStreetClosureRequestInput): Promise<StreetClosureRequest> {
     const parsedInput = approveStreetClosureRequestInputSchema.safeParse(input);
     if (!parsedInput.success) {
-      throw new StreetClosureRequestContractError("El identificador de M7 es inválido.", {
+      throw new StreetClosureRequestContractError("El número de corte de Tránsito es inválido.", {
         cause: parsedInput.error,
       });
     }

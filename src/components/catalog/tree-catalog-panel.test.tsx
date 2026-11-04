@@ -7,6 +7,7 @@ import { setupServer } from "msw/node";
 import { handlers } from "@/mocks/handlers";
 import { resetTreeFixtures } from "@/lib/tree-fixtures";
 import { scenarios } from "@/lib/scenarios";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 import { TreeCatalogPanel } from "./tree-catalog-panel";
 
 const server = setupServer(...handlers);
@@ -39,8 +40,9 @@ describe("TreeCatalogPanel", () => {
   });
 
   it("lists trees for any authenticated actor and opens detail without management actions", async () => {
-    render(<TreeCatalogPanel scenario={scenarios.fieldCrewLeader} />);
+    const { container } = render(<TreeCatalogPanel scenario={scenarios.fieldCrewLeader} />);
     expect(await screen.findByRole("heading", { name: "Árboles" })).toBeVisible();
+    expectNoInternalJargon(container);
     expect(await screen.findByRole("row", { name: /ARB-00442/ })).toBeVisible();
     expect(screen.getAllByRole("button", { name: "Ver detalle" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Registrar árbol" })).not.toBeInTheDocument();

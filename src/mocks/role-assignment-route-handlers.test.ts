@@ -31,7 +31,11 @@ describe("asignaciones mediante las rutas BFF", () => {
     expect((await call("DELETE", "/999")).status).toBe(204);
   });
   it("rechaza ids, roles duplicados o desconocidos y mezclas", async () => {
-    for (const method of ["GET", "PUT", "DELETE"]) expect((await call(method, "/abc", { roles: [] })).status).toBe(400);
+    for (const method of ["GET", "PUT", "DELETE"]) {
+      const response = await call(method, "/abc", { roles: [] });
+      expect(response.status).toBe(400);
+      expect((await response.json()).message).toBe("El legajo debe ser numérico.");
+    }
     for (const roles of [["M6_ADMIN", "M6_ADMIN"], ["INVALIDO"], ["M6_ADMIN", "M6_CAMPO_CUADRILLA"]]) expect((await call("PUT", "/999", { roles })).status).toBe(400);
   });
   it("actualiza la sesión al modificar los propios roles", async () => {

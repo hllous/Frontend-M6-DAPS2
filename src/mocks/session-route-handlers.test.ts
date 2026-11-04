@@ -129,7 +129,7 @@ describe("real M1 session login route through MSW", () => {
     const response = await login({ email: "inactiva@example.test", password: "cualquier clave" });
 
     expect(response.status).toBe(403);
-    expect((await response.json()).message).toMatch(/contacte al soporte de M1/i);
+    expect((await response.json()).message).toMatch(/comuníquese con el administrador del sistema/i);
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
@@ -157,7 +157,7 @@ describe("real M1 session login route through MSW", () => {
     const response = await login({ email: "vecino@example.test", password: "clave" });
 
     expect(response.status).toBe(403);
-    expect((await response.json()).message).toMatch(/no tiene acceso a M6/i);
+    expect((await response.json()).message).toMatch(/no tiene acceso a Ambiente e Higiene/i);
     expect(response.headers.get("set-cookie")).toBeNull();
     expect(backendCalled).toBe(false);
   });
@@ -202,7 +202,7 @@ describe("real M1 session login route through MSW", () => {
 
   it.each([
     [401, "No se pudo validar el ingreso con Ambiente. Intente nuevamente."],
-    [403, "Esta cuenta no tiene acceso a M6."],
+    [403, "Esta cuenta no tiene acceso a Ambiente e Higiene."],
     [503, "El servicio de Ambiente no está disponible. Intente nuevamente en unos minutos."],
   ])("does not create a session when Backend GET /me answers %i", async (status, message) => {
     server.use(

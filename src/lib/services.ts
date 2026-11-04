@@ -801,13 +801,13 @@ export const servicesAdapter = {
     const dependency = await streetClosureRequestsAdapter.getForService(serviceId);
     if (dependency.outcome === "blocked") {
       throw new ServiceStartBlockedError(
-        "No se puede iniciar el Servicio: la solicitud de corte de calle sigue pendiente de respuesta de M7.",
+        "No se puede iniciar el Servicio: la solicitud de corte de calle sigue pendiente de respuesta de Tránsito.",
         dependency.request!,
       );
     }
     if (dependency.outcome === "rejected") {
       throw new ServiceStartBlockedError(
-        "M7 rechazó el corte de calle. Oficina debe elegir explícitamente entre reprogramar o cancelar el Servicio.",
+        "Tránsito rechazó el corte de calle. Oficina debe elegir explícitamente entre reprogramar o cancelar el Servicio.",
         dependency.request!,
       );
     }

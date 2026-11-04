@@ -100,7 +100,7 @@ async function callM1(
   timeoutMs: number,
   now: number,
 ): Promise<Renewal | null> {
-  const unavailable = () => new BackendUnavailableError(503, "M1 no responde. Reintente en unos segundos.");
+  const unavailable = () => new BackendUnavailableError(503, "El servicio de ingreso no responde. Reintente en unos segundos.");
   const base = m1BaseUrl();
   if (!base) throw unavailable();
   let response: Response;

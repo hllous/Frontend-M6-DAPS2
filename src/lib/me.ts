@@ -72,7 +72,7 @@ export function sealRolesIfChanged(response: NextResponse, request: Request, rol
 /** Selecciona la cuadrilla del backend, priorizando liderazgo y luego el nombre del perfil. */
 export function sessionFromMe(session: Session, me: Me): Session {
   if (session.identity && (me.subType !== "EMPLEADO" || me.userId !== session.identity.userId)) {
-    throw new InvalidSessionError("La identidad de Backend no coincide con la sesión M1.");
+    throw new InvalidSessionError("No pudimos confirmar su sesión. Vuelva a ingresar.");
   }
 
   const isFieldCrew = me.roles.includes("M6_CAMPO_CUADRILLA");
