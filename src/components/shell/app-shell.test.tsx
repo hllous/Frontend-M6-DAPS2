@@ -36,7 +36,7 @@ describe("AppShell", () => {
       ["Catálogo", "/app?destination=catalog"],
       ["Tableros", "/app?destination=dashboards"],
       ["Accesos", "/app/access"],
-      ["Conexiones con otras áreas", "/app/admin/integration-monitor"],
+      ["Eventos", "/app/admin/integration-monitor"],
     ]);
     expect(within(moduleNavigation).queryAllByRole("button")).toHaveLength(0);
   });
@@ -55,16 +55,16 @@ describe("AppShell", () => {
     render(<AppShell scenario={scenarios.officeLimited} />);
 
     const auditorNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
-    expect(within(auditorNavigation).getByRole("link", { name: "Conexiones con otras áreas" }))
+    expect(within(auditorNavigation).getByRole("link", { name: "Eventos" }))
       .toHaveAttribute("href", "/app/admin/integration-monitor");
-    expect(within(auditorNavigation).getByRole("link", { name: "Conexiones con otras áreas" }))
+    expect(within(auditorNavigation).getByRole("link", { name: "Eventos" }))
       .toHaveAttribute("aria-current", "page");
   });
 
   it("hides the monitor from roles without its capability", () => {
     render(<AppShell scenario={scenarios.fieldCrewLeader} />);
     const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
-    expect(within(moduleNavigation).queryByRole("link", { name: "Conexiones con otras áreas" })).not.toBeInTheDocument();
+    expect(within(moduleNavigation).queryByRole("link", { name: "Eventos" })).not.toBeInTheDocument();
   });
 
   it("moves focus to main after a module change", async () => {

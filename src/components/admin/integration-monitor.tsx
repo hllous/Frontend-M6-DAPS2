@@ -192,35 +192,10 @@ function AuditLabel({ value, showRawCode }: { value: { label: string; rawCode: s
   );
 }
 
-const eventLabels: Record<string, string> = {
-  containerDamaged: "Daño en contenedor",
-  streetClosureRequested: "Solicitud de corte de calle",
-  serviceCompleted: "Servicio finalizado",
-  environmentalReportReceived: "Expediente ambiental recibido",
-  treeRiskDetected: "Riesgo en árbol detectado",
-  infrastructureRepairRequested: "Solicitud de reparación de infraestructura",
-  environmentalViolationDetected: "Infracción ambiental detectada",
-  ticketUpdated: "Reclamo ciudadano actualizado",
-  updateTicketStatus: "Estado de reclamo ciudadano actualizado",
-};
-
-function eventLabel(type: string): string {
-  return Object.hasOwn(eventLabels, type) ? eventLabels[type] : "Otro envío";
-}
-
-function eventTypeFilter(value: string): string {
-  const normalized = value.toLocaleLowerCase("es-AR");
-  const entries = Object.entries(eventLabels);
-  const exact = entries.find(([, label]) => label.toLocaleLowerCase("es-AR") === normalized);
-  if (exact) return exact[0];
-  const matches = entries.filter(([, label]) => label.toLocaleLowerCase("es-AR").includes(normalized));
-  return matches.length === 1 ? matches[0][0] : value;
-}
-
 function eventQuery(filters: EventFilters, page: number): string {
   const params = new URLSearchParams({ page: String(page), pageSize: "20" });
   if (filters.status) params.set("status", filters.status);
-  if (filters.eventType) params.set("eventType", eventTypeFilter(filters.eventType));
+  if (filters.eventType) params.set("eventType", filters.eventType);
   if (filters.from) params.set("from", filters.from);
   if (filters.to) params.set("to", filters.to);
   return params.toString();
@@ -242,7 +217,7 @@ function EventActions({ event, canManage, onOpenDetail }: {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {canManage ? (
-        <Button type="button" variant="outline" size="sm" aria-label={`Ver detalle de ${eventLabel(event.eventType)}`} onClick={() => onOpenDetail(event)}>
+        <Button type="button" variant="outline" size="sm" aria-label={`Ver detalle de ${event.eventType}`} onClick={() => onOpenDetail(event)}>
           Ver detalle
         </Button>
       ) : null}
@@ -265,7 +240,6 @@ export function IntegrationMonitor({
   const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<MonitorTab>(initialTab);
   const [eventDraft, setEventDraft] = useState({ status: "", eventType: "", from: "", to: "" });
-  const [eventFilterError, setEventFilterError] = useState("");
   const [eventFilters, setEventFilters] = useState<EventFilters>({});
   const [eventPageNumber, setEventPageNumber] = useState(1);
   const [eventResult, setEventResult] = useState<{ key: string; page?: OutboxPage; error?: string } | null>(null);
@@ -302,7 +276,7 @@ export function IntegrationMonitor({
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setEventResult({
           key: eventRequestKey,
-          error: error instanceof Error ? error.message : "No se pudieron cargar los envíos a otras áreas.",
+          error: error instanceof Error ? error.message : "No se pudieron cargar los eventos salientes.",
         });
       });
     return () => controller.abort();
@@ -365,13 +339,6 @@ export function IntegrationMonitor({
 
   function applyEventFilters() {
     if (datesInvalid) return;
-    const input = eventDraft.eventType.trim().toLocaleLowerCase("es-AR");
-    const matchingLabels = Object.values(eventLabels).filter((label) => label.toLocaleLowerCase("es-AR").includes(input));
-    if (input && matchingLabels.length > 1 && !matchingLabels.some((label) => label.toLocaleLowerCase("es-AR") === input)) {
-      setEventFilterError("Escriba un nombre de evento más específico.");
-      return;
-    }
-    setEventFilterError("");
     setEventFilters({
       status: eventDraft.status ? eventDraft.status as OutboxStatus : undefined,
       eventType: eventDraft.eventType.trim() || undefined,
@@ -383,7 +350,6 @@ export function IntegrationMonitor({
   }
 
   function clearEventFilters() {
-    setEventFilterError("");
     setEventDraft({ status: "", eventType: "", from: "", to: "" });
     setEventFilters({});
     setEventPageNumber(1);
@@ -524,12 +490,12 @@ export function IntegrationMonitor({
   return (
     <section aria-labelledby="integration-monitor-title" className="flex min-w-0 flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <h1 id="integration-monitor-title" className="text-2xl font-bold tracking-tight">Conexiones con otras áreas</h1>
+        <h1 id="integration-monitor-title" className="text-2xl font-bold tracking-tight">Eventos</h1>
       </header>
 
       <Tabs value={activeTab} onValueChange={changeTab} className="min-w-0">
         <TabsList className="w-full min-[761px]:w-fit">
-          <TabsTrigger value="events" className="text-foreground">Envíos a otras áreas</TabsTrigger>
+          <TabsTrigger value="events" className="text-foreground">Eventos salientes</TabsTrigger>
           <TabsTrigger value="activity" className="text-foreground">Registro de actividad</TabsTrigger>
         </TabsList>
 
@@ -583,12 +549,9 @@ export function IntegrationMonitor({
                 value={eventDraft.eventType}
                 maxLength={100}
                 autoComplete="off"
-                placeholder="p. ej., Daño en contenedor"
-                aria-invalid={Boolean(eventFilterError)}
-                aria-describedby={eventFilterError ? "event-type-error" : undefined}
+                placeholder="p. ej., containerDamaged"
                 onChange={(event) => setEventDraft((current) => ({ ...current, eventType: event.target.value }))}
               />
-              {eventFilterError && <FieldError id="event-type-error">{eventFilterError}</FieldError>}
             </Field>
             <Field>
               <FieldLabel htmlFor="outbox-from">Desde</FieldLabel>
@@ -629,11 +592,11 @@ export function IntegrationMonitor({
           ) : null}
 
           {eventsLoading ? (
-            <div role="status" aria-label="Cargando envíos a otras áreas" className="flex flex-col gap-2">
+            <div role="status" aria-label="Cargando eventos salientes" className="flex flex-col gap-2">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
-              <span className="sr-only">Cargando envíos a otras áreas.</span>
+              <span className="sr-only">Cargando eventos salientes.</span>
             </div>
           ) : eventsError ? (
             <Alert variant="danger">
@@ -644,7 +607,7 @@ export function IntegrationMonitor({
           ) : eventRows.length === 0 ? (
             <Empty className="border border-dashed border-border">
               <EmptyHeader>
-                <EmptyTitle>{Object.values(eventFilters).some(Boolean) ? "No hay eventos con esos filtros" : "No hay envíos a otras áreas"}</EmptyTitle>
+                <EmptyTitle>{Object.values(eventFilters).some(Boolean) ? "No hay eventos con esos filtros" : "No hay eventos salientes"}</EmptyTitle>
                 <EmptyDescription>{Object.values(eventFilters).some(Boolean) ? "Cambie o limpie los filtros para ver otros eventos." : "Los eventos enviados aparecerán aquí."}</EmptyDescription>
               </EmptyHeader>
               {Object.values(eventFilters).some(Boolean) ? (
@@ -654,8 +617,8 @@ export function IntegrationMonitor({
           ) : (
             <>
               <div className={styles.desktopLayout}>
-                <Table aria-label="Envíos a otras áreas" className="min-w-[58rem]">
-                  <TableCaption className="sr-only">Envíos a otras áreas, del más reciente al más antiguo</TableCaption>
+                <Table aria-label="Eventos salientes" className="min-w-[58rem]">
+                  <TableCaption className="sr-only">Eventos salientes, del más reciente al más antiguo</TableCaption>
                   <TableHeader>
                     <TableRow>
                       <TableHead scope="col">Tipo</TableHead>
@@ -669,7 +632,7 @@ export function IntegrationMonitor({
                   <TableBody>
                     {eventRows.map((event) => (
                       <TableRow key={event.id}>
-                        <TableCell className="font-medium">{eventLabel(event.eventType)}</TableCell>
+                        <TableCell className="font-medium">{event.eventType}</TableCell>
                         <TableCell><EventStatus status={event.status} /></TableCell>
                         <TableCell className="tabular-nums">{dateTime(event.occurredAt)}</TableCell>
                         <TableCell className="tabular-nums">{event.attempts}</TableCell>
@@ -680,11 +643,11 @@ export function IntegrationMonitor({
                   </TableBody>
                 </Table>
               </div>
-              <ul aria-label="Envíos a otras áreas" className={`${styles.mobileLayout} flex flex-col divide-y divide-border`}>
+              <ul aria-label="Eventos salientes" className={`${styles.mobileLayout} flex flex-col divide-y divide-border`}>
                 {eventRows.map((event) => (
                   <li key={event.id} className="flex min-w-0 flex-col gap-2 py-3">
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <span className="min-w-0 break-all font-medium">{eventLabel(event.eventType)}</span>
+                      <span className="min-w-0 break-all font-medium">{event.eventType}</span>
                       <EventStatus status={event.status} />
                     </div>
                     <p className="text-sm tabular-nums">{dateTime(event.occurredAt)} · Intentos: {event.attempts}</p>
@@ -840,8 +803,7 @@ export function IntegrationMonitor({
             <>
               <DialogHeader>
                 <DialogTitle>Detalle del evento</DialogTitle>
-                <DialogDescription>{selectedEvent ? eventLabel(selectedEvent.eventType) : ""} · {selectedEvent ? dateTime(selectedEvent.occurredAt) : ""}</DialogDescription>
-                {selectedEvent && !Object.hasOwn(eventLabels, selectedEvent.eventType) ? <p className="text-sm text-muted-foreground">Tipo técnico: {selectedEvent.eventType}</p> : null}
+                <DialogDescription>{selectedEvent?.eventType} · {selectedEvent ? dateTime(selectedEvent.occurredAt) : ""}</DialogDescription>
               </DialogHeader>
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-3">
                 {detailLoading ? <p role="status">Cargando detalle del evento.</p> : null}

@@ -75,7 +75,7 @@ const navigation: NavigationItem[] = [
   { id: "catalog", label: "Catálogo", capability: "catalog:view", icon: Settings2 },
   { id: "dashboards", label: "Tableros", capability: "indicator:view", icon: BarChart3 },
   { id: "access", label: "Accesos", capability: "role:manage", icon: ShieldCheck },
-  { id: "integration-monitor", label: "Conexiones con otras áreas", capability: "integrationMonitor:view", icon: Activity },
+  { id: "integration-monitor", label: "Eventos", capability: "integrationMonitor:view", icon: Activity },
 ];
 
 // Una sola URL por pantalla: cada destino vive en /app?destination=<id>. Las rutas

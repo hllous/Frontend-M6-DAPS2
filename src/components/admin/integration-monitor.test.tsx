@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
-import { getOutboxFixture, listOutboxFixtures, resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
+import { resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 import { IntegrationMonitor } from "./integration-monitor";
 
@@ -22,51 +22,15 @@ afterAll(() => server.close());
 
 describe("IntegrationMonitor", () => {
   it("loads a paginated outgoing event list without exposing payload", async () => {
-    const { container } = render(<IntegrationMonitor canManage initialTab="events" />);
+    render(<IntegrationMonitor canManage initialTab="events" />);
 
-    const list = await screen.findByRole("table", { name: "Envíos a otras áreas" });
-    expect(within(list).getByText("Daño en contenedor")).toBeVisible();
+    const list = await screen.findByRole("table", { name: "Eventos salientes" });
+    expect(within(list).getByText("containerDamaged")).toBeVisible();
     expect(within(list).queryByText(/damageType|containerId/)).not.toBeInTheDocument();
     expect(await screen.findByLabelText("Eventos fallidos")).toHaveTextContent("2 eventos fallidos");
-    expect(screen.getByRole("heading", { name: "Conexiones con otras áreas" })).toBeVisible();
-    expectNoInternalJargon(container);
-  });
-
-  it("filters using a partial Spanish event name", async () => {
-    const user = userEvent.setup();
-    render(<IntegrationMonitor canManage initialTab="events" />);
-    await screen.findByRole("table", { name: "Envíos a otras áreas" });
-    await user.type(screen.getByRole("textbox", { name: "Tipo de evento" }), "Daño");
-    await user.click(screen.getByRole("button", { name: "Aplicar filtros" }));
-    const table = await screen.findByRole("table", { name: "Envíos a otras áreas" });
-    expect(within(table).getByText("Daño en contenedor")).toBeVisible();
-    expect(within(table).queryByText("Servicio finalizado")).not.toBeInTheDocument();
-  });
-
-  it("explains when an event filter matches more than one name", async () => {
-    const user = userEvent.setup();
-    render(<IntegrationMonitor canManage initialTab="events" />);
-    await screen.findByRole("table", { name: "Envíos a otras áreas" });
-    await user.type(screen.getByRole("textbox", { name: "Tipo de evento" }), "Solicitud");
-    await user.click(screen.getByRole("button", { name: "Aplicar filtros" }));
-    expect(screen.getByText("Escriba un nombre de evento más específico.")).toBeVisible();
-  });
-
-  it("keeps an unknown event type available as a support identifier in its detail", async () => {
-    const user = userEvent.setup();
-    const page = listOutboxFixtures({ page: 1, pageSize: 20 });
-    const event = { ...page.data[0], eventType: "futureEventType" };
-    const detail = { ...getOutboxFixture(event.id)!, eventType: event.eventType };
-    server.use(
-      http.get("*/api/events/outbox", () => HttpResponse.json({ ...page, data: [event] })),
-      http.get("*/api/events/outbox/:id", () => HttpResponse.json(detail)),
-    );
-    render(<IntegrationMonitor canManage initialTab="events" />);
-    const table = await screen.findByRole("table", { name: "Envíos a otras áreas" });
-    expect(within(table).getByText("Otro envío")).toBeVisible();
-    expect(within(table).queryByText("futureEventType")).not.toBeInTheDocument();
-    await user.click(within(table).getByRole("button", { name: "Ver detalle de Otro envío" }));
-    expect(await screen.findByText("Tipo técnico: futureEventType")).toBeVisible();
+    const heading = screen.getByRole("heading", { name: "Eventos" });
+    expect(heading).toBeVisible();
+    expectNoInternalJargon(heading);
   });
 
   it("announces calendar days in Spanish", async () => {
@@ -82,7 +46,7 @@ describe("IntegrationMonitor", () => {
     const user = userEvent.setup();
     render(<IntegrationMonitor canManage initialTab="events" />);
 
-    await user.click((await screen.findAllByRole("button", { name: "Ver detalle de Daño en contenedor" }))[0]);
+    await user.click((await screen.findAllByRole("button", { name: "Ver detalle de containerDamaged" }))[0]);
     const detail = await screen.findByRole("dialog", { name: "Detalle del evento" });
     expect(within(detail).getByText(/"severity": "HIGH"/)).toBeVisible();
     await user.click(within(detail).getByRole("button", { name: "Reintentar evento" }));
@@ -99,7 +63,7 @@ describe("IntegrationMonitor", () => {
   it("hides event detail and retry actions from an auditor", async () => {
     render(<IntegrationMonitor canManage={false} initialTab="events" />);
 
-    expect(await screen.findByRole("table", { name: "Envíos a otras áreas" })).toBeVisible();
+    expect(await screen.findByRole("table", { name: "Eventos salientes" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /Ver detalle/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Reintentar/ })).not.toBeInTheDocument();
   });
@@ -109,7 +73,7 @@ describe("IntegrationMonitor", () => {
     server.use(http.post("*/api/events/outbox/:id/retry", () => HttpResponse.json({ statusCode: 409, message: "El evento ya cambió", error: "Conflict", path: "/api/events/outbox/id" }, { status: 409 })));
     render(<IntegrationMonitor canManage initialTab="events" />);
 
-    await user.click((await screen.findAllByRole("button", { name: "Ver detalle de Daño en contenedor" }))[0]);
+    await user.click((await screen.findAllByRole("button", { name: "Ver detalle de containerDamaged" }))[0]);
     const detail = await screen.findByRole("dialog", { name: "Detalle del evento" });
     await user.click(within(detail).getByRole("button", { name: "Reintentar evento" }));
     const confirmation = await screen.findByRole("dialog", { name: "Confirmar reintento" });
