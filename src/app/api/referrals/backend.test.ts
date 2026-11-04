@@ -196,7 +196,7 @@ describe("referrals against the backend", () => {
     const body = await response.json();
 
     expect(response.status).toBe(502);
-    expect(body.message).toContain("no reconoce");
+    expect(body.message).toBe("No se pudo mostrar la derivación. Comuníquese con el administrador del sistema.");
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(repairId), expect.anything());
   });
 
