@@ -1,3 +1,4 @@
+import { notifyMapInventoryChanged } from "./map-inventory-events";
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
@@ -189,14 +190,18 @@ export const treesAdapter = {
     const parsedInput = treeCreateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new TreeContractError("Los datos para registrar el árbol son inválidos.", { cause: parsedInput.error });
     const { payload } = await request("/api/trees", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) });
-    return parseResource(payload, "La respuesta de creación del árbol no respeta el contrato esperado.");
+    const saved = parseResource(payload, "La respuesta de creación del árbol no respeta el contrato esperado.");
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async update(id: string, input: TreeUpdateInput): Promise<Tree> {
     const parsedInput = treeUpdateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new TreeContractError("Los datos editables del árbol son inválidos.", { cause: parsedInput.error });
     const { payload } = await request(`/api/trees/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) });
-    return parseResource(payload, "La respuesta de actualización del árbol no respeta el contrato esperado.");
+    const saved = parseResource(payload, "La respuesta de actualización del árbol no respeta el contrato esperado.");
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async remove(id: string): Promise<void> {

@@ -6,7 +6,8 @@ import { MapView } from "./map-view";
 import { containerFixtures } from "@/lib/containers-fixtures";
 import { greenPointFixtures } from "@/lib/green-point-fixtures";
 import { operationalMapAdapter, type OperationalMapData } from "@/lib/operational-map";
-import { operationalZonesAdapter, resolveOperationalZones } from "@/lib/operational-zones";
+import { operationalZonesAdapter, parseOperationalZoneGeoJson, resolveOperationalZones } from "@/lib/operational-zones";
+import zonesGeoJson from "@/data/operational-zones.json";
 import { treeFixtures } from "@/lib/tree-fixtures";
 import type { Service } from "@/lib/services";
 import { zoneFixtures } from "@/lib/zones-fixtures";
@@ -43,7 +44,7 @@ const mapData: OperationalMapData = {
   greenSpaces: [],
   trees: treeFixtures,
 };
-const zones = resolveOperationalZones(zoneFixtures);
+const zones = resolveOperationalZones(zoneFixtures, parseOperationalZoneGeoJson(zonesGeoJson));
 
 function makeService(overrides: Partial<Service>): Service {
   return {

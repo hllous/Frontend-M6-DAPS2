@@ -118,7 +118,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(await within(picker).findByRole("button", { name: "AV CORRIENTES 1000" }));
     await user.click(within(picker).getByRole("button", { name: "Confirmar ubicación" }));
     expect(address).toHaveValue(typedAddress || "AV CORRIENTES 1000");
-    expect(within(dialog).getByText("Fuera de las zonas operativas")).toBeVisible();
+    expect(await within(dialog).findByText("Fuera de las zonas operativas")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Abrir reporte" }));
     expect(await within(dialog).findByText("No se pudo abrir el reporte. Intente nuevamente.")).toBeVisible();
     expect(within(dialog).getByLabelText(/Descripción del hallazgo/)).toHaveValue("Ruido nocturno constante.");

@@ -1,3 +1,4 @@
+import { notifyMapInventoryChanged } from "./map-inventory-events";
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
@@ -169,7 +170,7 @@ export const greenSpacesAdapter = {
     if (!parsedInput.success) {
       throw new GreenSpaceContractError("Los datos para registrar el espacio verde son inválidos.", { cause: parsedInput.error });
     }
-    return parseGreenSpace(
+    const saved = parseGreenSpace(
       await send("/api/green-spaces", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -177,6 +178,8 @@ export const greenSpacesAdapter = {
       }),
       "La respuesta de creación de espacio verde no respeta el contrato esperado.",
     );
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async update(id: string, input: UpdateGreenSpaceInput): Promise<GreenSpace> {
@@ -184,7 +187,7 @@ export const greenSpacesAdapter = {
     if (!parsedInput.success) {
       throw new GreenSpaceContractError("Los datos para actualizar el espacio verde son inválidos.", { cause: parsedInput.error });
     }
-    return parseGreenSpace(
+    const saved = parseGreenSpace(
       await send(`/api/green-spaces/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -192,6 +195,8 @@ export const greenSpacesAdapter = {
       }),
       "La respuesta de actualización de espacio verde no respeta el contrato esperado.",
     );
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async remove(id: string): Promise<GreenSpace> {

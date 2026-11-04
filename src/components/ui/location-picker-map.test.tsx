@@ -35,7 +35,7 @@ it.each(["tap", "drag"])("recognizes a repeated-world zone and confirms canonica
     await userEvent.click(screen.getByRole("button", {name: "Drag pin"}));
     state.draggedPoint = {lat: -34.56, lng: -58.45};
   }
-  expect(screen.getByRole("status")).toHaveTextContent("Ubicación marcada: Belgrano");
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Ubicación marcada: Belgrano"));
   await userEvent.click(screen.getByRole("button", {name: "Confirmar ubicación"}));
   expect(onConfirm).toHaveBeenCalledWith({lat: -34.5446871, lng: -58.4386826}, undefined);
 });
@@ -71,7 +71,7 @@ it("accepts an eastern repeated-world point outside every operational zone", asy
   const onConfirm = vi.fn();
   render(<LocationPicker searchAddresses={vi.fn()} onConfirm={onConfirm} onCancel={vi.fn()} />);
   act(() => state.events.click({latlng: {lat: -33.868800012, lng: 1231.209900019}} as never));
-  expect(screen.getByRole("status")).toHaveTextContent("Fuera de las zonas operativas");
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Fuera de las zonas operativas"));
   await userEvent.click(screen.getByRole("button", {name: "Confirmar ubicación"}));
   expect(onConfirm).toHaveBeenCalledWith({lat: -33.8688, lng: 151.2099}, undefined);
 });
