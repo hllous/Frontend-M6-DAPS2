@@ -169,7 +169,7 @@ async function readJsonBody(response: Response, resource: "zones" = "zones"): Pr
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
-    throw new ZoneContractError("La respuesta de zonas no es JSON válido.", { cause });
+    throw new ZoneContractError("No se pudo obtener información válida de zonas. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -178,7 +178,7 @@ function handleErrorPayload(payload: unknown, resource: "zones" = "zones"): neve
   if (!parsedError.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
     throw new ZoneContractError(
-      "La respuesta de error de zonas no respeta el contrato documentado.",
+      "No se pudo obtener información válida de zonas. Reintente en unos segundos.",
       { cause: parsedError.error },
     );
   }

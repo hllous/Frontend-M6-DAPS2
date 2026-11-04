@@ -25,7 +25,7 @@ describe("BFF upstream relay", () => {
     expect(result.headers.get("x-content-type-options")).toBe("nosniff");
     expect(await result.json()).toEqual({
       statusCode: 502, error: "Bad Gateway", path: "/api/services",
-      message: "La respuesta del backend no tiene un tipo de contenido JSON válido.", timestamp: expect.any(String),
+      message: "El sistema devolvió una respuesta que no se pudo leer. Reintente en unos segundos.", timestamp: expect.any(String),
     });
   });
 

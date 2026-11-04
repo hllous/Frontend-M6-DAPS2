@@ -582,7 +582,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-    throw new ServiceContractError("La respuesta de servicios no es JSON válido.", { cause });
+    throw new ServiceContractError("No se pudo obtener información válida de servicios. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -638,7 +638,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de servicios no respeta el contrato documentado.",
+          "No se pudo obtener información válida de servicios. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -685,7 +685,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de servicio no respeta el contrato documentado.",
+          "No se pudo obtener información válida de servicio. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -729,7 +729,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de servicios no respeta el contrato documentado.",
+          "No se pudo obtener información válida de servicios. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -778,7 +778,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de asignación de servicio no respeta el contrato documentado.",
+          "No se pudo obtener información válida de asignación de servicio. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -831,7 +831,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de inicio de servicio no respeta el contrato documentado.",
+          "No se pudo obtener información válida de inicio de servicio. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -880,7 +880,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de suspensión de servicio no respeta el contrato documentado.",
+          "No se pudo obtener información válida de suspensión de servicio. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -918,7 +918,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de reanudación de servicio no respeta el contrato documentado.",
+          "No se pudo obtener información válida de reanudación de servicio. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -966,7 +966,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de reprogramación de servicio no respeta el contrato documentado.",
+          "No se pudo obtener información válida de reprogramación de servicio. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -1014,7 +1014,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de cancelación de servicio no respeta el contrato documentado.",
+          "No se pudo obtener información válida de cancelación de servicio. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -1062,7 +1062,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de confirmación de reprogramación no respeta el contrato documentado.",
+          "No se pudo obtener información válida de confirmación de reprogramación. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -1097,7 +1097,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de resultados de zona no respeta el contrato documentado.",
+          "No se pudo obtener información válida de resultados de zona. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -1149,7 +1149,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de registro de zona no respeta el contrato documentado.",
+          "No se pudo obtener información válida de registro de zona. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -1248,7 +1248,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de carga de evidencia no respeta el contrato documentado.",
+          "No se pudo obtener información válida de carga de evidencia. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }
@@ -1302,7 +1302,7 @@ export const servicesAdapter = {
       if (!parsedError.success) {
         recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
         throw new ServiceContractError(
-          "La respuesta de error de finalización de servicio no respeta el contrato documentado.",
+          "No se pudo obtener información válida de finalización de servicio. Reintente en unos segundos.",
           { cause: parsedError.error },
         );
       }

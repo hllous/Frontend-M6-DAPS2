@@ -149,12 +149,12 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
   try {
     payload = await response.json();
   } catch (cause) {
-    throw new ServiceTypeContractError("La respuesta de tipos de servicio no es JSON válido.", { cause });
+    throw new ServiceTypeContractError("No se pudo obtener información válida de tipos de servicio. Reintente en unos segundos.", { cause });
   }
 
   if (!response.ok) {
     const parsedError = errorResponseSchema.safeParse(payload);
-    if (!parsedError.success) throw new ServiceTypeContractError("La respuesta de error no respeta el contrato documentado.", { cause: parsedError.error });
+    if (!parsedError.success) throw new ServiceTypeContractError("No se pudo obtener información válida. Reintente en unos segundos.", { cause: parsedError.error });
     const message = Array.isArray(parsedError.data.message) ? parsedError.data.message.join(" ") : parsedError.data.message;
     throw new ServiceTypeRequestError(message, parsedError.data.statusCode);
   }

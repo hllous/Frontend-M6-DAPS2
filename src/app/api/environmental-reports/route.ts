@@ -111,7 +111,7 @@ async function listFieldReports(request: Request, query: EnvironmentalReportQuer
       return errorResponse(502, "La respuesta de expedientes ambientales no contiene JSON válido.", path);
     }
     const parsed = environmentalReportPageSchema.safeParse(payload);
-    if (!parsed.success) return errorResponse(502, "La respuesta de expedientes ambientales no respeta el contrato documentado.", path);
+    if (!parsed.success) return errorResponse(502, "No se pudo obtener información válida de expedientes ambientales. Reintente en unos segundos.", path);
     if (page === 1) totalPages = Math.max(1, parsed.data.meta.totalPages);
     dropped += droppedRecords(parsed.data.data);
     visibleReports.push(...parsed.data.data.filter((report) => report.assignedCrewId === crewId && matchesQuery(report, query)));

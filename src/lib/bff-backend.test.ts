@@ -82,7 +82,7 @@ describe("fetchBackend availability", () => {
     await expect(fetchBackend(backendRequest(), "/services/service-1")).rejects.toMatchObject({
       name: "BackendUnavailableError",
       status: 503,
-      message: "El backend no responde. Reintente en unos segundos.",
+      message: "El sistema no responde. Reintente en unos segundos.",
     });
   });
 

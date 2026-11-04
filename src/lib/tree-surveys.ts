@@ -115,11 +115,11 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
     payload = response.status === 204 ? undefined : await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "tree-surveys" });
-    throw new TreeSurveyContractError(`La respuesta de ${labels.treeSurveys} no es JSON válido.`, { cause });
+    throw new TreeSurveyContractError(`No se pudo obtener información válida de ${labels.treeSurveys}. Reintente en unos segundos.`, { cause });
   }
   if (!response.ok) {
     const parsedError = errorResponseSchema.safeParse(payload);
-    if (!parsedError.success) throw new TreeSurveyContractError("La respuesta de error de relevamientos no respeta el contrato documentado.", { cause: parsedError.error });
+    if (!parsedError.success) throw new TreeSurveyContractError("No se pudo obtener información válida de relevamientos. Reintente en unos segundos.", { cause: parsedError.error });
     const message = Array.isArray(parsedError.data.message) ? parsedError.data.message.join(" ") : parsedError.data.message;
     throw new TreeSurveyRequestError(message, parsedError.data.statusCode);
   }

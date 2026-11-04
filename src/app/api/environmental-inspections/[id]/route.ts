@@ -29,10 +29,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       if (!backendResponse.ok) return withInspectionAttachments(request, backendResponse);
       let payload: unknown;
       try { payload = await backendResponse.json(); } catch {
-        return errorResponse(502, "La respuesta del backend no contiene una inspección válida.", path);
+        return errorResponse(502, "No se pudo obtener la inspección. Reintente en unos segundos.", path);
       }
       const parsed = environmentalInspectionSchema.safeParse(payload);
-      if (!parsed.success) return errorResponse(502, "La respuesta del backend no contiene una inspección válida.", path);
+      if (!parsed.success) return errorResponse(502, "No se pudo obtener la inspección. Reintente en unos segundos.", path);
       let inspection: Record<string, unknown> = parsed.data;
       if (scenario.actor.kind === "FIELD") {
         if (!parsed.data.serviceId || !session.crew?.id) return errorResponse(404, "Inspección no encontrada.", path);

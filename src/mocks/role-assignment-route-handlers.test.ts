@@ -79,6 +79,9 @@ describe("respuestas del backend", () => {
       ]);
 
       expect(responses.map((response) => response.status)).toEqual([502, 502, 502]);
+      for (const response of responses) {
+        expect((await response.json()).message).toBe("No se pudo obtener información válida de asignaciones de roles. Reintente en unos segundos.");
+      }
     } finally { restore(); }
   });
 

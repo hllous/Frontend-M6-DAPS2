@@ -89,8 +89,7 @@ describe("authorized scenario BFF route", () => {
       const body = await response.json();
 
       expect(response.status).toBe(500);
-      expect(body.message).toBe("El backend respondió con un error (HTTP 500).");
-      expect(body.message).not.toContain("sesión");
+      expect(body.message).toBe("No pudimos confirmar su sesión. Reintente en unos segundos.");
     });
 
     it("answers 503 with its own message when the backend is unreachable", async () => {
@@ -100,7 +99,7 @@ describe("authorized scenario BFF route", () => {
       const body = await response.json();
 
       expect(response.status).toBe(503);
-      expect(body.message).toBe("El backend no responde. Reintente en unos segundos.");
+      expect(body.message).toBe("El sistema no responde. Reintente en unos segundos.");
     });
   });
 });

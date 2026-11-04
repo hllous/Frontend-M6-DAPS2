@@ -135,7 +135,7 @@ async function readJson(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "trees" });
-    throw new TreeContractError("La respuesta de árboles no es JSON válido.", { cause });
+    throw new TreeContractError("No se pudo obtener información válida de árboles. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -155,7 +155,7 @@ async function request(path: string, init?: RequestInit): Promise<{ payload: unk
   if (!response.ok) {
     const parsed = errorResponseSchema.safeParse(payload);
     if (!parsed.success) {
-      throw new TreeContractError("La respuesta de error de árboles no respeta el contrato documentado.", { cause: parsed.error });
+      throw new TreeContractError("No se pudo obtener información válida de árboles. Reintente en unos segundos.", { cause: parsed.error });
     }
     const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
     throw new TreeRequestError(message, parsed.data.statusCode);

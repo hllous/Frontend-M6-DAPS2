@@ -24,8 +24,8 @@ describe("IntegrationMonitor", () => {
   it("loads a paginated outgoing event list without exposing payload", async () => {
     const { container } = render(<IntegrationMonitor canManage initialTab="events" />);
 
-    const list = await screen.findByRole("table", { name: "Eventos salientes" });
-    expect(within(list).getByText("containerDamaged")).toBeVisible();
+    const list = await screen.findByRole("table", { name: "Envíos a otras áreas" });
+    expect(within(list).getByText("Daño en contenedor")).toBeVisible();
     expect(within(list).queryByText(/damageType|containerId/)).not.toBeInTheDocument();
     expect(await screen.findByLabelText("Eventos fallidos")).toHaveTextContent("2 eventos fallidos");
     expect(screen.getByRole("heading", { name: "Conexiones con otras áreas" })).toBeVisible();
@@ -45,7 +45,7 @@ describe("IntegrationMonitor", () => {
     const user = userEvent.setup();
     render(<IntegrationMonitor canManage initialTab="events" />);
 
-    await user.click((await screen.findAllByRole("button", { name: "Ver detalle de containerDamaged" }))[0]);
+    await user.click((await screen.findAllByRole("button", { name: "Ver detalle de Daño en contenedor" }))[0]);
     const detail = await screen.findByRole("dialog", { name: "Detalle del evento" });
     expect(within(detail).getByText(/"severity": "HIGH"/)).toBeVisible();
     await user.click(within(detail).getByRole("button", { name: "Reintentar evento" }));
@@ -62,7 +62,7 @@ describe("IntegrationMonitor", () => {
   it("hides event detail and retry actions from an auditor", async () => {
     render(<IntegrationMonitor canManage={false} initialTab="events" />);
 
-    expect(await screen.findByRole("table", { name: "Eventos salientes" })).toBeVisible();
+    expect(await screen.findByRole("table", { name: "Envíos a otras áreas" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /Ver detalle/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Reintentar/ })).not.toBeInTheDocument();
   });
@@ -72,7 +72,7 @@ describe("IntegrationMonitor", () => {
     server.use(http.post("*/api/events/outbox/:id/retry", () => HttpResponse.json({ statusCode: 409, message: "El evento ya cambió", error: "Conflict", path: "/api/events/outbox/id" }, { status: 409 })));
     render(<IntegrationMonitor canManage initialTab="events" />);
 
-    await user.click((await screen.findAllByRole("button", { name: "Ver detalle de containerDamaged" }))[0]);
+    await user.click((await screen.findAllByRole("button", { name: "Ver detalle de Daño en contenedor" }))[0]);
     const detail = await screen.findByRole("dialog", { name: "Detalle del evento" });
     await user.click(within(detail).getByRole("button", { name: "Reintentar evento" }));
     const confirmation = await screen.findByRole("dialog", { name: "Confirmar reintento" });

@@ -153,7 +153,7 @@ async function readJsonBody(response: Response, resource: "routes" = "routes"): 
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
-    throw new RouteContractError("La respuesta de recorridos no es JSON válido.", { cause });
+    throw new RouteContractError("No se pudo obtener información válida de recorridos. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -162,7 +162,7 @@ function handleErrorPayload(payload: unknown, resource: "routes" = "routes"): ne
   if (!parsedError.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
     throw new RouteContractError(
-      "La respuesta de error de recorridos no respeta el contrato documentado.",
+      "No se pudo obtener información válida de recorridos. Reintente en unos segundos.",
       { cause: parsedError.error },
     );
   }

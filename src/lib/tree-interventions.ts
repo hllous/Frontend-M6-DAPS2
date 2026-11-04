@@ -128,11 +128,11 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
     payload = response.status === 204 ? undefined : await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "tree-interventions" });
-    throw new TreeInterventionContractError("La respuesta de intervenciones de arbolado no es JSON válido.", { cause });
+    throw new TreeInterventionContractError("No se pudo obtener información válida de intervenciones de arbolado. Reintente en unos segundos.", { cause });
   }
   if (!response.ok) {
     const parsedError = errorResponseSchema.safeParse(payload);
-    if (!parsedError.success) throw new TreeInterventionContractError("La respuesta de error de intervenciones no respeta el contrato documentado.", { cause: parsedError.error });
+    if (!parsedError.success) throw new TreeInterventionContractError("No se pudo obtener información válida de intervenciones. Reintente en unos segundos.", { cause: parsedError.error });
     const message = Array.isArray(parsedError.data.message) ? parsedError.data.message.join(" ") : parsedError.data.message;
     throw new TreeInterventionRequestError(message, parsedError.data.statusCode);
   }

@@ -156,7 +156,7 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
     payload = await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "repair-requests" });
-    throw new RepairRequestContractError("La respuesta de derivaciones no es JSON válido.", { cause });
+    throw new RepairRequestContractError("No se pudo obtener información válida de derivaciones. Reintente en unos segundos.", { cause });
   }
 
   if (!response.ok) {
@@ -164,7 +164,7 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
     if (!parsedError.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "repair-requests" });
       throw new RepairRequestContractError(
-        "La respuesta de error de derivaciones no respeta el contrato documentado.",
+        "No se pudo obtener información válida de derivaciones. Reintente en unos segundos.",
         { cause: parsedError.error },
       );
     }

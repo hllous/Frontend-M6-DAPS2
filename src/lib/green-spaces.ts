@@ -101,7 +101,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
-    throw new GreenSpaceContractError("La respuesta de espacios verdes no es JSON válido.", { cause });
+    throw new GreenSpaceContractError("No se pudo obtener información válida de espacios verdes. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -109,7 +109,7 @@ function requestError(payload: unknown): GreenSpaceRequestError | GreenSpaceCont
   const parsed = errorResponseSchema.safeParse(payload);
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
-    return new GreenSpaceContractError("La respuesta de error de espacios verdes no respeta el contrato documentado.", {
+    return new GreenSpaceContractError("No se pudo obtener información válida de espacios verdes. Reintente en unos segundos.", {
       cause: parsed.error,
     });
   }

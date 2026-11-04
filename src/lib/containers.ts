@@ -219,7 +219,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
-    throw new ContainerContractError("La respuesta de contenedores no es JSON válido.", { cause });
+    throw new ContainerContractError("No se pudo obtener información válida de contenedores. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -228,7 +228,7 @@ function requestError(payload: unknown): ContainerRequestError | ContainerContra
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
     return new ContainerContractError(
-      "La respuesta de error de contenedores no respeta el contrato documentado.",
+      "No se pudo obtener información válida de contenedores. Reintente en unos segundos.",
       { cause: parsed.error },
     );
   }

@@ -16,7 +16,7 @@ import { rememberBffPath } from "./bff-response-path";
 const INVALID_BACKEND_PATH_ID = "\u0000invalid-backend-path-id\u0000";
 const BACKEND_PATH_ID_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
 const DEFAULT_BACKEND_TIMEOUT_MS = 15_000;
-const BACKEND_UNAVAILABLE_MESSAGE = "El backend no responde. Reintente en unos segundos.";
+const BACKEND_UNAVAILABLE_MESSAGE = "El sistema no responde. Reintente en unos segundos.";
 export type FetchBackendOptions = {
   timeoutMs?: number;
 };
@@ -45,7 +45,7 @@ export async function fetchBackend(
   const backendOrigin = process.env.M6_BACKEND_ORIGIN;
   const sessionAccessToken = session.accessToken;
   if (!backendOrigin || !sessionAccessToken) {
-    throw new AuthUnavailableError("El backend no está configurado.");
+    throw new AuthUnavailableError("El sistema no está disponible. Comuníquese con el administrador del sistema.");
   }
 
   if (resourcePath.includes(INVALID_BACKEND_PATH_ID)) {

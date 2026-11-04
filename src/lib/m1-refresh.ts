@@ -167,7 +167,7 @@ export async function renewRequestSession<T extends RenewableSession>(
     if (options.tolerateUnavailable && error instanceof BackendUnavailableError) return session;
     throw error;
   }
-  if (!next) throw new InvalidSessionError("M1 rechazó la renovación de la sesión.");
+  if (!next) throw new InvalidSessionError("No pudimos confirmar su sesión. Vuelva a ingresar.");
   rememberRenewedSession(request, next);
   await persistRenewedSession(next, request);
   return next as T;

@@ -66,8 +66,8 @@ async function requestJson(path: string, init?: RequestInit) {
   let response: Response;
   try { response = await authenticatedFetch(path, init); } catch (cause) { if (cause instanceof NetworkFailureError) recordTelemetryEvent({ name: "request_network_failure", resource: "crews" }); throw cause; }
   let payload: unknown;
-  try { payload = await response.json(); } catch (cause) { recordTelemetryEvent({ name: "request_malformed_response", resource: "crews" }); throw new CrewContractError("La respuesta de cuadrillas no es JSON válido.", { cause }); }
-  if (!response.ok) { const parsed = errorSchema.safeParse(payload); if (!parsed.success) throw new CrewContractError("La respuesta de error no respeta el contrato documentado.", { cause: parsed.error }); const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message; throw new CrewRequestError(message, parsed.data.statusCode); }
+  try { payload = await response.json(); } catch (cause) { recordTelemetryEvent({ name: "request_malformed_response", resource: "crews" }); throw new CrewContractError("No se pudo obtener información válida de cuadrillas. Reintente en unos segundos.", { cause }); }
+  if (!response.ok) { const parsed = errorSchema.safeParse(payload); if (!parsed.success) throw new CrewContractError("No se pudo obtener información válida. Reintente en unos segundos.", { cause: parsed.error }); const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message; throw new CrewRequestError(message, parsed.data.statusCode); }
   return payload;
 }
 function resource(payload: unknown, message: string): Crew {

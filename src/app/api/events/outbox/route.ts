@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         "integrationMonitor:view",
         { cache: "no-store" },
       );
-      return validatedBackendResponse(response, outboxPageSchema, path, "La respuesta de eventos salientes no respeta el contrato documentado.");
+      return validatedBackendResponse(response, outboxPageSchema, path, "No se pudo obtener información válida de eventos salientes. Reintente en unos segundos.");
     }
 
     return jsonNoStore(outboxPageSchema.parse(listOutboxFixtures(parsedQuery.data)));

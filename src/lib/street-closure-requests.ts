@@ -255,7 +255,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "street-closure-requests" });
-    throw new StreetClosureRequestContractError("La respuesta de cortes de calle no es JSON válido.", {
+    throw new StreetClosureRequestContractError("No se pudo obtener información válida de cortes de calle. Reintente en unos segundos.", {
       cause,
     });
   }
@@ -266,7 +266,7 @@ async function requestError(payload: unknown, response: Response): Promise<never
   if (!parsedError.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "street-closure-requests" });
     throw new StreetClosureRequestContractError(
-      "La respuesta de error de cortes de calle no respeta el contrato documentado.",
+      "No se pudo obtener información válida de cortes de calle. Reintente en unos segundos.",
       { cause: parsedError.error },
     );
   }

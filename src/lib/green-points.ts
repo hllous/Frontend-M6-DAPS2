@@ -116,7 +116,7 @@ async function readJson(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "green-points" });
-    throw new GreenPointContractError("La respuesta de puntos verdes no es JSON válido.", { cause });
+    throw new GreenPointContractError("No se pudo obtener información válida de puntos verdes. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -136,7 +136,7 @@ async function request(path: string, init?: RequestInit): Promise<{ response: Re
   if (!response.ok) {
     const parsed = errorResponseSchema.safeParse(payload);
     if (!parsed.success) {
-      throw new GreenPointContractError("La respuesta de error de puntos verdes no respeta el contrato documentado.", { cause: parsed.error });
+      throw new GreenPointContractError("No se pudo obtener información válida de puntos verdes. Reintente en unos segundos.", { cause: parsed.error });
     }
     const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
     throw new GreenPointRequestError(message, parsed.data.statusCode);

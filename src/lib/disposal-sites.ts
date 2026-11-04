@@ -44,10 +44,10 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
   let response: Response;
   try { response = await authenticatedFetch(path, init); } catch (cause) { if (cause instanceof NetworkFailureError) throw cause; throw cause; }
   let payload: unknown;
-  try { payload = await response.json(); } catch (cause) { throw new DisposalSiteContractError("La respuesta de sitios de disposición no es JSON válido.", { cause }); }
+  try { payload = await response.json(); } catch (cause) { throw new DisposalSiteContractError("No se pudo obtener información válida de sitios de disposición. Reintente en unos segundos.", { cause }); }
   if (!response.ok) {
     const parsed = errorResponseSchema.safeParse(payload);
-    if (!parsed.success) throw new DisposalSiteContractError("La respuesta de error no respeta el contrato documentado.", { cause: parsed.error });
+    if (!parsed.success) throw new DisposalSiteContractError("No se pudo obtener información válida. Reintente en unos segundos.", { cause: parsed.error });
     const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
     throw new DisposalSiteRequestError(message, parsed.data.statusCode);
   }

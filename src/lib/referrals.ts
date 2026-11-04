@@ -223,7 +223,7 @@ async function requestJson(path: string): Promise<unknown> {
   try {
     payload = await response.json();
   } catch (cause) {
-    throw new ReferralContractError("La respuesta de derivaciones no es JSON válido.", { cause });
+    throw new ReferralContractError("No se pudo obtener información válida de derivaciones. Reintente en unos segundos.", { cause });
   }
   if (!response.ok) {
     const message = payload && typeof payload === "object" && "message" in payload

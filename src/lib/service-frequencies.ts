@@ -118,11 +118,11 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
     payload = await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "service-frequencies" });
-    throw new ServiceFrequencyContractError("La respuesta de frecuencias no es JSON válido.", { cause });
+    throw new ServiceFrequencyContractError("No se pudo obtener información válida de frecuencias. Reintente en unos segundos.", { cause });
   }
   if (!response.ok) {
     const parsed = errorResponseSchema.safeParse(payload);
-    if (!parsed.success) throw new ServiceFrequencyContractError("La respuesta de error de frecuencias no respeta el contrato documentado.", { cause: parsed.error });
+    if (!parsed.success) throw new ServiceFrequencyContractError("No se pudo obtener información válida de frecuencias. Reintente en unos segundos.", { cause: parsed.error });
     const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
     throw new ServiceFrequencyRequestError(message, parsed.data.statusCode);
   }

@@ -82,7 +82,7 @@ export function AccessWorkspace({ ownUserId }: { ownUserId: string }) {
     setRoles([]);
 
     if (!/^\d+$/.test(userId)) {
-      setLookupError("Ingrese un identificador numérico de persona.");
+      setLookupError("Ingrese el número de legajo.");
       return;
     }
 

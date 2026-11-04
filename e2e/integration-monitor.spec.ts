@@ -27,19 +27,19 @@ test("monitor de integración: admin, auditor, filtros, reintentos y acceso @smo
 
   await expect(page.getByRole("heading", { level: 1, name: "Conexiones con otras áreas" })).toBeVisible();
   await expect(page.getByLabel("Eventos fallidos", { exact: true })).toContainText("2 eventos fallidos");
-  const eventsTable = page.getByRole("table", { name: "Eventos salientes" });
-  await expect(eventsTable).toContainText("containerDamaged");
+  const eventsTable = page.getByRole("table", { name: "Envíos a otras áreas" });
+  await expect(eventsTable).toContainText("Daño en contenedor");
   await expect(eventsTable).not.toContainText("severity");
   await expectNoViolations(page);
 
   await chooseOption(page, "Estado", "Fallido");
-  await page.getByRole("textbox", { name: "Tipo de evento" }).fill("containerDamaged");
+  await page.getByRole("textbox", { name: "Tipo de evento" }).fill("Daño en contenedor");
   await chooseDate(page, "Desde", "2026-10-28");
   await chooseDate(page, "Hasta", "2026-10-28");
   await page.getByRole("button", { name: "Aplicar filtros", exact: true }).click();
   await expect(eventsTable.getByRole("row")).toHaveCount(2);
-  await expect(eventsTable).toContainText("containerDamaged");
-  await expect(eventsTable).not.toContainText("environmentalReportReceived");
+  await expect(eventsTable).toContainText("Daño en contenedor");
+  await expect(eventsTable).not.toContainText("Expediente ambiental recibido");
 
   await page.getByRole("link", { name: "Ver actividad de Contenedor" }).click();
   await expect(page).toHaveURL(/tab=activity/);
@@ -49,9 +49,9 @@ test("monitor de integración: admin, auditor, filtros, reintentos y acceso @smo
   await expect(activityTable).toContainText("Informó un daño");
   await expect(page.getByRole("textbox", { name: "Identificador de entidad" })).toHaveValue("550e8400-e29b-41d4-a716-446655440001");
 
-  await page.getByRole("tab", { name: "Eventos salientes" }).click();
+  await page.getByRole("tab", { name: "Envíos a otras áreas" }).click();
   await page.getByRole("button", { name: "Limpiar filtros", exact: true }).click();
-  await page.getByRole("button", { name: "Ver detalle de containerDamaged" }).click();
+  await page.getByRole("button", { name: "Ver detalle de Daño en contenedor" }).click();
   const detail = page.getByRole("dialog", { name: "Detalle del evento" });
   await expect(detail).toContainText('"severity": "HIGH"');
   await page.getByRole("button", { name: "Reintentar evento" }).click();
@@ -78,8 +78,8 @@ test("monitor de integración: admin, auditor, filtros, reintentos y acceso @smo
   await resetMockData(page);
   await loginViaApi(page, "office-limited-intake");
   await page.goto("/app/admin/integration-monitor");
-  const mobileEventsList = page.getByRole("list", { name: "Eventos salientes" });
-  await expect(mobileEventsList).toContainText("containerDamaged");
+  const mobileEventsList = page.getByRole("list", { name: "Envíos a otras áreas" });
+  await expect(mobileEventsList).toContainText("Daño en contenedor");
   await expect(mobileEventsList).not.toContainText("severity");
   await expect(page.getByRole("button", { name: /Ver detalle|Reintentar/ })).toHaveCount(0);
   await page.getByRole("tab", { name: "Registro de actividad" }).click();

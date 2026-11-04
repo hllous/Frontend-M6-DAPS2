@@ -294,7 +294,7 @@ async function request(path: string) {
     payload = await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "indicators" });
-    throw new IndicatorContractError("La respuesta de indicadores no es JSON válido.", { cause });
+    throw new IndicatorContractError("No se pudo obtener información válida de indicadores. Reintente en unos segundos.", { cause });
   }
   if (!response.ok) {
     const parsed = z.object({ statusCode: z.number(), message: z.union([z.string(), z.array(z.string())]) }).safeParse(payload);

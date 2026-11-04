@@ -28,7 +28,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
           ? (payload as { data: unknown }).data
           : payload;
         const parsed = environmentalReportSchema.safeParse(raw);
-        if (!parsed.success) return errorResponse(502, "La respuesta del expediente ambiental no respeta el contrato documentado.", path);
+        if (!parsed.success) return errorResponse(502, "No se pudo obtener información válida del expediente ambiental. Reintente en unos segundos.", path);
         if (!session.crew?.id || parsed.data.assignedCrewId !== session.crew.id) {
           return errorResponse(404, "Expediente ambiental no encontrado.", path);
         }

@@ -36,7 +36,7 @@ export async function GET(
         try {
           backendPayload = JSON.parse(payload) as unknown;
         } catch {
-          return errorResponse(502, "El backend devolvió una respuesta inválida.", path);
+          return errorResponse(502, "No se pudo obtener la derivación. Reintente en unos segundos.", path);
         }
         if (kind === "repair-requests") {
           const parsed = repairRequestSchema.safeParse(backendPayload);
@@ -69,5 +69,5 @@ export async function GET(
 
 function contractMismatch(kind: string, id: string, error: { issues: { message: string }[] }, path: string) {
   console.warn(`Derivación ${kind} ${id}: la respuesta del backend no respeta el contrato.`, error.issues.map((issue) => issue.message));
-  return errorResponse(502, "El backend devolvió una derivación con un formato que esta versión no reconoce (por ejemplo, un estado nuevo). Avisá a Backend.", path);
+  return errorResponse(502, "No se pudo mostrar la derivación. Comuníquese con el administrador del sistema.", path);
 }
