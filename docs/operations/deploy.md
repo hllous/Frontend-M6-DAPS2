@@ -49,19 +49,18 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 
 | Variable | Uso |
 |---|---|
-| `M6_AUTH_MODE` | `mock` para escenarios locales; `backend-development` para integrar con el backend usando un JWT de desarrollo. `real-m1` todavía falla de forma cerrada. Configurar el modo explícitamente en producción: si se omite, el código selecciona `real-m1`. |
-| `M6_BACKEND_ORIGIN` | Origen privado de M6 Backend; requerido en `backend-development`. |
+| `M6_AUTH_MODE` | En Vercel (preview y producción) debe ser `real-m1`: es el único modo desplegado. Un build desplegado (`NODE_ENV=production`) con otro valor, o sin definir, falla al arrancar (`src/instrumentation.ts`) y el login responde 503. `mock` (fixtures y selector de perfiles) es solo para desarrollo local y tests. |
+| `M6_BACKEND_ORIGIN` | Origen de M6 Backend; requerido en `real-m1`. |
 | `BFF_SHARED_KEY` | Opcional. Secreto compartido con el backend: el **mismo** valor que su `BFF_SHARED_KEY` (Render), 32 caracteres o más (`openssl rand -base64 32`; en el repositorio solo placeholders). Con él, `fetchPublicBackend` manda `X-M6-BFF-Key` y el backend cuenta, en el límite de tasa del portal, la IP del vecino que va en `X-Forwarded-For`; sin él (o con otro valor) cuenta la IP del BFF y todos los vecinos comparten un solo límite. Se manda solo en `/api/public/*`, nunca en las rutas autenticadas ni al navegador; solo servidor, sin `NEXT_PUBLIC_`. Se rota cambiándolo en Vercel y Render a la vez. |
-| `M6_JWT_SECRET` | `JWT_SECRET` del backend (base64). Si está, el BFF firma un token HS256 de 5 minutos por petición con la persona del seed del perfil elegido (#740) y la sesión dura horas (#745). Solo servidor, guardar como secreto, nunca `NEXT_PUBLIC_*`. |
-| `M6_JWT_ISSUER` | Emisor (`iss`) de esos tokens; por defecto `modulo1-ciudadanos`. Debe coincidir con `JWT_ISSUER` del backend. |
-| `M6_DEV_JWT` | Alternativa sin `M6_JWT_SECRET`: JWT de desarrollo único, aceptado por el backend (vence a los 15 min salvo fecha límite). Con `M6_JWT_SECRET` se ignora. Guardar como secreto. |
-| `M1_BASE_URL` | Opcional. Base de M1 para `POST /auth/refresh`; sin ella (o sin refresh token en la sesión) no hay renovación. No verificado contra M1. |
+| `M1_BASE_URL` | Base de M1, requerida en `real-m1`: login (`POST /auth/usuario/login`) y renovación (`POST /auth/refresh`). Producción: `https://ciudadanos-m1-backend.onrender.com/`. |
 | `M6_SESSION_SECRET` | Secreto aleatorio de al menos 32 bytes para sellar la cookie del BFF (generalo con `openssl rand -base64 32`). Obligatorio cuando `NODE_ENV=production`; el desarrollo local tiene un valor de respaldo. |
 | `NEXT_PUBLIC_DISABLE_MSW` | Solo para desarrollo y depuración de pruebas; desactiva el service worker de MSW. |
 
-> **Solo para la demo desplegada.** `M6_AUTH_MODE=backend-development` con `M6_JWT_SECRET` hace que el login abierto emita, sin credenciales, tokens de cualquier persona del seed (administración incluida) contra el backend. No cargar ese secreto en un ambiente con usuarios reales ni reutilizarlo fuera de la demo: cualquiera que abra la URL puede elegir cualquier perfil. La sesión dura 8 horas desde el login, sin corte por inactividad. Cuando M1 esté hosteado se borra `src/lib/demo-jwt.ts` y el login pasa a ser el de M1.
+> **Ingreso en la demo desplegada.** Solo se entra con una cuenta de empleado real de M1 (correo y contraseña, las del CSV de cuentas de empleado que entrega M1); no existen perfiles de demostración ni tokens firmados por el frontend. La primera llamada a M1 puede tardar hasta ~80 s por el arranque en frío de Render: el login espera hasta 90 s y lo avisa en pantalla. Un empleado sin rol de M6 entra y ve «Sin rol asignado»; un ciudadano recibe 403.
+>
+> **Variables retiradas.** `M6_DEV_JWT` y `M6_JWT_SECRET` (y `M6_JWT_ISSUER`) ya no existen en el código. Si siguen cargadas en Vercel se ignoran, pero hay que borrarlas del proyecto (paso de operador).
 
-La cookie de sesión es `httpOnly`, `Secure` en producción y `SameSite=Lax`. La implementación actual la cifra con AES-256-GCM; aún no autentica contra M1. Para una demo aislada, el modo `mock` usa fixtures. Para probar llamadas al backend, usá `backend-development` y un JWT temporal válido. No publiques secretos en el repositorio ni los incluyas en variables públicas.
+La cookie de sesión es `httpOnly`, `Secure` en producción y `SameSite=Lax`, y se cifra con AES-256-GCM; guarda los tokens de M1, que nunca llegan al navegador. Para desarrollo sin M1 usá `mock`; para probar el login real en local, el M1 falso con el backend mockeado (`docs/agents/real-m1-development.md`). No publiques secretos en el repositorio ni los incluyas en variables públicas.
 
 ### IP del vecino y `X-Forwarded-For`
 
@@ -74,7 +73,7 @@ Los nombres exactos están definidos en `Backend-M6-DAPS2/src/config/env.validat
 | Variable | Uso |
 |---|---|
 | `DATABASE_URL` | Conexión PostgreSQL; requerida. |
-| `JWT_SECRET` | Secreto compartido de M1, en base64, con el que el backend verifica el JWT (HMAC `HS256`/`HS384`/`HS512`). Mientras M1 no esté hosteado, con él también se firman los tokens de demo (`M6_DEV_JWT` o `M6_JWT_SECRET` del frontend). |
+| `JWT_SECRET` | Secreto compartido de M1, en base64, con el que el backend verifica el JWT (HMAC `HS256`/`HS384`/`HS512`). Es el secreto vigente de M1; el frontend no firma tokens. |
 | `JWT_ISSUER` | `iss` esperado; por defecto `modulo1-ciudadanos`. |
 | `M6_BOOTSTRAP_ADMIN_USER_IDS` | Ids numéricos de M1 que arrancan como `M6_ADMIN`; sin ellos nadie puede asignar roles y toda la API responde 403. |
 | `CORS_ORIGINS` | Orígenes permitidos. No limita al BFF, que llama desde el servidor. |

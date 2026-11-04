@@ -56,7 +56,7 @@ describe("respuestas del backend", () => {
   it("rechaza respuestas de asignación que no respetan los DTO del backend", async () => {
     const restore = backendEnv();
     try {
-      const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", roles: ["M6_ADMIN"] });
+      const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1", roles: ["M6_ADMIN"] });
       const invalidAssignment = { userId: "42", roles: ["ROLE_DESCONOCIDO"] };
       const invalidPage = {
         data: [invalidAssignment],
@@ -124,7 +124,7 @@ describe("respuestas del backend", () => {
   it("reconoce el propio usuario del demo por el subject del perfil", async () => {
     const restore = backendEnv();
     try {
-      const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development", roles: ["M6_ADMIN"] });
+      const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1", roles: ["M6_ADMIN"] });
       const demoUserId = DEMO_IDENTITIES["office-duty-queue"].sub;
       server.use(
         http.put(`https://backend.internal/role-assignments/${demoUserId}`, () => HttpResponse.json({ userId: demoUserId, roles: ["M6_ADMIN"] })),
@@ -149,7 +149,7 @@ describe("respuestas del backend", () => {
   it("reenvía estados y contenido de las cuatro operaciones", async () => {
     const restore = backendEnv();
     try {
-      const cookie = createSessionCookie("office-duty-queue", { mode: "backend-development" });
+      const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
       for (const status of [200, 400, 403, 404, 409]) {
         server.use(
           http.all("https://backend.internal/role-assignments", () => status === 200

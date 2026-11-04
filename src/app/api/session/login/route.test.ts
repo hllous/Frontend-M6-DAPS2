@@ -24,10 +24,11 @@ function request(body: unknown) {
 }
 
 describe("POST /api/session/login", () => {
-  it("fails closed for a production demo mode unless the override is explicit", async () => {
+  it.each(["mock", "backend-development", undefined])("fails closed in a deployed build with M6_AUTH_MODE=%s", async (mode) => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("M6_AUTH_MODE", "mock");
-    vi.stubEnv("M6_ALLOW_DEMO", "false");
+    vi.stubEnv("M6_SESSION_SECRET", "production-test-session-secret");
+    if (mode === undefined) vi.stubEnv("M6_AUTH_MODE", "");
+    else vi.stubEnv("M6_AUTH_MODE", mode);
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const rejected = await login(request({ scenarioId: "office-duty-queue" }));
@@ -35,15 +36,25 @@ describe("POST /api/session/login", () => {
     expect(rejected.status).toBe(503);
     expect(rejected.headers.get("cache-control")).toBe("no-store");
     expect(rejected.headers.get("set-cookie")).toBeNull();
-    expect(log).toHaveBeenCalledWith("[m6-auth-mode-misconfigured]", "mock");
+    expect(log).toHaveBeenCalledWith("[m6-auth-mode-misconfigured]", mode ?? "");
+  });
 
-    vi.stubEnv("M6_ALLOW_DEMO", "true");
-    vi.stubEnv("M6_SESSION_SECRET", "production-test-session-secret");
-    const allowed = await login(request({ scenarioId: "office-duty-queue" }));
+  it("rejects a scenario body in real-m1: no persona login exists in a deployed mode", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
 
-    expect(allowed.status).toBe(200);
-    expect(allowed.headers.get("cache-control")).toBe("no-store");
-    expect(allowed.headers.get("set-cookie")).toMatch(/Secure/i);
+    const response = await login(request({ scenarioId: "office-duty-queue" }));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("keeps the persona login for mock outside production", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "mock");
+
+    const response = await login(request({ scenarioId: "office-duty-queue" }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toMatch(/m6_session=/);
   });
 
   it("rejects a body over the request-size limit before validating credentials", async () => {

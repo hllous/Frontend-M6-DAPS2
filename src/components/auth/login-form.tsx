@@ -142,7 +142,7 @@ export function LoginForm({
                     </Select>
                     <FieldDescription id="operational-scenario-note">
                       Entorno de demostración: cualquier persona puede elegir un perfil. Este perfil corresponde a
-                      {" "}{DEMO_IDENTITIES[scenarioId].name} {authMode === "backend-development" ? ` (id ${DEMO_IDENTITIES[scenarioId].sub} del seed del backend)` : null}.
+                      {" "}{DEMO_IDENTITIES[scenarioId].name}.
                     </FieldDescription>
                   </Field>
                 )}

@@ -31,7 +31,7 @@ Here, `server` is the suite's existing `setupServer(...handlers)` instance. Use 
 
 The `fallbackCookie` (signed, from `src/test/session.ts`) is the actor of a domain's handler set and is added only when the request has no session cookie. Pass a Field crew cookie to build a Field-crew set. A request's own cookie always wins, which is how authorization tests send their actor.
 
-M6 roles: a scenario's `roles` are the fixture of `GET /me` and its capabilities derive from them (`src/lib/m6-roles.ts`). In `backend-development` the login handler calls `GET /me` first, so tests that log in through the handler use `loginAs` or `loginWithMe` from `src/test/session.ts`: they answer `/me` on the side with the scenario's roles (or the `roles` option) and leave the rest of the test's fetch mock queue untouched. `createSessionCookie` seals a session without any call.
+M6 roles: a scenario's `roles` are the fixture of `GET /me` and its capabilities derive from them (`src/lib/m6-roles.ts`). In `real-m1` the roles come from `GET /me`, so BFF tests use `loginAs`, `loginWithMe`, `createSessionCookie` or `createTestSession` from `src/test/session.ts`: they seal a `real-m1` session as if M1 had logged in and `/me` had answered with the scenario's roles (or the `roles` option), with a fake access token (`TEST_ACCESS_TOKEN`), without any network call or touching the test's fetch mock queue. The real login handler is tested with a fake M1 (`src/app/api/session/login/`).
 
 ## Adding or changing a domain
 

@@ -34,7 +34,7 @@ describe("mock data reset route", () => {
   });
 
   it("does not exist outside mock mode", async () => {
-    env.M6_AUTH_MODE = "backend-development";
+    env.M6_AUTH_MODE = "real-m1";
     addProbeZone();
 
     expect((await POST(resetRequest())).status).toBe(404);

@@ -10,7 +10,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
   resetContainerFixtures();
@@ -154,11 +153,11 @@ describe("POST /api/containers/[id]/report-damage BFF route", () => {
 
   it("forwards an authorized backend damage report with its id, method, and payload", async () => {
     const id = "container_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
     const payload = { damageType: "STRUCTURAL", severity: "CRITICAL", requiresPublicWorks: true };
     const cookie = createSessionCookie("field-crew-leader-route", {
-      mode: "backend-development",
-      devJwt,
+      mode: "real-m1",
+      accessToken: devJwt,
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, status: "DAMAGED", ...payload }));

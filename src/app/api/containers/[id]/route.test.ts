@@ -5,7 +5,6 @@ import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -90,10 +89,10 @@ describe("Container detail BFF route", () => {
 
   it("forwards an authenticated backend Container detail request with its id and method", async () => {
     const id = "container_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
     const cookie = await loginAs("office-duty-queue", {
-      mode: "backend-development",
-      devJwt,
+      mode: "real-m1",
+      accessToken: devJwt,
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id }));

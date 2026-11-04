@@ -119,7 +119,7 @@ describe("FoundationDemo", () => {
   it("updates the Field crew and member actions after an activity pulse", async () => {
     server.use(
       http.get("*/api/mock/scenarios/field-crew-leader-route", () => HttpResponse.json(scenarios.fieldCrewLeader)),
-      http.get("*/api/session", () => HttpResponse.json({ session: { mode: "backend-development", roles: ["M6_CAMPO_CUADRILLA"], crew: { id: "crew-c", name: "Cuadrilla nueva" }, fieldRole: "CREW_MEMBER" } })),
+      http.get("*/api/session", () => HttpResponse.json({ session: { mode: "real-m1", roles: ["M6_CAMPO_CUADRILLA"], crew: { id: "crew-c", name: "Cuadrilla nueva" }, fieldRole: "CREW_MEMBER" } })),
     );
     render(<FoundationDemo scenarioId="field-crew-leader-route" />);
     expect(await screen.findByText(/Cuadrilla B · Fernández/)).toBeVisible();
