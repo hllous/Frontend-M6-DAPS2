@@ -51,11 +51,16 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 |---|---|
 | `M6_AUTH_MODE` | `mock` solo para desarrollo local y pruebas; `real-m1` es el único modo permitido en despliegues. Configurarlo explícitamente como `real-m1` en Preview y Production. |
 | `M6_BACKEND_ORIGIN` | Origen privado de M6 Backend, usado por el BFF en modo `real-m1`. |
+| `BFF_SHARED_KEY` | Opcional. Secreto compartido con el backend: el **mismo** valor que su `BFF_SHARED_KEY` (Render), 32 caracteres o más (`openssl rand -base64 32`; en el repositorio solo placeholders). Con él, `fetchPublicBackend` manda `X-M6-BFF-Key` y el backend cuenta, en el límite de tasa del portal, la IP del vecino que va en `X-Forwarded-For`; sin él (o con otro valor) cuenta la IP del BFF y todos los vecinos comparten un solo límite. Se manda solo en `/api/public/*`, nunca en las rutas autenticadas ni al navegador; solo servidor, sin `NEXT_PUBLIC_`. Se rota cambiándolo en Vercel y Render a la vez. |
 | `M1_BASE_URL` | Base del M1 real, requerida en despliegues para el login. El intercambio de renovación con `POST /auth/refresh` todavía no está verificado; ver [contratos externos](external-contracts.md). |
 | `M6_SESSION_SECRET` | Secreto aleatorio de al menos 32 bytes para sellar la cookie del BFF (generalo con `openssl rand -base64 32`). Obligatorio cuando `NODE_ENV=production`; el desarrollo local tiene un valor de respaldo. |
 | `NEXT_PUBLIC_DISABLE_MSW` | Solo para desarrollo y depuración de pruebas; desactiva el service worker de MSW. |
 
 La cookie de sesión es `httpOnly`, `Secure` en producción y `SameSite=Lax`; el BFF cifra su contenido con AES-256-GCM y nunca entrega el JWT al navegador. El modo `mock` usa fixtures y el selector de perfiles locales; no se acepta en entornos desplegados. Para probar el login real localmente con el M1 falso y el Backend MSW, seguí la [guía de desarrollo de ingreso real](../agents/real-m1-development.md). No publiques secretos en el repositorio ni los incluyas en variables públicas.
+
+### IP del vecino y `X-Forwarded-For`
+
+Según la [documentación de Vercel](https://vercel.com/docs/headers/request-headers#x-forwarded-for), `x-forwarded-for` lleva la IP pública del cliente, Vercel lo sobrescribe y no reenvía IPs externas (para evitar suplantación); `x-real-ip` es idéntico. Por eso, desplegado en Vercel, el primer salto es la IP real y el BFF lo reenvía. Si se pone un proxy delante de Vercel, ese header trae la IP del proxy (no la del vecino). Fuera de Vercel (Docker, local) no hay garantía: un cliente podría mandar el header, así que ahí no se debe activar `BFF_SHARED_KEY` salvo que un proxy propio lo sobrescriba. El backend además descarta una primera entrada que no sea una IP válida.
 
 ## Variables principales del backend
 
