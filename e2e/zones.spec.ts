@@ -2,38 +2,24 @@ import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
 
-async function openCatalog(page: import("@playwright/test").Page) {
-  await loginViaApi(page, "office-duty-queue");
-  await page.goto("/app");
-  await page.getByRole("link", { name: "Catálogo" }).click();
-}
-
-test.describe("Zones representative states @smoke", () => {
-  test("shows the success state with the deterministic fixture zones", async ({ page }) => {
-    await openCatalog(page);
-
-    await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Belgrano", { exact: true })).toBeVisible();
-    // zones-catalog.spec renames Palermo in the shared mock data; accept either name.
-    await expect(page.getByText(/^Palermo( Parque Industrial)?$/)).toBeVisible();
-    await expect(page.getByText("Recoleta", { exact: true })).toBeVisible();
-    await expect(page.getByText(/^Z-[A-Z]{3}$/)).toHaveCount(0);
-  });
-
-  test("shows the empty state for a search with no matching zones", async ({ page }) => {
-    // Re-issues the same request against the real BFF route with a search term the
-    // deterministic fixtures never match, so the empty envelope comes from the actual
-    // contract rather than a hand-authored payload.
-    await page.route("**/api/zones**", async (route) => {
-      const url = new URL(route.request().url());
-      url.searchParams.set("search", "zzz-sin-resultados");
-      const response = await route.fetch({ url: url.toString() });
-      await route.fulfill({ response });
+test.describe("Catalog landing #844", () => {
+  test("shows only the catalog cards and keeps the zones catalog reachable", async ({ page }) => {
+    await loginViaApi(page, "office-duty-queue");
+    const zoneRequests: string[] = [];
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/zones") zoneRequests.push(request.url());
     });
+    await page.goto("/app?destination=catalog");
 
-    await openCatalog(page);
+    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
+    await expect(page.locator("main li")).toHaveCount(12);
+    await expect(page.getByRole("heading", { name: "Zonas operativas", level: 2 })).toHaveCount(0);
+    await expect(page.getByText("Belgrano", { exact: true })).toHaveCount(0);
+    expect(zoneRequests).toHaveLength(0);
 
-    await expect(page.getByText("Sin zonas operativas")).toBeVisible();
-    await expect(page.getByText("No hay zonas registradas para mostrar.")).toHaveCount(0);
+    await page.getByRole("link", { name: "Abrir Zonas operativas" }).click();
+    await expect(page).toHaveURL(/\/app\/catalog\/zones$/);
+    await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Belgrano" }).first()).toBeVisible();
   });
 });
