@@ -110,8 +110,8 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Documentation-only classifier tests
-        run: node --test scripts/ci/docs-only.node-test.mjs
+      - name: CI script tests
+        run: node --test scripts/ci/docs-only.node-test.mjs scripts/ci/e2e-shard.node-test.mjs
 
   # Vitest abre un worker aislado por archivo (255 archivos): repartirlo en shards es
   # lo que acorta el camino crítico. `isolate: false` no es opción: contamina estado
@@ -180,8 +180,12 @@ jobs:
       - name: Setup Playwright Chromium
         uses: ./.github/actions/setup-playwright
 
+      # `--shard` corta bloques contiguos y los specs pesados caían juntos (un shard tardaba
+      # el doble que otro); scripts/ci/e2e-shard.cjs reparte los tests en round-robin.
       - name: Playwright smoke and accessibility suite
-        run: pnpm exec playwright test --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: |
+          grep=$(node scripts/ci/e2e-shard.cjs --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }})
+          pnpm exec playwright test --project=chromium --grep "$grep"
 
       - name: Upload Playwright report
         if: ${{ failure() }}
