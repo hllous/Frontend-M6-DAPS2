@@ -265,6 +265,7 @@ export function IntegrationMonitor({
   const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<MonitorTab>(initialTab);
   const [eventDraft, setEventDraft] = useState({ status: "", eventType: "", from: "", to: "" });
+  const [eventFilterError, setEventFilterError] = useState("");
   const [eventFilters, setEventFilters] = useState<EventFilters>({});
   const [eventPageNumber, setEventPageNumber] = useState(1);
   const [eventResult, setEventResult] = useState<{ key: string; page?: OutboxPage; error?: string } | null>(null);
@@ -364,6 +365,13 @@ export function IntegrationMonitor({
 
   function applyEventFilters() {
     if (datesInvalid) return;
+    const input = eventDraft.eventType.trim().toLocaleLowerCase("es-AR");
+    const matchingLabels = Object.values(eventLabels).filter((label) => label.toLocaleLowerCase("es-AR").includes(input));
+    if (input && matchingLabels.length > 1 && !matchingLabels.some((label) => label.toLocaleLowerCase("es-AR") === input)) {
+      setEventFilterError("Los filtros de envíos a otras áreas no son válidos.");
+      return;
+    }
+    setEventFilterError("");
     setEventFilters({
       status: eventDraft.status ? eventDraft.status as OutboxStatus : undefined,
       eventType: eventDraft.eventType.trim() || undefined,
@@ -375,6 +383,7 @@ export function IntegrationMonitor({
   }
 
   function clearEventFilters() {
+    setEventFilterError("");
     setEventDraft({ status: "", eventType: "", from: "", to: "" });
     setEventFilters({});
     setEventPageNumber(1);
@@ -575,8 +584,11 @@ export function IntegrationMonitor({
                 maxLength={100}
                 autoComplete="off"
                 placeholder="p. ej., Daño en contenedor"
+                aria-invalid={Boolean(eventFilterError)}
+                aria-describedby={eventFilterError ? "event-type-error" : undefined}
                 onChange={(event) => setEventDraft((current) => ({ ...current, eventType: event.target.value }))}
               />
+              {eventFilterError && <FieldError id="event-type-error">{eventFilterError}</FieldError>}
             </Field>
             <Field>
               <FieldLabel htmlFor="outbox-from">Desde</FieldLabel>

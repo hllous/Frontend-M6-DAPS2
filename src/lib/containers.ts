@@ -327,7 +327,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/report-overflow`, {
         method: "POST",
       }),
-      "No se pudo obtener información válida de la reporte de desborde. Reintente en unos segundos.",
+      "No se pudo obtener información válida del reporte de desborde. Reintente en unos segundos.",
     );
   },
 
@@ -344,14 +344,14 @@ export const containersAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "No se pudo obtener información válida de la reporte de daño. Reintente en unos segundos.",
+      "No se pudo obtener información válida del reporte de daño. Reintente en unos segundos.",
     );
   },
 
   async startRepair(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}/start-repair`, { method: "POST" }),
-      "No se pudo obtener información válida de la inicio de reparación. Reintente en unos segundos.",
+      "No se pudo obtener información válida del inicio de reparación. Reintente en unos segundos.",
     );
   },
 
@@ -365,7 +365,7 @@ export const containersAdapter = {
   async remove(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}/remove`, { method: "POST" }),
-      "No se pudo obtener información válida de la retiro de contenedor. Reintente en unos segundos.",
+      "No se pudo obtener información válida del retiro de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -436,7 +436,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/empty`, {
         method: "POST",
       }),
-      "No se pudo obtener información válida de la vaciado de contenedor. Reintente en unos segundos.",
+      "No se pudo obtener información válida del vaciado de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -445,7 +445,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/relocate`, {
         method: "POST",
       }),
-      "No se pudo obtener información válida de la inicio de reubicación. Reintente en unos segundos.",
+      "No se pudo obtener información válida del inicio de reubicación. Reintente en unos segundos.",
     );
   },
 

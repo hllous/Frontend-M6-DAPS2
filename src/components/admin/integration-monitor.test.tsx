@@ -43,6 +43,15 @@ describe("IntegrationMonitor", () => {
     expect(within(table).queryByText("Servicio finalizado")).not.toBeInTheDocument();
   });
 
+  it("explains when an event filter matches more than one name", async () => {
+    const user = userEvent.setup();
+    render(<IntegrationMonitor canManage initialTab="events" />);
+    await screen.findByRole("table", { name: "Envíos a otras áreas" });
+    await user.type(screen.getByRole("textbox", { name: "Tipo de evento" }), "Solicitud");
+    await user.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    expect(screen.getByText("Los filtros de envíos a otras áreas no son válidos.")).toBeVisible();
+  });
+
   it("keeps an unknown event type available as a support identifier in its detail", async () => {
     const user = userEvent.setup();
     const page = listOutboxFixtures({ page: 1, pageSize: 20 });

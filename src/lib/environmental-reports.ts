@@ -594,7 +594,7 @@ export const environmentalReportsAdapter = {
   },
 
   async startReview(id: string): Promise<EnvironmentalReport> {
-    return transition(id, "start-review", "No se pudo obtener información válida de la inicio de revisión. Reintente en unos segundos.");
+    return transition(id, "start-review", "No se pudo obtener información válida del inicio de revisión. Reintente en unos segundos.");
   },
   async forward(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
     return transition(id, "forward", "No se pudo obtener información válida de derivación. Reintente en unos segundos.", decisionBody(input));

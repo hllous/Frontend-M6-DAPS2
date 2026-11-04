@@ -243,7 +243,7 @@ export const repairRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "No se pudo obtener información válida de la inicio de la derivación. Reintente en unos segundos.",
+      "No se pudo obtener información válida del inicio de la derivación. Reintente en unos segundos.",
     );
   },
 
@@ -256,7 +256,7 @@ export const repairRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "No se pudo obtener información válida de la cierre de la derivación. Reintente en unos segundos.",
+      "No se pudo obtener información válida del cierre de la derivación. Reintente en unos segundos.",
     );
   },
 };

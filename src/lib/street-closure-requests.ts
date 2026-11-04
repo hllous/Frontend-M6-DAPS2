@@ -385,7 +385,7 @@ export const streetClosureRequestsAdapter = {
   async reject(id: string): Promise<StreetClosureRequest> {
     return parseRequest(
       await sendRequest(`/api/street-closure-requests/${id}/reject`, { method: "POST" }),
-      "No se pudo obtener información válida de la rechazo del corte de calle. Reintente en unos segundos.",
+      "No se pudo obtener información válida del rechazo del corte de calle. Reintente en unos segundos.",
     );
   },
 

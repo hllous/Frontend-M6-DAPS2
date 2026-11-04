@@ -168,7 +168,7 @@ export const treeInterventionsAdapter = {
   async submitForAuthorization(id: string): Promise<TreeInterventionDetail> {
     return parseIntervention(
       await request(`/api/tree-interventions/${encodeURIComponent(id)}/submit-for-authorization`, { method: "POST" }),
-      "No se pudo obtener información válida de la envío a autorización. Reintente en unos segundos.",
+      "No se pudo obtener información válida del envío a autorización. Reintente en unos segundos.",
     );
   },
 
