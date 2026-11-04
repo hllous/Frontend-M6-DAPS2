@@ -10,7 +10,6 @@ const barrioId = (codigo: string) => neighborhoodFixtures.find((barrio) => barri
 afterEach(() => {
   resetZoneFixtures();
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -77,9 +76,9 @@ describe("POST /api/zones/[id]/neighborhoods", () => {
     expect(getZoneFixture("zone-1")?.neighborhoodIds).toEqual([barrioId("belgrano")]);
   });
 
-  it("proxies the assignment to the backend in backend-development mode", async () => {
+  it("proxies the assignment to the backend in real-m1 mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "http://backend-test";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "zone-1", code: "Z-01", name: "Zona Norte", active: true, neighborhoodIds: [] }), {
         status: 200,

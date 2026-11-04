@@ -10,7 +10,6 @@ import { loginAs } from "@/test/session";
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -36,7 +35,7 @@ describe("environmental report forward and dismiss BFF routes", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "ER-1001", status: "FORWARDED" }), { status: 201, headers: { "content-type": "application/json" } }),
     );
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
 
     const response = await handler(postRequest(action, cookie, { reason: `  ${body.reason}  ` }), context);
 
@@ -55,7 +54,7 @@ describe("environmental report forward and dismiss BFF routes", () => {
   ] as const)("%s rejects a missing or blank reason before reaching the backend", async (action, handler) => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch");
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
 
     const missing = await handler(postRequest(action, cookie), context);
     const blank = await handler(postRequest(action, cookie, { reason: "   " }), context);
@@ -70,7 +69,7 @@ describe("environmental report forward and dismiss BFF routes", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "ER-1001", status: "UNDER_REVIEW" }), { status: 201, headers: { "content-type": "application/json" } }),
     );
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
 
     await startReview(postRequest("start-review", cookie), context);
 
@@ -83,7 +82,7 @@ describe("environmental report forward and dismiss BFF routes", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "ER-1001", status: "CLOSED" }), { status: 201, headers: { "content-type": "application/json" } }),
     );
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
 
     const response = await close(postRequest("close", cookie), context);
 
@@ -107,7 +106,7 @@ describe("environmental report request-information BFF route", () => {
   it("forwards RequestInformationDto JSON to the backend", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "ER-1002", informationRequestPending: true }), { status: 200, headers: { "content-type": "application/json" } }));
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
 
     const response = await call(cookie, { message: "  Una foto  ", requiredBy: "2099-11-03", internalNote: "movida" });
 
@@ -120,7 +119,7 @@ describe("environmental report request-information BFF route", () => {
   it("rejects a missing, blank or oversized message and a malformed date before reaching the backend", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch");
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
 
     const statuses = [
       (await call(cookie)).status,

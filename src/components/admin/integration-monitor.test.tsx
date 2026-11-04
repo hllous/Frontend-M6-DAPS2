@@ -107,4 +107,31 @@ describe("IntegrationMonitor", () => {
     expect(within(table).getByText("Informó un daño")).toBeVisible();
     expect(within(table).queryByText("Completó un servicio")).not.toBeInTheDocument();
   });
+
+  it("shows formal Spanish labels for known audit actions and statuses", async () => {
+    render(<IntegrationMonitor canManage initialTab="activity" />);
+
+    const table = await screen.findByRole("table", { name: "Registro de actividad" });
+    expect(within(table).getByText("Creó el registro")).toBeVisible();
+    expect(within(table).getByText("Informó un daño")).toBeVisible();
+    expect(within(table).getAllByText("Activo").length).toBeGreaterThan(0);
+    expect(within(table).queryByText(/Acción registrada/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to a Spanish label for unknown values and shows the raw code only to administrators", async () => {
+    const { unmount } = render(<IntegrationMonitor canManage initialTab="activity" />);
+
+    const adminTable = await screen.findByRole("table", { name: "Registro de actividad" });
+    expect(within(adminTable).getByText("Otra acción")).toBeVisible();
+    expect(within(adminTable).getByText("Otro estado")).toBeVisible();
+    expect(within(adminTable).getByText("Código: ARCHIVE_RECORD")).toBeVisible();
+    expect(within(adminTable).getByText("Código: PAUSED_BY_CITY")).toBeVisible();
+    unmount();
+
+    render(<IntegrationMonitor canManage={false} initialTab="activity" />);
+    const auditorTable = await screen.findByRole("table", { name: "Registro de actividad" });
+    expect(within(auditorTable).getByText("Otra acción")).toBeVisible();
+    expect(within(auditorTable).queryByText(/ARCHIVE_RECORD/)).not.toBeInTheDocument();
+    expect(within(auditorTable).queryByText(/PAUSED_BY_CITY/)).not.toBeInTheDocument();
+  });
 });

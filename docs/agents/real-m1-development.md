@@ -44,7 +44,7 @@ $env:NEXT_PUBLIC_DISABLE_MSW = "true"
 pnpm dev --port 3121
 ```
 
-Para correr el e2e de este flujo, con ese servidor y el M1 falso arriba: `$env:M6_E2E_REAL_M1 = "true"; $env:PLAYWRIGHT_BASE_URL = "http://localhost:3121"; pnpm exec playwright test e2e/real-m1-login.spec.ts`. Sin `M6_E2E_REAL_M1=true` la spec se saltea, porque el e2e normal (y el CI) corren en modo mock.
+`pnpm test:e2e` incluye el proyecto `real-m1`: inicia un M1 falso en 4312 y un Next independiente en 4311, con el MSW de Backend cargado dentro de ese proceso. La spec `e2e/real-m1-login.spec.ts` corre en CI sin variables adicionales. Para ejecutarla contra los servidores que arrancaste manualmente arriba, usá `$env:PLAYWRIGHT_REAL_M1_BASE_URL = "http://localhost:3121"; pnpm exec playwright test --project=real-m1 e2e/real-m1-login.spec.ts`.
 
 Abrí `http://localhost:3121/login`. El Backend MSW solo responde `GET /me` para estas pruebas y deriva roles de M6 de los perfiles de desarrollo; las rutas de dominio requieren un Backend disponible. La cuenta sin rol permite revisar el flujo de ingreso y la pantalla `/no-role` sin asignar capacidades.
 

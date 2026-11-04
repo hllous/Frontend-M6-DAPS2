@@ -27,7 +27,7 @@ La aplicación queda en `http://localhost:3000`; el health check local es `/api/
 
 Si vas a usar variables locales, copiá `.env.example` a `.env.local` y ajustá los valores. Cuando el backend local usa el puerto 3000, iniciá el frontend en otro puerto, por ejemplo `pnpm dev --port 3001`.
 
-Para conectarse al backend, configurar `M6_AUTH_MODE=backend-development`, `M6_BACKEND_ORIGIN`, `M6_DEV_JWT` y `M6_SESSION_SECRET`. Son variables del servidor: el navegador llama a los Route Handlers del BFF de Next.js y nunca recibe el JWT. El modo `real-m1` acepta credenciales de M1 en el servidor y consulta `GET /me` para los roles de M6. Para probarlo localmente con el M1 falso y el Backend MSW, seguí la [guía de desarrollo de ingreso real](docs/agents/real-m1-development.md). Ver también [contratos](CONTRACTS.md) y [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md).
+Para conectarse al backend, configurar `M6_AUTH_MODE=real-m1`, `M1_BASE_URL`, `M6_BACKEND_ORIGIN` y `M6_SESSION_SECRET`. `real-m1` es el único modo de un entorno desplegado; `mock` es solo para desarrollo local y tests. Son variables del servidor: el navegador llama a los Route Handlers del BFF de Next.js y nunca recibe el JWT. El modo `real-m1` acepta credenciales de M1 en el servidor y consulta `GET /me` para los roles de M6. Para probarlo localmente con el M1 falso y el Backend MSW, seguí la [guía de desarrollo de ingreso real](docs/agents/real-m1-development.md). Ver también [contratos](CONTRACTS.md) y [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md).
 
 ## Docker
 

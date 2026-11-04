@@ -5,7 +5,7 @@ import { GET } from "./route";
 import { loginAs } from "@/test/session";
 
 beforeEach(() => resetTreeSurveyFixtures());
-afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_DEV_JWT; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
+afterEach(() => { delete process.env.M6_AUTH_MODE; delete process.env.M6_BACKEND_ORIGIN; vi.restoreAllMocks(); });
 
 
 
@@ -21,8 +21,8 @@ describe("/api/trees/[id]/surveys/[surveyId]", () => {
   });
 
   it("forwards backend survey detail with both path ids and the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "survey-backend-1", treeId: "tree-backend-1" }));
 
     const response = await GET(new Request("http://localhost/api/trees/tree-backend-1/surveys/survey-backend-1", { headers: { cookie } }), {

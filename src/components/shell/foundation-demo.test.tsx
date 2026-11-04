@@ -82,16 +82,19 @@ describe("FoundationDemo", () => {
     expect(screen.getByText("Este sistema es solo para personal municipal.")).toBeVisible();
   });
 
-  it("says the user has no M6 role yet instead of showing an error or an empty shell", async () => {
+  it("uses the shared no-role route when the user has no M6 roles", async () => {
+    const replace = vi.fn();
+    const router = navigation.useRouter();
+    vi.spyOn(navigation, "useRouter").mockReturnValue({ ...router, replace });
     server.use(http.get("*/api/mock/scenarios/office-duty-queue", () =>
       HttpResponse.json(scenarioForRoles(scenarios.officeDutyQueue, []))));
 
     render(<FoundationDemo scenarioId="office-duty-queue" />);
 
-    expect(await screen.findByText("Sin rol asignado")).toBeVisible();
-    expect(screen.getByText("Su usuario aún no tiene un rol asignado en Ambiente. Solicite a un administrador que se lo asigne y vuelva a ingresar.")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Reintentar carga" })).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/no-role"));
+    expect(screen.queryByText("Sin rol asignado")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Servicios" })).not.toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
   it("re-reads the roles after a ROLE_REQUIRED 403 and recomputes the actor without reloading", async () => {
@@ -116,7 +119,7 @@ describe("FoundationDemo", () => {
   it("updates the Field crew and member actions after an activity pulse", async () => {
     server.use(
       http.get("*/api/mock/scenarios/field-crew-leader-route", () => HttpResponse.json(scenarios.fieldCrewLeader)),
-      http.get("*/api/session", () => HttpResponse.json({ session: { mode: "backend-development", roles: ["M6_CAMPO_CUADRILLA"], crew: { id: "crew-c", name: "Cuadrilla nueva" }, fieldRole: "CREW_MEMBER" } })),
+      http.get("*/api/session", () => HttpResponse.json({ session: { mode: "real-m1", roles: ["M6_CAMPO_CUADRILLA"], crew: { id: "crew-c", name: "Cuadrilla nueva" }, fieldRole: "CREW_MEMBER" } })),
     );
     render(<FoundationDemo scenarioId="field-crew-leader-route" />);
     expect(await screen.findByText(/Cuadrilla B · Fernández/)).toBeVisible();

@@ -6,17 +6,16 @@ import {
 } from "node:crypto";
 import { cookies } from "next/headers";
 
-import { demoSigningConfigured, signDemoJwt } from "./demo-jwt";
 import { m6RoleSchema, type M6Role } from "./m6-roles";
 import { getScenario, type Capability, type ScenarioCrew, type ScenarioId } from "./scenarios";
 import { AUTH_COOKIE_NAME, SESSION_MARKER_COOKIE_NAME } from "./session-config";
 
-export { AUTH_COOKIE_NAME, SESSION_MARKER_COOKIE_NAME } from "./session-config";
+export { AUTH_COOKIE_NAME, SESSION_MARKER_COOKIE_NAME, isDeployedAuthModeMisconfigured } from "./session-config";
 
 export const SESSION_IDLE_MS = 30 * 60 * 1000;
 export const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
 
-export type AuthMode = "mock" | "backend-development" | "real-m1";
+export type AuthMode = "mock" | "real-m1";
 export type SupportedAuthMode = AuthMode;
 
 export type SessionIdentity = {
@@ -36,16 +35,13 @@ export type Session = {
   accessToken?: string;
   /** Token de renovación de M1 (`X-Refresh-Token`, 7 días). Solo existe si el login lo trajo; nunca llega al navegador. */
   refreshToken?: string;
-  /**
-   * Quién emite el material de token. `m1` (login real, #145) habilita la renovación; M6_DEV_JWT nunca.
-   * `demo`: la sesión no guarda token, el BFF firma uno corto por pedido (demo-jwt.ts) y el vencimiento del token no la cierra.
-   */
-  source?: "m1" | "demo";
+  /** Quién emite el material de token: `m1` (login real, #145) habilita la renovación. */
+  source?: "m1";
   /** Identidad validada por el token M1 y confirmada por Backend GET /me. */
   identity?: SessionIdentity;
-  /** Roles de M6 efectivos: en modo backend los trae GET /me (login y refresco); en mock, el fixture del escenario. */
+  /** Roles de M6 efectivos: en real-m1 los trae GET /me (login y refresco); en mock, el fixture del escenario. */
   roles: M6Role[];
-  /** Cuadrilla y función informadas por GET /me en modo backend. */
+  /** Cuadrilla y función informadas por GET /me en real-m1. */
   crew?: ScenarioCrew;
   fieldRole?: "CREW_LEADER" | "CREW_MEMBER";
 };
@@ -97,17 +93,12 @@ export class CitizenForbiddenError extends ForbiddenSessionError {
 type SessionOptions = {
   mode: AuthMode;
   now?: number;
-  devJwt?: string;
-  backendOrigin?: string;
-  /** Firmar un token por pedido con M6_JWT_SECRET en lugar de reenviar M6_DEV_JWT. */
-  demoSigning?: boolean;
-  /** Roles de GET /me; sin ellos, los del fixture del escenario (mock y tests). */
+  /** Sin ellos, los del fixture del escenario (mock y tests). */
   roles?: readonly M6Role[];
 };
 
 type RuntimeEnvironment = {
   M6_AUTH_MODE?: string;
-  M6_DEV_JWT?: string;
   M6_SESSION_SECRET?: string;
   NODE_ENV?: string;
 };
@@ -117,12 +108,9 @@ const sessionKeySalt = Buffer.from("m6-bff-session-key-salt-v1", "utf8");
 const sessionKeyInfo = Buffer.from("aes-256-gcm cookie encryption v1", "utf8");
 
 export function getAuthMode(environment: RuntimeEnvironment = process.env): AuthMode {
-  const configuredMode = environment.M6_AUTH_MODE;
-  if (configuredMode === "mock" || configuredMode === "backend-development" || configuredMode === "real-m1") {
-    return configuredMode;
-  }
-
-  return environment.NODE_ENV === "production" ? "real-m1" : "mock";
+  // Desplegado (producción/preview): real-m1 es el único modo. Cualquier otro valor falla cerrado (503 en el login, error al arrancar).
+  if (environment.NODE_ENV === "production") return "real-m1";
+  return environment.M6_AUTH_MODE === "real-m1" ? "real-m1" : "mock";
 }
 
 export function createSession(
@@ -134,57 +122,16 @@ export function createSession(
   const roles = [...(options.roles ?? getScenario(scenarioId).roles)];
 
   if (options.mode === "real-m1") {
-    throw new AuthUnavailableError("La autenticación real de M1 permanece bloqueada hasta publicar su contrato.");
-  }
-
-  if (options.mode === "mock") {
-    return {
-      mode: options.mode,
-      scenarioId,
-      issuedAt: now,
-      lastActivityAt: now,
-      absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
-      jwtExpiresAt: now + SESSION_ABSOLUTE_MS,
-      roles,
-    };
-  }
-
-  if (options.demoSigning) {
-    if (!options.backendOrigin) throw new AuthUnavailableError("El backend de desarrollo no está configurado.");
-    return {
-      mode: options.mode,
-      scenarioId,
-      issuedAt: now,
-      lastActivityAt: now,
-      absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
-      jwtExpiresAt: now + SESSION_ABSOLUTE_MS,
-      source: "demo",
-      roles,
-    };
-  }
-
-  const accessToken = options.devJwt;
-  if (!accessToken) {
-    throw new AuthUnavailableError("El modo de desarrollo requiere M6_DEV_JWT en el servidor.");
-  }
-
-  if (!options.backendOrigin) {
-    throw new AuthUnavailableError("El backend de desarrollo no está configurado.");
-  }
-
-  const jwtExpiresAt = readJwtExpiry(accessToken);
-  if (jwtExpiresAt === undefined || jwtExpiresAt <= now) {
-    throw new AuthUnavailableError("M6_DEV_JWT no tiene una expiración válida.");
+    throw new AuthUnavailableError("Las sesiones de real-m1 se crean con createM1Session tras el login contra M1.");
   }
 
   return {
-    mode: options.mode,
+    mode: "mock",
     scenarioId,
     issuedAt: now,
     lastActivityAt: now,
     absoluteExpiresAt: now + SESSION_ABSOLUTE_MS,
-    jwtExpiresAt,
-    accessToken,
+    jwtExpiresAt: now + SESSION_ABSOLUTE_MS,
     roles,
   };
 }
@@ -212,22 +159,11 @@ export function createM1Session(options: {
   };
 }
 
-/** El token con el que el BFF habla con el backend: el de la sesión, o uno recién firmado si la sesión es de demo. */
-export function sessionToken(session: Session): string | undefined {
-  if (session.accessToken || session.source !== "demo") return session.accessToken;
-  // Sesión demo viva pero sin la clave de firma (se quitó la variable): se trata como sesión caída, no como un 500.
-  if (!demoSigningConfigured()) throw new InvalidSessionError("La firma de demo ya no está configurada.");
-  if (!session.scenarioId) throw new InvalidSessionError("La sesión de demo no tiene un escenario.");
-  return signDemoJwt(session.scenarioId);
-}
-
 export function effectiveSessionExpiry(session: Session): number {
-  // Demo firma por pedido. M1 renueva el token dentro de la sesión; su expiración no cierra la cookie.
+  // M1 renueva el token dentro de la sesión; su expiración no cierra la cookie.
   if (session.source === "m1") {
     return Math.min(session.lastActivityAt + SESSION_IDLE_MS, session.absoluteExpiresAt);
   }
-  // La sesión de demo no depende del token (se firma por pedido) ni se corta por inactividad: vale el tope absoluto.
-  if (session.source === "demo") return session.absoluteExpiresAt;
   return Math.min(
     session.jwtExpiresAt,
     session.lastActivityAt + SESSION_IDLE_MS,
@@ -279,7 +215,7 @@ export function sealSession(session: Session, secret = sessionSecret()): string 
  * Deja la cookie renovada en la respuesta del route handler, arme la respuesta que la arme (Next la fusiona al
  * enviarla). Fuera de un pedido de Next (tests, scripts) no hay store de cookies y no hace nada.
  */
-export async function persistRenewedSession(session: Session): Promise<void> {
+export async function persistRenewedSession(session: Session, request?: Request): Promise<void> {
   let value: string;
   try {
     value = sealSession(session);
@@ -288,7 +224,7 @@ export async function persistRenewedSession(session: Session): Promise<void> {
     throw new BackendUnavailableError(502, "La sesión renovada es demasiado grande para la cookie.", { cause: error });
   }
   try {
-    (await cookies()).set({ name: AUTH_COOKIE_NAME, value, ...sessionCookieOptions(session) });
+    (await cookies()).set({ name: AUTH_COOKIE_NAME, value, ...sessionCookieOptions(session, request) });
   } catch {
     // Sin contexto de pedido de Next: los caminos explícitos (forwardResponse, /api/session) sellan igual.
   }
@@ -327,7 +263,7 @@ export function getSessionFromCookieValue(
 // Sesión renovada contra M1 durante un pedido: el resto del pedido ve los tokens nuevos, no los de la cookie.
 const renewedRequestSessions = new WeakMap<Request, Session>();
 // Respuesta que debe llevar la cookie resellada con esa sesión (la aplica forwardResponse).
-const renewedResponseSessions = new WeakMap<Response, Session>();
+const renewedResponseSessions = new WeakMap<Response, { session: Session; request: Request }>();
 
 export function rememberRenewedSession(request: Request, session: Session): void {
   renewedRequestSessions.set(request, session);
@@ -337,12 +273,16 @@ export function wasSessionRenewed(request: Request): boolean {
   return renewedRequestSessions.has(request);
 }
 
-export function rememberRenewedResponse(response: Response, session: Session): void {
-  renewedResponseSessions.set(response, session);
+export function rememberRenewedResponse(response: Response, session: Session, request: Request): void {
+  renewedResponseSessions.set(response, { session, request });
 }
 
 export function renewedSessionForResponse(response: Response): Session | undefined {
-  return renewedResponseSessions.get(response);
+  return renewedResponseSessions.get(response)?.session;
+}
+
+export function renewedRequestForResponse(response: Response): Request | undefined {
+  return renewedResponseSessions.get(response)?.request;
 }
 
 export function getSessionFromRequest(
@@ -363,10 +303,8 @@ export function getSessionFromRequest(
   return getSessionFromCookieValue(cookieValue, secret, now);
 }
 
-export function getRequiredSession(request: Request): Session & { scenarioId: ScenarioId } {
-  const session = requireSession(getSessionFromRequest(request));
-  if (!session.scenarioId) throw new ForbiddenSessionError("La sesión no tiene un escenario operativo asignado.");
-  return session as Session & { scenarioId: ScenarioId };
+export function getRequiredSession(request: Request): Session {
+  return requireSession(getSessionFromRequest(request));
 }
 
 export async function getSession(
@@ -377,10 +315,10 @@ export async function getSession(
   return getSessionFromCookieValue(cookieStore.get(AUTH_COOKIE_NAME)?.value, secret, now);
 }
 
-export function sessionCookieOptions(session: Session) {
+export function sessionCookieOptions(session: Session, request?: Request) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(request),
     sameSite: "lax" as const,
     path: "/",
     maxAge: Math.max(0, Math.ceil((effectiveSessionExpiry(session) - Date.now()) / 1000)),
@@ -388,12 +326,31 @@ export function sessionCookieOptions(session: Session) {
 }
 
 /** Marca de "ya ingresó": vive lo que el tope de la sesión y la lee el proxy. */
-export function sessionMarkerCookieOptions() {
-  return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: SESSION_ABSOLUTE_MS / 1000 };
+export function sessionMarkerCookieOptions(request?: Request) {
+  return { httpOnly: true, secure: shouldUseSecureCookie(request), sameSite: "lax" as const, path: "/", maxAge: SESSION_ABSOLUTE_MS / 1000 };
 }
 
-export function sessionCookieRemovalOptions() {
-  return { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", maxAge: 0 };
+export function sessionCookieRemovalOptions(request?: Request) {
+  return { httpOnly: true, secure: shouldUseSecureCookie(request), sameSite: "lax" as const, path: "/", maxAge: 0 };
+}
+
+function shouldUseSecureCookie(request?: Request): boolean {
+  if (process.env.NODE_ENV === "production") return true;
+  if (!request) return false;
+  try {
+    return !isLoopbackHostname(new URL(request.url).hostname);
+  } catch {
+    return true;
+  }
+}
+
+export function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host === "::1") return true;
+  const octets = host.split(".");
+  return octets.length === 4 &&
+    Number(octets[0]) === 127 &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255);
 }
 
 export function sessionSecret(environment: RuntimeEnvironment = process.env): string {
@@ -433,20 +390,22 @@ export function readJwtExpiry(token: string): number | undefined {
 /** `sub` como texto (M1 lo manda numérico o string); undefined si no se puede leer. */
 export function readJwtSubject(token: string): string | undefined {
   const sub = readJwtPayload(token)?.sub;
-  return typeof sub === "string" || typeof sub === "number" ? String(sub) : undefined;
+  if (typeof sub === "string" && /^\d{1,19}$/.test(sub)) return BigInt(sub).toString();
+  if (typeof sub === "number" && Number.isSafeInteger(sub) && sub >= 0) return BigInt(sub).toString();
+  return undefined;
 }
 
 function isSession(value: Partial<Session>): value is Session {
   return (
-    (value.mode === "mock" || value.mode === "backend-development" || value.mode === "real-m1") &&
+    (value.mode === "mock" || value.mode === "real-m1") &&
     (typeof value.scenarioId === "string" || (value.mode === "real-m1" && value.scenarioId === undefined)) &&
     typeof value.issuedAt === "number" &&
     typeof value.lastActivityAt === "number" &&
     typeof value.absoluteExpiresAt === "number" &&
     typeof value.jwtExpiresAt === "number" &&
     m6RoleSchema.array().safeParse(value.roles).success &&
-    (value.mode === "mock" || value.source === "demo" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
-    (value.source === undefined || ((value.source === "m1" || value.source === "demo") && value.mode !== "mock")) &&
+    (value.mode === "mock" ? value.accessToken === undefined : typeof value.accessToken === "string") &&
+    (value.source === undefined || (value.source === "m1" && value.mode !== "mock")) &&
     (value.refreshToken === undefined || (value.mode !== "mock" && typeof value.refreshToken === "string")) &&
     (value.mode !== "real-m1" || (
       value.source === "m1" &&

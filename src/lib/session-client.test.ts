@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { broadcastLogout, onRemoteLogout } from "./session-client";
+import { broadcastLogout, onRemoteLogout, registerSessionLogoutCleanup } from "./session-client";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -46,6 +46,24 @@ describe("cross-tab session logout", () => {
     await broadcastLogout();
 
     expect(assignMock).toHaveBeenCalledWith("/login");
+  });
+
+  it("clears local session state before requesting server logout", async () => {
+    const order: string[] = [];
+    const stopCleanup = registerSessionLogoutCleanup(() => order.push("clear"));
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      order.push("request");
+      return new Response(null, { status: 200 });
+    });
+    mockLocationAssign();
+
+    try {
+      await broadcastLogout();
+    } finally {
+      stopCleanup();
+    }
+
+    expect(order).toEqual(["clear", "request"]);
   });
 
   it("lets another tab listen for a remote logout and unsubscribe", async () => {

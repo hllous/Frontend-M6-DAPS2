@@ -46,7 +46,6 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
   resetEnvironmentalReportFixtures();
@@ -154,8 +153,8 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
 
   it("forwards an authorized backend notice lookup with its id and GET method", async () => {
     const id = "inspection_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, noticeNumber: "ACTA-2026-001" }));
 
     const response = await GET(
@@ -172,8 +171,8 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
   it("denies backend notice reads without violationNotice:view before forwarding", async () => {
     const cookie = await loginAs("office-limited-intake", {
       roles: ["M6_OFICINA_OPERACIONES"],
-      mode: "backend-development",
-      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      mode: "real-m1",
+      accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch");
@@ -186,8 +185,8 @@ describe("/api/environmental-inspections/:id/violation-notice", () => {
 
   it("fails closed when backend mode has no backend origin", async () => {
     const cookie = createSessionCookie("office-duty-queue", {
-      mode: "backend-development",
-      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      mode: "real-m1",
+      accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
       backendOrigin: "https://backend.internal",
     });
     delete process.env.M6_BACKEND_ORIGIN;

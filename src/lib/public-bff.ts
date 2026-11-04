@@ -28,7 +28,12 @@ export function publicError(status: number, message: string, path: string, retry
   return withCacheControl(response);
 }
 
-/** IP del vecino según la plataforma (primer salto de `X-Forwarded-For`). */
+/**
+ * IP del vecino según la plataforma (primer salto de `X-Forwarded-For`).
+ * En Vercel es confiable: la plataforma sobrescribe el header con la IP pública del cliente y no reenvía IPs externas
+ * (vercel.com/docs/headers/request-headers#x-forwarded-for; `x-real-ip` es idéntico). Fuera de Vercel (Docker, local) nada
+ * lo garantiza: un cliente podría mandarlo, así que ahí la IP solo sirve si un proxy propio lo sobrescribe.
+ */
 function residentIp(request: Request): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   return forwarded || request.headers.get("x-real-ip")?.trim() || undefined;
@@ -42,6 +47,9 @@ export async function fetchPublicBackend(request: Request, resourcePath: string)
   const headers = new Headers({ accept: "application/json" });
   const ip = residentIp(request);
   if (ip) headers.set("x-forwarded-for", ip);
+  // Con la clave el backend cree esa IP para su límite de tasa; sin ella cuenta la del BFF. Solo servidor, solo rutas públicas.
+  const bffKey = process.env.BFF_SHARED_KEY?.trim();
+  if (bffKey) headers.set("x-m6-bff-key", bffKey);
   try {
     return await fetch(new URL(resourcePath, origin), {
       method: "GET",

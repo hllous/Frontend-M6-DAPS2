@@ -500,7 +500,16 @@ describe("ReferralsWorkspace", () => {
   it("labels an EXPIRED closure as Vencido and warns when the BFF dropped unreadable records", async () => {
     const closure = fixtureReferrals().find((referral) => referral.kind === "STREET_CLOSURE_REQUEST");
     if (!closure || closure.kind !== "STREET_CLOSURE_REQUEST") throw new Error("Expected a closure fixture");
-    const expired = { ...closure, status: "EXPIRED", request: { ...closure.request, status: "EXPIRED" } };
+    const expired = {
+      ...closure,
+      status: "EXPIRED",
+      request: {
+        ...closure.request,
+        status: "EXPIRED",
+        approvedFrom: "2026-10-01T09:00:00.000Z",
+        approvedTo: "2026-10-01T12:00:00.000Z",
+      },
+    };
     server.use(http.get("*/api/referrals", () => HttpResponse.json({ data: [expired], meta: { total: 1, invalid: 2 } })));
     const user = userEvent.setup();
     render(<ReferralsWorkspace scenario={scenarios.officeDutyQueue} />);
@@ -511,6 +520,8 @@ describe("ReferralsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: new RegExp(`Corte de calle · ${street}`) }));
     const detail = await screen.findByRole("region", { name: `Detalle de Corte de calle · ${street}` });
     expect(within(detail).getByRole("status", { name: "Estado: Vencido" })).toBeVisible();
+    expect(within(detail).getByText("Período autorizado")).toBeVisible();
+    expect(within(detail).getByText("01/10/2026 06:00 – 01/10/2026 09:00")).toBeVisible();
   });
 });
 

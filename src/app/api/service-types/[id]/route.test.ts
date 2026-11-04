@@ -7,7 +7,6 @@ import { loginAs } from "@/test/session";
 beforeEach(() => resetServiceTypeFixtures());
 afterEach(() => {
   delete process.env.M6_AUTH_MODE;
-  delete process.env.M6_DEV_JWT;
   delete process.env.M6_BACKEND_ORIGIN;
   vi.restoreAllMocks();
 });
@@ -51,8 +50,8 @@ describe("/api/service-types/[id]", () => {
 
   it("forwards an authorized backend service-type deactivation with its id and DELETE method", async () => {
     const id = "st-encoded_42.3~";
-    const devJwt = "header.eyJleHAiOjE4MDAwMDAwMDB9.signature";
-    const cookie = await loginAs("office-duty-queue", { mode: "backend-development", devJwt, backendOrigin: "https://backend.internal" });
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id, active: false }));
 
     const response = await DELETE(
@@ -68,8 +67,8 @@ describe("/api/service-types/[id]", () => {
 
   it("denies a backend session without serviceType:manage before forwarding", async () => {
     const cookie = await loginAs("office-limited-intake", {
-      mode: "backend-development",
-      devJwt: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+      mode: "real-m1",
+      accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch");

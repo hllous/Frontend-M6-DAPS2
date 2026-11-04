@@ -52,6 +52,9 @@ function discoverApiRoutes(dir: string, segments: string[] = []): string[] {
 }
 
 export default async function globalSetup(config: FullConfig) {
+  // A real-m1-only run (E2E_TARGET=real-m1) starts no mock frontend to warm up.
+  if (process.env.E2E_TARGET === "real-m1") return;
+
   const baseURL = config.projects[0]?.use.baseURL;
   if (!baseURL) return;
 

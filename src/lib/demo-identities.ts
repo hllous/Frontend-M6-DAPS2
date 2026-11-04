@@ -1,6 +1,6 @@
 import type { ScenarioId } from "./scenarios";
 
-// Datos puros (sin node:crypto): los lee también el navegador. La firma vive en demo-jwt.ts, solo servidor.
+// Datos puros (sin node:crypto): los lee también el navegador. 
 
 /** Persona del seed del backend (prisma/seed.ts): `sub` numérico de M1 y el rol de M1 que le permite sus roles de M6. */
 export type DemoIdentity = { sub: string; m1Role: "RESPONSABLE_AREA" | "ADMINISTRATIVO" | "AUDITOR" | "CIUDADANO"; name: string };
