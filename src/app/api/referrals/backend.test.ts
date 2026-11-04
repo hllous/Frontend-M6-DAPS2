@@ -379,7 +379,7 @@ describe("referrals against the backend", () => {
     const response = await getDetail(await loginAs("office-duty-queue"));
 
     expect(response.status).toBe(status);
-    expect(await response.json()).toEqual(payload);
+    expect(await response.json()).toEqual({ ...payload, message: "No se pudo obtener la información. Reintente en unos segundos." });
     expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 

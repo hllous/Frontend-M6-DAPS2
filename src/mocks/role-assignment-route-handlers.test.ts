@@ -175,7 +175,11 @@ describe("respuestas del backend", () => {
             const body = await response.json();
             if (status === 200 && path) expect(body).toMatchObject({ userId: "42", roles: ["M6_AUDITOR"] });
             else if (status === 200) expect(body).toMatchObject({ data: [], meta: { page: 1, pageSize: 10 } });
-            else expect(body).toMatchObject({ message: `backend ${status}` });
+            else expect(body).toMatchObject({ message: method === "GET"
+              ? "No se pudo obtener la información. Reintente en unos segundos."
+              : status < 500
+                ? "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."
+                : "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar." });
           }
         }
       }

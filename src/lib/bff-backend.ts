@@ -38,7 +38,7 @@ async function clarifyBackendError(response: Response, method: string): Promise<
   if (!values.some((value) => typeof value === "string" && /\bm[oó]dulo\s+[1-9]\b|\bM[1-9]\b|backend|\b(?:workOrderId|closureId|ticketId|serviceId|zoneId)\b/i.test(value))) return response;
   const replacement = ["GET", "HEAD"].includes(method.toUpperCase())
     ? "No se pudo obtener la información. Reintente en unos segundos."
-    : [400, 422].includes(response.status)
+    : response.status >= 400 && response.status < 500
       ? "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."
       : "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar.";
   const headers = new Headers(response.headers);

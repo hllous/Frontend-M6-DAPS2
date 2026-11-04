@@ -111,7 +111,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
     const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual(error);
+    expect(await response.json()).toEqual({ ...error, message: "No se pudo obtener la información. Reintente en unos segundos." });
     expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 
