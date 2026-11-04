@@ -1,0 +1,30 @@
+# Deja Chromium de Playwright listo (dependencias del sistema + navegador en caché).
+# Requiere setup-node-pnpm ejecutado antes.
+name: Setup Playwright Chromium
+description: Restaura la caché del navegador e instala Chromium y sus dependencias del sistema.
+
+runs:
+  using: composite
+  steps:
+    - name: Read Playwright version
+      id: playwright-version
+      shell: bash
+      run: |
+        version=$(node -p "require('@playwright/test/package.json').version")
+        printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Playwright browser cache
+      id: cache-playwright
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.version }}
+
+    - name: Install Playwright system dependencies
+      shell: bash
+      run: pnpm exec playwright install-deps chromium
+
+    - name: Install Playwright Chromium
+      if: ${{ steps.cache-playwright.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: pnpm exec playwright install chromium
