@@ -355,7 +355,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-canvas)]">
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-end justify-between gap-4">
+        <div className="mx-auto flex w-full flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Control ambiental</h1>
           </div>
@@ -363,7 +363,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:px-6 sm:pt-5 sm:pb-6 lg:px-8 lg:pb-8">
+      <div className="mx-auto flex w-full flex-1 flex-col gap-5 p-4 sm:px-6 sm:pt-5 sm:pb-6 lg:px-8 lg:pb-8">
         <div role="status" className="sr-only">{announcement}</div>
         {!rangeError && loadState.status === "ready" && <DroppedRecordsAlert count={loadState.dropped} />}
         {scenario.actor.kind === "OFFICE" && <QueueFilters from={filterFrom} to={filterTo} rangeError={rangeError} onFrom={(value) => { setFilterFrom(value); setQueuePage(1); }} onTo={(value) => { setFilterTo(value); setQueuePage(1); }} onClearDates={() => { setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} filterStatus={filterStatus} filterType={filterType} filterPriority={filterPriority} search={search} onStatus={(value) => { setFilterStatus(value); setQueuePage(1); }} onType={(value) => { setFilterType(value); setQueuePage(1); }} onPriority={(value) => { setFilterPriority(value); setQueuePage(1); }} onSearch={(value) => { setSearch(value); setQueuePage(1); }} />}
