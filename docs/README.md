@@ -18,6 +18,7 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 - [adr/README.md](adr/README.md): índice de decisiones técnicas del proyecto.
 - [agents/README.md](agents/README.md): índice de guías de trabajo del repositorio.
 - [backend-context/](backend-context/README.md): espejo de contexto y API del backend. Es de solo lectura; ante una diferencia, corregir la fuente del backend y volver a copiarlo.
+- [manual-de-usuario/](manual-de-usuario/manual-de-usuario.md): espejo del manual de usuario del Backend, organizado por tareas, con capturas. Solo lectura; se edita en el Backend.
 - [design/examples/](design/examples/README.md): ejemplos verificables del estándar de [DESIGN](../DESIGN.md).
 - [operations/deploy.md](operations/deploy.md): estado y procedimiento de despliegue.
 - [operations/external-contracts.md](operations/external-contracts.md): contratos externos, evidencia y estado de GA.
