@@ -73,6 +73,7 @@ import {
   buildZoneGroups,
   countActiveFilters,
   emptyColumnFilters,
+  isLateService,
   zoneGroupsFromServices,
   type ZoneGroup,
 } from "./services-filters";
@@ -229,7 +230,7 @@ export function ServicesWorkspace({
     const crews = new Set(getAllParams("crew"));
     const timeFrom = getParam("timeFrom") ?? "";
     const timeTo = getParam("timeTo") ?? "";
-    return { zones, statuses, crews, timeFrom, timeTo };
+    return { zones, statuses, crews, timeFrom, timeTo, late: getParam("late") === "true" };
   });
 
   // Selection & Detail
@@ -471,6 +472,7 @@ export function ServicesWorkspace({
     columnFilters.crews.forEach((cr) => newParams.append("crew", cr));
     if (columnFilters.timeFrom) newParams.set("timeFrom", columnFilters.timeFrom);
     if (columnFilters.timeTo) newParams.set("timeTo", columnFilters.timeTo);
+    if (columnFilters.late) newParams.set("late", "true");
 
     if (isScheduleOpen) {
       newParams.set("action", "schedule");
@@ -533,6 +535,8 @@ export function ServicesWorkspace({
         if (!columnFilters.statuses.has(service.status)) return false;
       }
 
+      if (columnFilters.late && !isLateService(service)) return false;
+
       // Column: Crew
       if (columnFilters.crews.size > 0) {
         const crewDisplay = service.crewName ?? "Sin asignar";
@@ -561,7 +565,7 @@ export function ServicesWorkspace({
   );
   // Paginación de la tabla sobre lo ya cargado y filtrado; el mapa sigue mostrando todo el período.
   // La página vuelve a 1 cuando cambia la búsqueda, un filtro, el orden o el período; también al elegir un servicio que está en otra página.
-  const pageKey = [search, [...columnFilters.statuses].join(","), [...columnFilters.zones].join(","), [...columnFilters.crews].join(","), columnFilters.timeFrom, columnFilters.timeTo, sortKey, sortDir, activePeriod].join("|");
+  const pageKey = [search, [...columnFilters.statuses].join(","), [...columnFilters.zones].join(","), [...columnFilters.crews].join(","), columnFilters.timeFrom, columnFilters.timeTo, columnFilters.late, sortKey, sortDir, activePeriod].join("|");
   const [pageState, setPageState] = useState({ page: 1, key: pageKey, revealedId: null as string | null });
   const initialPageKey = useRef(pageKey);
   const pageRestored = useRef(false);

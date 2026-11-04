@@ -52,6 +52,8 @@ export type ColumnFilters = {
   crews: Set<string>;
   timeFrom: string;
   timeTo: string;
+  /** Solo servicios terminados después de su fecha programada. */
+  late: boolean;
 };
 
 type ColumnPointerDrag = {

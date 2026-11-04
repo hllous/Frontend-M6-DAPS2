@@ -69,8 +69,8 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
         value: compliance.finished.late,
         previous: compliance.previous?.totals.finished.late ?? null,
         context: withTarget(`A tiempo ${plainNumber(compliance.finished.onTimePct, 1)} %`, compliance.targets?.compliancePct?.value),
-        href: `/app?destination=services&status=COMPLETED&status=PARTIALLY_COMPLETED&periodo=${periodo}`,
-        linkLabel: "Ver lista de servicios finalizados del período",
+        href: `/app?destination=services&late=true&periodo=${periodo}`,
+        linkLabel: "Ver lista de servicios fuera de horario",
       }
       : { id: "late", family: "compliance", label: "Servicios fuera de horario" },
     incidents

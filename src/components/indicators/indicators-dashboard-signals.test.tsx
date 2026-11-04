@@ -60,7 +60,7 @@ describe("Requiere atención", () => {
     const hrefs = links.map((link) => link.getAttribute("href"));
     expect(hrefs[0]).toContain("destination=services");
     expect(hrefs[0]).toContain("status=PARTIALLY_COMPLETED");
-    expect(hrefs[1]).toContain("destination=services");
+    expect(hrefs[1]).toBe("/app?destination=services&late=true&periodo=mes");
     expect(hrefs[2]).toBe("/app/catalog/containers?status=OVERFLOWED");
   });
 
