@@ -6,7 +6,7 @@ const PASSWORD = "m6-dev-796";
 
 async function enterCredentials(page: import("@playwright/test").Page, email: string, password = PASSWORD) {
   const emailInput = page.getByRole("textbox", { name: "Correo electrónico" });
-  const passwordInput = page.getByLabel("Contraseña");
+  const passwordInput = page.getByLabel("Contraseña", { exact: true });
   await emailInput.click();
   await emailInput.pressSequentially(email);
   await passwordInput.click();
@@ -29,7 +29,7 @@ test.describe("Ingreso real con M1", () => {
     const emailInput = page.getByRole("textbox", { name: "Correo electrónico" });
     await emailInput.click();
     await emailInput.pressSequentially("carlos.rodriguez@m6.local");
-    const passwordInput = page.getByLabel("Contraseña");
+    const passwordInput = page.getByLabel("Contraseña", { exact: true });
     await passwordInput.click();
     await passwordInput.pressSequentially(PASSWORD);
     await page.getByRole("button", { name: "Ingresar al sistema" }).click();
@@ -52,7 +52,7 @@ test.describe("Ingreso real con M1", () => {
 
     await expect(page.getByText("El correo o la contraseña no son correctos.")).toBeVisible();
     await expect(page.getByLabel("Correo electrónico")).toHaveValue("carlos.rodriguez@m6.local");
-    await expect(page.getByLabel("Contraseña")).toHaveValue("");
+    await expect(page.getByLabel("Contraseña", { exact: true })).toHaveValue("");
     await expectNoSessionCookie(context);
   });
 

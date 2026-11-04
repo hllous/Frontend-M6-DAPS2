@@ -21,7 +21,7 @@ describe("LoginForm", () => {
 
     render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
     expect(screen.getByRole("heading", { name: "Ingresar" })).toBeVisible();
-    expect(screen.getByText("Ambiente e Higiene")).toBeVisible();
+    expect(screen.getByText("Ambiente, Higiene y Servicios Urbanos")).toBeVisible();
     expect(screen.queryByText("Ambiente y servicios")).not.toBeInTheDocument();
     expect(screen.queryByText("Seleccione un escenario de trabajo para abrir una sesión protegida.")).not.toBeInTheDocument();
     expect(screen.queryByText("El alcance de la sesión se limita al escenario elegido.")).not.toBeInTheDocument();
@@ -109,6 +109,37 @@ describe("LoginForm", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo ingresar. Revise la conexión e intente nuevamente.");
     fetchMock.mockRestore();
+  });
+
+  it("presents the institutional portal without options M1 may not support", () => {
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="real-m1" redirectTo="/app" />);
+
+    expect(screen.getByText("Módulo 6")).toBeInTheDocument();
+    expect(screen.getByText("Acceso para empleados municipales y empresas contratistas")).toBeVisible();
+    expect(screen.getByText("Ingrese con sus credenciales del Módulo 1.")).toBeVisible();
+    expect(screen.getByText("Desarrollo de Aplicaciones II · UADE · Grupo 4")).toBeInTheDocument();
+    expect(screen.queryByText("Mantener sesión iniciada")).not.toBeInTheDocument();
+    expect(screen.queryByText("¿Olvidó su contraseña?")).not.toBeInTheDocument();
+    expect(screen.queryByText(/no tiene usuarios propios/)).not.toBeInTheDocument();
+  });
+
+  it("does not mention Module 1 credentials in the demo profile mode", () => {
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="mock" redirectTo="/app" />);
+
+    expect(screen.queryByText(/credenciales del Módulo 1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/administrador del Módulo 1/)).not.toBeInTheDocument();
+  });
+
+  it("lets the person reveal and hide the password", async () => {
+    const user = userEvent.setup();
+    render(<LoginForm scenarios={Object.values(scenarios)} authMode="real-m1" redirectTo="/app" />);
+    const password = screen.getByLabelText("Contraseña");
+
+    expect(password).toHaveAttribute("type", "password");
+    await user.click(screen.getByRole("button", { name: "Mostrar contraseña" }));
+    expect(password).toHaveAttribute("type", "text");
+    await user.click(screen.getByRole("button", { name: "Ocultar contraseña" }));
+    expect(password).toHaveAttribute("type", "password");
   });
 
   it("shows the real credential form without the demo persona picker", () => {
