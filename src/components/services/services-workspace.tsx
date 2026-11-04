@@ -64,6 +64,11 @@ import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import styles from "./services-workspace.module.css";
 import { ServicesFilterBar } from "./services-filter-bar";
 import {
+  readServicesListCache,
+  servicesListCacheKey,
+  writeServicesListCache,
+} from "./services-list-cache";
+import {
   buildZoneGroups,
   countActiveFilters,
   emptyColumnFilters,
@@ -105,7 +110,7 @@ const periodItems: Record<Period, string> = {
 };
 
 function getWorkspaceSplitStorageKey(userId: string): string {
-  return `m6:services-workspace-split:v1:${encodeURIComponent(userId)}`;
+  return `m6:services-workspace-split:v2:${encodeURIComponent(userId)}`;
 }
 
 function readWorkspaceSplit(storageKey: string): Record<string, number> | null {
@@ -161,17 +166,30 @@ export function ServicesWorkspace({
     return [];
   }, [nextSearchParams]);
 
-  // Load state
-  const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
-  const loadedScopeRef = useRef<string | null>(null);
-  const [reloadVersion, setReloadVersion] = useState(0);
-  const [periodChoice, setPeriodChoice] = useState<Period | null>(() => {
+  // Quién pide la lista: la oficina entera o una cuadrilla. Con la misma clave se reusa la lista ya cargada en esta sesión.
+  const listScope = scenario?.actor.kind === "FIELD" ? `field:${scenario.actor.crewId ?? ""}` : "office";
+  const listUserId = scenario?.actor.userId ?? "user-lucia";
+  const [initialPeriodChoice] = useState<Period | null>(() => {
     const value = getParam("periodo");
     return value === "semana" || value === "mes" || value === "todo" ? value : null;
   });
-  const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? "todo");
+  const listKey = servicesListCacheKey(listUserId, listScope);
+  const [initialCached] = useState(() => readServicesListCache(listKey, initialPeriodChoice));
+  // Lista y período con los que se cargó lo que se muestra; la copia de la sesión se actualiza con cada cambio.
+  const loadedRef = useRef<{ key: string; choice: Period | null; period: Period } | null>(
+    initialCached ? { key: listKey, choice: initialPeriodChoice, period: initialCached.period } : null,
+  );
+
+  // Load state
+  const [loadState, setLoadState] = useState<LoadState>(
+    initialCached ? { status: "ready", services: initialCached.services, dropped: initialCached.dropped } : { status: "loading" },
+  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const loadedScopeRef = useRef<string | null>(initialCached ? listScope : null);
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const [periodChoice, setPeriodChoice] = useState<Period | null>(initialPeriodChoice);
+  const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? initialCached?.period ?? "todo");
   const handlePeriodChoiceChange = useCallback((period: Period) => {
     setActivePeriod(period);
     setPeriodChoice(period);
@@ -305,9 +323,11 @@ export function ServicesWorkspace({
   // Fetch all services
   useEffect(() => {
     let isCurrent = true;
-    const scopeKey = scenario?.actor.kind === "FIELD"
-      ? `field:${scenario.actor.crewId ?? ""}`
-      : "office";
+    const scopeKey = listScope;
+    // Volver a la pantalla no vuelve a pedir la lista (ya se muestra la de la visita anterior); «Reintentar» sí.
+    if (reloadVersion === 0 && loadedRef.current?.key === listKey && readServicesListCache(listKey, periodChoice)) {
+      return () => { isCurrent = false; };
+    }
     const keepCurrentWorkspace = loadedScopeRef.current === scopeKey;
     if (keepCurrentWorkspace) {
       setIsRefreshing(true);
@@ -364,6 +384,7 @@ export function ServicesWorkspace({
         if (totalPages > 20) throw new RangeError("Hay demasiados servicios en el período. Elija un período más corto.");
         if (isCurrent) {
           loadedScopeRef.current = scopeKey;
+          loadedRef.current = { key: listKey, choice: periodChoice, period };
           setLoadState({ status: "ready", services, dropped });
           setIsRefreshing(false);
           setRefreshError(null);
@@ -386,7 +407,15 @@ export function ServicesWorkspace({
     return () => {
       isCurrent = false;
     };
-  }, [reloadVersion, scenario, periodChoice]);
+  }, [reloadVersion, scenario, periodChoice, listScope, listKey]);
+
+  // Crear, asignar o editar un servicio cambia `loadState`: la copia de la sesión acompaña esos cambios.
+  useEffect(() => {
+    const loaded = loadedRef.current;
+    if (loadState.status === "ready" && loaded) {
+      writeServicesListCache(loaded.key, loaded.choice, { services: loadState.services, dropped: loadState.dropped, period: loaded.period });
+    }
+  }, [loadState]);
 
   const focusSelectedServiceAction = useCallback((id = selectedId) => {
     if (!id || typeof document === "undefined") return;
@@ -1173,14 +1202,14 @@ export function ServicesWorkspace({
           <div className={cn("relative min-h-0 min-w-0 flex-1", isNarrow ? styles.mobileWorkspaceLayout : styles.desktopWorkspaceLayout)}>
             <ResizablePanelGroup
               orientation="horizontal"
-              defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+              defaultLayout={{ "map-pane": 38, "table-pane": 62 }}
               className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
             >
-              <ResizablePanel id="map-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}>
+              <ResizablePanel id="map-pane" defaultSize="38%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileMapPanel)}>
                 <div className={cn("h-full min-h-0 min-w-0", !isNarrow && "p-3")}><MapPaneSkeleton className="rounded-2xl" /></div>
               </ResizablePanel>
               <ResizableHandle withHandle={false} disabled aria-label="Ajustar ancho del mapa" className={cn(styles.mobileResizeHandle, isNarrow && "hidden")} />
-              <ResizablePanel id="table-pane" defaultSize="50%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}>
+              <ResizablePanel id="table-pane" defaultSize="62%" minSize="30%" style={{ overflow: "hidden" }} className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}>
                 {isNarrow ? (
                   <InventoryMapDrawer ariaLabel="Lista de servicios" summary="Listado" snapState="half" className={styles.mobileServiceDrawer}>
                     <div className={styles.mobileDrawerContent}>
@@ -1217,7 +1246,7 @@ export function ServicesWorkspace({
               <ResizablePanelGroup
                 groupRef={panelGroupRef}
                 orientation="horizontal"
-                defaultLayout={{ "map-pane": 50, "table-pane": 50 }}
+                defaultLayout={{ "map-pane": 38, "table-pane": 62 }}
                 onLayoutChanged={handlePanelLayoutChanged}
                 className={cn("h-full min-w-0 flex-1", styles.panelGroup)}
                 aria-hidden={Boolean(isNarrow && selectedService) || undefined}
@@ -1225,7 +1254,7 @@ export function ServicesWorkspace({
               >
                 <ResizablePanel
                   id="map-pane"
-                  defaultSize="50%"
+                  defaultSize="38%"
                   minSize="30%"
                   style={{ overflow: "hidden" }}
                   aria-hidden={Boolean(isNarrow && mobileDrawerSnap === "full") || undefined}
@@ -1254,7 +1283,7 @@ export function ServicesWorkspace({
 
                 <ResizablePanel
                   id="table-pane"
-                  defaultSize="50%"
+                  defaultSize="62%"
                   minSize="30%"
                   style={{ overflow: "hidden" }}
                   className={cn("min-h-0 min-w-0 overflow-hidden", isNarrow && styles.mobileTablePanel)}

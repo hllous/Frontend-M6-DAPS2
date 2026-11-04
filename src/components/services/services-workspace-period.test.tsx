@@ -7,6 +7,7 @@ import { ServiceRequestError, servicesAdapter } from "@/lib/services";
 import { scenarios } from "@/lib/scenarios";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
+import { invalidateServicesListCache } from "./services-list-cache";
 import { choosePeriod, periodSelect } from "./services-period-test-helpers";
 
 const server = setupServer(...handlers);
@@ -15,6 +16,7 @@ afterAll(() => server.close());
 
 afterEach(() => {
   sessionStorage.clear();
+  invalidateServicesListCache();
   vi.restoreAllMocks();
   server.resetHandlers();
   vi.useRealTimers();
@@ -33,6 +35,7 @@ describe("Services workspace period", () => {
     const { unmount } = render(<ServicesWorkspace />);
     expect(await screen.findByText("3 registros no se pudieron mostrar con esta versión de la aplicación.")).toBeVisible();
     unmount();
+    invalidateServicesListCache(); // a new visit after the list expired/was refreshed
     first.mockRestore();
     mockPages(() => 0);
     render(<ServicesWorkspace />);

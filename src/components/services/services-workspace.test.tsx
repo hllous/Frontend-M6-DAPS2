@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -18,6 +18,7 @@ import { operationalMapAdapter } from "@/lib/operational-map";
 import { operationalZonesAdapter } from "@/lib/operational-zones";
 import { resetEnvironmentalInspectionFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
+import { invalidateServicesListCache } from "./services-list-cache";
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
@@ -29,7 +30,10 @@ function startedServiceFixture() {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-beforeEach(() => sessionStorage.clear());
+beforeEach(() => {
+  sessionStorage.clear();
+  invalidateServicesListCache();
+});
 afterEach(() => {
   server.resetHandlers();
   resetStreetClosureRequestFixtures();
@@ -49,6 +53,17 @@ describe("ServicesWorkspace component", () => {
     expect(table).toBeInTheDocument();
     expect(within(table).getByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Mapa de servicios" })).toBeInTheDocument();
+  });
+
+  it("keeps the services list when the screen is left and opened again in the same session", async () => {
+    const first = render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    first.unmount();
+
+    const list = vi.spyOn(servicesAdapter, "list");
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    expect(screen.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it("shows a table skeleton while the services load and lands the table where it was", async () => {
@@ -787,6 +802,15 @@ describe("ServicesWorkspace component", () => {
     // Preview opens for the newly scheduled service
     expect(await screen.findByRole("complementary")).toBeInTheDocument();
     expect(screen.getByRole("complementary")).toHaveTextContent("Sin asignar");
+    const createdTitle = within(screen.getByRole("complementary")).getByRole("heading").textContent!;
+
+    // Leaving and coming back keeps the created service without asking the API again.
+    cleanup();
+    const list = vi.spyOn(servicesAdapter, "list");
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    expect(list).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar servicios" }), { target: { value: createdTitle } });
+    expect(await within(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).findByText(createdTitle)).toBeInTheDocument();
   });
 
   it("opens linked scheduling dialog with a localized origin and hides the technical reference ID", async () => {
