@@ -20,7 +20,18 @@ async function gateRoutes(page: Page, patterns: string[]) {
 }
 
 async function openDetailFromTable(page: Page, serviceId: string, search: string) {
-  await page.getByPlaceholder(/^Buscar/).fill(search);
+  await expect(page.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
+  // On phones the search lives in the «Filtros (n)» sheet.
+  const phoneFilters = page.getByRole("button", { name: /^Filtros \(\d+\)$/ });
+  if (await phoneFilters.isVisible()) {
+    await phoneFilters.click();
+    const sheet = page.getByRole("dialog", { name: "Filtros" });
+    await sheet.getByRole("searchbox", { name: "Buscar servicios" }).fill(search);
+    await sheet.getByRole("button", { name: "Cerrar" }).click();
+    await expect(sheet).toHaveCount(0);
+  } else {
+    await page.getByRole("searchbox", { name: "Buscar servicios" }).fill(search);
+  }
   const table = page.getByRole("region", { name: "Tabla operativa de Servicios" });
   await expect(table).toBeVisible();
   const row = table.locator(`tr[data-service-id="${serviceId}"]`);
