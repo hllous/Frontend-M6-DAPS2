@@ -6,11 +6,13 @@ import {
 } from "node:crypto";
 import { cookies } from "next/headers";
 
+import { isProductionAuthModeMisconfigured } from "./auth-mode";
 import { m6RoleSchema, type M6Role } from "./m6-roles";
 import { getScenario, type Capability, type ScenarioCrew, type ScenarioId } from "./scenarios";
 import { AUTH_COOKIE_NAME, SESSION_MARKER_COOKIE_NAME } from "./session-config";
 
 export { AUTH_COOKIE_NAME, SESSION_MARKER_COOKIE_NAME } from "./session-config";
+export { isProductionAuthModeMisconfigured } from "./auth-mode";
 
 export const SESSION_IDLE_MS = 30 * 60 * 1000;
 export const SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000;
@@ -118,12 +120,6 @@ export function getAuthMode(environment: RuntimeEnvironment = process.env): Auth
 
   if (configuredMode !== undefined) return "real-m1";
   return environment.NODE_ENV === "production" ? "real-m1" : "mock";
-}
-
-export function isProductionAuthModeMisconfigured(environment: RuntimeEnvironment = process.env): boolean {
-  return environment.NODE_ENV === "production" &&
-    environment.M6_AUTH_MODE !== undefined &&
-    environment.M6_AUTH_MODE !== "real-m1";
 }
 
 export function createSession(
