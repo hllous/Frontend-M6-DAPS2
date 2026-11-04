@@ -110,6 +110,30 @@ const initialAudit: AuditEntry[] = [
     note: "Revisión inicial.",
     occurredAt: "2026-10-29T13:10:00.000Z",
   },
+  {
+    id: "650e8400-e29b-41d4-a716-446655440030",
+    entityType: "CONTAINER",
+    entityId: "550e8400-e29b-41d4-a716-446655440002",
+    action: "CREATE",
+    fromStatus: null,
+    toStatus: "ACTIVE",
+    actorUserId: "42",
+    actorRoles: ["M6_ADMIN"],
+    note: null,
+    occurredAt: "2026-10-28T10:00:00.000Z",
+  },
+  {
+    id: "650e8400-e29b-41d4-a716-446655440040",
+    entityType: "STREET_CLOSURE_REQUEST",
+    entityId: "550e8400-e29b-41d4-a716-446655440041",
+    action: "ARCHIVE_RECORD",
+    fromStatus: "REQUESTED",
+    toStatus: "PAUSED_BY_CITY",
+    actorUserId: "42",
+    actorRoles: ["M6_ADMIN"],
+    note: null,
+    occurredAt: "2026-10-27T10:00:00.000Z",
+  },
 ];
 
 let eventDetails: OutboxDetail[] = structuredClone(initialEvents);
