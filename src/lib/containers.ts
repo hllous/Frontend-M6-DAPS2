@@ -1,3 +1,4 @@
+import { notifyMapInventoryChanged } from "./map-inventory-events";
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
@@ -295,7 +296,7 @@ export const containersAdapter = {
         cause: parsedInput.error,
       });
     }
-    return parseContainer(
+    const saved = parseContainer(
       await send("/api/containers", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -303,6 +304,8 @@ export const containersAdapter = {
       }),
       "La respuesta de creación de contenedor no respeta el contrato esperado.",
     );
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async update(id: string, input: UpdateContainerInput): Promise<Container> {
@@ -312,7 +315,7 @@ export const containersAdapter = {
         cause: parsedInput.error,
       });
     }
-    return parseContainer(
+    const saved = parseContainer(
       await send(`/api/containers/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -320,6 +323,8 @@ export const containersAdapter = {
       }),
       "La respuesta de actualización de contenedor no respeta el contrato esperado.",
     );
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async reportOverflow(id: string): Promise<Container> {

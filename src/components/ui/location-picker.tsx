@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useId, useRef, useState } from "react";
 import { ADDRESS_SEARCH_FALLBACK_MESSAGE } from "@/lib/address-search-messages";
 import { roundCoordinate } from "@/lib/input-limits";
-import { getOperationalZoneGeometries, isCoordinateInsideOperationalZone } from "@/lib/operational-zones";
+import { getOperationalZoneGeometries, isCoordinateInsideOperationalZone, loadOperationalZoneGeometries } from "@/lib/operational-zones";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { Field, FieldLabel } from "./field";
@@ -36,6 +36,8 @@ const TYPEAHEAD_DELAY_MS = 250;
 const TYPEAHEAD_MIN_CHARS = 3;
 
 export function LocationPicker({ currentPoint, initialAddress = "", searchAddresses, suggestStreets, onConfirm, onCancel }: LocationPickerProps) {
+  const [zonesLoaded, setZonesLoaded] = useState(false);
+  useEffect(() => { let active = true; void loadOperationalZoneGeometries().then(() => { if (active) setZonesLoaded(true); }).catch(() => undefined); return () => { active = false; }; }, []);
   const searchId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   /** The query the user did not type (initial value, picked street), so it triggers no suggestions. */
@@ -151,13 +153,13 @@ export function LocationPicker({ currentPoint, initialAddress = "", searchAddres
       setPoint(next); setAccuracy(undefined); setSelectedLabel(undefined);
     }} />
     <p role="status" aria-live="polite" aria-atomic="true">
-      {point ? <>Ubicación marcada: {locationPointLabel(point)}<span className="sr-only">. {point.lat.toFixed(7)}, {point.lng.toFixed(7)}</span></> : "Marque la ubicación"}
+      {point ? <>Ubicación marcada: {zonesLoaded ? locationPointLabel(point) : "Cargando"}<span className="sr-only">. {point.lat.toFixed(7)}, {point.lng.toFixed(7)}</span></> : "Marque la ubicación"}
     </p>
     <div className="flex shrink-0 flex-wrap justify-end gap-2">
       <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-      <Button type="button" disabled={!point} onClick={() => point && onConfirm({
-        lat: roundCoordinate(point.lat), lng: roundCoordinate(point.lng),
-      }, selectedLabel)}>Confirmar ubicación</Button>
+    <Button type="button" disabled={!point} onClick={() => point && onConfirm({
+      lat: roundCoordinate(point.lat), lng: roundCoordinate(point.lng),
+    }, selectedLabel)}>Confirmar ubicación</Button>
     </div>
   </div>;
 }

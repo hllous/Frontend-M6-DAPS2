@@ -2,7 +2,7 @@
 
 import { LatLngBounds, divIcon } from "leaflet";
 import type { Marker as LeafletMarker } from "leaflet";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Polygon, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
 
 import type { Service } from "@/lib/services";
@@ -23,6 +23,7 @@ type ServicesMapCanvasProps = {
   selectedId: string | null;
   onSelect: (id: string) => void;
   compact?: boolean;
+  ready?: boolean;
 };
 
 // Paths of lucide's TreeDeciduous: divIcon takes an HTML string, not a React node.
@@ -247,7 +248,14 @@ export function ServicesMapCanvas({
   selectedId,
   onSelect,
   compact = false,
+  ready = true,
 }: ServicesMapCanvasProps) {
+  const [tilesLoaded, setTilesLoaded] = useState(false);
+  useEffect(() => {
+    if (!tilesLoaded || !ready) return;
+    const frame = requestAnimationFrame(() => performance.mark("map-ready:services"));
+    return () => cancelAnimationFrame(frame);
+  }, [tilesLoaded, ready]);
   const locationsByServiceId = useMemo(
     () => new Map(locations.map((location) => [location.serviceId, location])),
     [locations],
@@ -277,6 +285,7 @@ export function ServicesMapCanvas({
         aria-label="Mapa de servicios"
       >
         <TileLayer
+          eventHandlers={{ load: () => setTilesLoaded(true) }}
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
