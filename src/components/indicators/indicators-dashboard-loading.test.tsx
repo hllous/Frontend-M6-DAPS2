@@ -86,18 +86,19 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expectBusy(records);
     expect(records.querySelector('[data-slot="table-row-skeleton"]')).not.toBeNull();
 
-    await waitFor(() => expect(records).toHaveAttribute("aria-busy", "false"), { timeout: 2000 });
+    await waitFor(() => expect(records).toHaveAttribute("aria-busy", "false"), { timeout: 4000 });
     expect(records.querySelector('[data-slot="table-row-skeleton"]')).toBeNull();
     expect(within(records).queryByText("Cargando")).toBeNull();
   });
 
   it("keeps the catalog filters in place while the options load: no spinner, no extra bar", async () => {
     server.use(http.get("*/api/service-types", async () => {
-      await delay(150);
+      await delay(800);
       return HttpResponse.json({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 });
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
+    await userEvent.setup().click(screen.getByRole("button", { name: "Más filtros" }));
     const filter = screen.getByLabelText("Tipo de servicio");
     const hint = screen.getByRole("region", { name: "Opciones de Tipo de servicio" });
     expectBusy(hint);
@@ -107,7 +108,7 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expect(filter.querySelector('[data-slot="spinner"], svg.animate-spin')).toBeNull();
     expect(filter).not.toHaveAttribute("aria-busy");
 
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Opciones de Tipo de servicio" })).toBeNull(), { timeout: 2000 });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Opciones de Tipo de servicio" })).toBeNull(), { timeout: 4000 });
   });
 
   it("shows the narrow summary as a busy region with a skeleton until the family arrives", async () => {
@@ -122,6 +123,6 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expectBusy(summary);
     expect(summary.querySelector('[data-slot="skeleton"]')).not.toBeNull();
 
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Resumen de Cobertura" })).toBeNull(), { timeout: 2000 });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Resumen de Cobertura" })).toBeNull(), { timeout: 4000 });
   });
 });

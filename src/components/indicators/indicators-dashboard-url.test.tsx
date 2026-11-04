@@ -28,7 +28,7 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Incidencias" });
-    expect(screen.getByRole("combobox", { name: "Familia" })).toHaveTextContent("Incidencias");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Más filtros" }));
     expect(screen.getByRole("button", { name: /^Desde/ })).toHaveTextContent("01/09/2026");
     expect(screen.getByRole("button", { name: /^Hasta/ })).toHaveTextContent("15/09/2026");
     expect(screen.getByRole("button", { name: "Tabla" })).toHaveAttribute("aria-pressed", "true");
@@ -42,8 +42,7 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
     expect(screen.queryByText(/Filtros sin efecto/)).not.toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole("combobox", { name: "Familia" }));
-    await user.click(screen.getByRole("option", { name: "Residuos" }));
+    await user.click(screen.getByRole("button", { name: "Residuos: seleccionar familia" }));
     await user.click(screen.getByRole("button", { name: "Tabla" }));
 
     const params = new URLSearchParams(window.location.search);

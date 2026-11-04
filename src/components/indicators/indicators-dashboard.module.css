@@ -124,3 +124,7 @@
 .periodShortcuts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-8); }
 .previousData { opacity: 0.6; }
 @media (max-width: 760px) { .periodShortcuts > button { min-height: 48px; flex: 1 1 auto; } }
+
+.quickFilters { display: flex; flex-direction: column; gap: var(--space-12); }
+.quickBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-12); }
+@media (max-width: 760px) { .quickPeriods { flex: 1 1 100%; } .quickPeriods > * { flex: 1 1 0; } }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Activity, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, TriangleAlert } from "lucide-react";
+import { Activity, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -18,7 +18,6 @@ import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableCaption, TableCell, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -31,6 +30,7 @@ import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
+import { AttentionSignals } from "./attention-signals";
 import { CoverageTrend } from "./coverage-trend";
 import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
 import { formatIndicatorNumber } from "./number-format";
@@ -85,6 +85,15 @@ const familyMeta: Record<FamilyKey, { label: string; icon: typeof Activity; desc
   incidents: { label: "Incidencias", icon: TriangleAlert, description: "Resolución de reportes" },
   waste: { label: "Residuos", icon: Recycle, description: "Desvío del relleno" },
 };
+
+const quickPeriods = [{ id: "7", label: "Semana", days: 7 }, { id: "30", label: "Mes", days: 30 }, { id: "90", label: "Trimestre", days: 90 }] as const;
+
+function quickPeriodRange(days: number) {
+  const to = todayInArgentina();
+  const fromDate = new Date(`${to}T00:00:00Z`);
+  fromDate.setUTCDate(fromDate.getUTCDate() - days + 1);
+  return { from: fromDate.toISOString().slice(0, 10), to };
+}
 
 const familyOrder: FamilyKey[] = ["coverage", "compliance", "incidents", "waste"];
 const territorialBreakdownIds = new Set(["zones", "unattended-zones", "containers"]);
@@ -601,13 +610,14 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setAppliedQuery({ ...nextQuery });
   };
   const applyPeriod = (days: number) => {
-    const to = todayInArgentina();
-    const fromDate = new Date(`${to}T00:00:00Z`);
-    fromDate.setUTCDate(fromDate.getUTCDate() - days + 1);
-    const nextQuery = { ...query, from: fromDate.toISOString().slice(0, 10), to };
+    const nextQuery = { ...query, ...quickPeriodRange(days) };
     setQuery(nextQuery);
     applyQuery(nextQuery);
   };
+  const activeQuickPeriod = quickPeriods.find((item) => {
+    const range = quickPeriodRange(item.days);
+    return appliedQuery.from === range.from && appliedQuery.to === range.to;
+  });
 
   const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
   const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} open={recordsOpen} onOpenChange={setRecordsOpen} onClear={clearSignal} />;
@@ -620,29 +630,35 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   return (
     <section className={styles.dashboard} aria-labelledby="indicator-dashboard-title">
       <div className={styles.heading}>
-        <div><h1 id="indicator-dashboard-title">Indicadores operativos</h1></div>
+        <div><h1 id="indicator-dashboard-title">Tableros</h1></div>
         {freshness ? <div className={styles.freshness}><Database size={16} aria-hidden /> Actualizado {formatDateTime(freshness)}</div> : <div aria-hidden className={`${styles.freshness} invisible`}><Database size={16} aria-hidden /> Actualizado</div>}
       </div>
 
+      <Collapsible className={styles.quickFilters}>
+        <div className={styles.quickBar}>
+          <ToggleGroup variant="outline" value={activeQuickPeriod ? [activeQuickPeriod.id] : []} onValueChange={(values) => { const item = quickPeriods.find((entry) => entry.id === values[0]); if (item) applyPeriod(item.days); }} aria-label="Período" className={styles.quickPeriods}>
+            {quickPeriods.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="min-h-11 min-w-20 aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary sm:min-h-8">{item.label}</ToggleGroupItem>)}
+          </ToggleGroup>
+          <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="group/filters min-h-11 sm:min-h-8" />}>
+            <SlidersHorizontal data-icon="inline-start" aria-hidden />
+            Más filtros
+            <ChevronDown data-icon="inline-end" aria-hidden className="transition-transform group-aria-expanded/filters:rotate-180" />
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent>
       <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); applyQuery(query); }}>
         <Field className={styles.field}><FieldLabel htmlFor="indicator-from">Desde</FieldLabel><DatePicker id="indicator-from" value={query.from ?? ""} onChange={(from) => { setFilterError(null); setQuery((current) => ({ ...current, from: from || undefined })); }} /></Field>
         <Field className={styles.field}><FieldLabel htmlFor="indicator-to">Hasta</FieldLabel><DatePicker id="indicator-to" value={query.to ?? ""} invalid={Boolean(filterError)} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(to) => { setFilterError(null); setQuery((current) => ({ ...current, to: to || undefined })); }} /></Field>
-        <div className={styles.periodShortcuts} role="group" aria-label="Períodos rápidos">
-          {([["Última semana", 7], ["Último mes", 30], ["Último trimestre", 90]] as const).map(([label, days]) => <Button key={days} type="button" variant="outline" onClick={() => applyPeriod(days)}>{label}</Button>)}
-        </div>
-        <Field className={styles.field}>
-          <FieldLabel htmlFor="indicator-family">Familia</FieldLabel>
-          <Select value={selectedFamily} onValueChange={(family) => selectFamily(String(family) as FamilyKey)}>
-            <SelectTrigger id="indicator-family"><SelectValue>{familyMeta[selectedFamily].label}</SelectValue></SelectTrigger>
-            <SelectContent><SelectGroup>{familyOrder.map((family) => <SelectItem key={family} value={family}>{familyMeta[family].label}</SelectItem>)}</SelectGroup></SelectContent>
-          </Select>
-        </Field>
         <CatalogFilter id="indicator-zone" label="Zona operativa" allLabel="Todas las zonas" noun="zonas" options={filterCatalog?.zones} value={query.zoneId} onChange={(zoneId) => setQuery((current) => ({ ...current, zoneId }))} />
         <CatalogFilter id="indicator-service-type" label="Tipo de servicio" allLabel="Todos los tipos" noun="tipos de servicio" options={filterCatalog?.serviceTypes} value={query.serviceTypeId} onChange={(serviceTypeId) => setQuery((current) => ({ ...current, serviceTypeId }))} />
         <Button className={styles.filterAction} type="submit" disabled={dashboardStatus === "loading"}><RefreshCw data-icon="inline-start" aria-hidden />{dashboardStatus === "loading" ? "Actualizando…" : "Actualizar"}</Button>
         {ignoredFilters ? <Alert role="status" className={styles.note}>Filtros sin efecto en {familyMeta[selectedFamily].label}: {ignoredFilters}. Esta familia sólo se filtra por período, así que se muestra sin filtrar.</Alert> : null}
         {filterError ? <FieldError id="indicator-to-error" className={styles.fieldError}>{filterError}</FieldError> : null}
       </form>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} />
 
       <div className={styles.summaryHeading}><h2>Resumen del período</h2><span>{appliedQuery.from && appliedQuery.to ? `${formatDate(appliedQuery.from)} – ${formatDate(appliedQuery.to)}` : "Últimos 30 días"}</span></div>
       <FamilySelectorBand states={familyStates} selectedFamily={selectedFamily} onSelect={selectFamily} onRetry={retryFamily} />

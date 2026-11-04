@@ -28,7 +28,7 @@ test.describe("shared control density", () => {
 
       if (width === 760) {
         await page.goto("/app?destination=dashboards");
-        await expect(page.getByRole("heading", { name: "Indicadores operativos" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Tableros" })).toBeVisible();
         await expect.poll(() => heightOf(page.locator('[data-slot="tabs-list"]'))).toBe(expected);
       }
     }

@@ -59,7 +59,7 @@ test.describe("operational indicator dashboard #138", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app?destination=dashboards");
 
-    await expect(page.getByRole("heading", { name: "Indicadores operativos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tableros" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Cobertura/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Cumplimiento/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Incidencias/ })).toBeVisible();
@@ -81,7 +81,7 @@ test.describe("operational indicator dashboard #138", () => {
   test("the dashboard alias opens the same gated Office surface", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/dashboard");
-    await expect(page.getByRole("heading", { name: "Indicadores operativos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tableros" })).toBeVisible();
     await expect(page).toHaveURL(/\/app\?destination=dashboards(&|$)/, { timeout: 15_000 });
   });
 

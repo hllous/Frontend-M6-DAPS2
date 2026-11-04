@@ -314,7 +314,7 @@ describe("IndicatorsDashboard", () => {
     expect(within(recordsRegion).queryByText("SVC-1042")).not.toBeInTheDocument();
     expect(recordsRegion).toHaveTextContent(/Filtro:.*Centro/i);
     expect(recordsRegion).toHaveTextContent(/Cobertura por zona/i);
-    expect(screen.getByRole("link", { name: /Ver servicios/i })).toHaveAttribute("href", "/app?destination=services");
+    expect(within(screen.getByRole("region", { name: "Registros" })).getByRole("link", { name: /Ver servicios/i })).toHaveAttribute("href", "/app?destination=services");
 
     await user.click(screen.getByRole("button", { name: "Quitar filtro" }));
 
@@ -334,7 +334,7 @@ describe("IndicatorsDashboard", () => {
     expect(within(recordsRegion).getByRole("row", { name: /CONT-001/ })).toBeVisible();
     // Se muestra el código, pero el enlace usa el UUID que `GET /containers/:id` espera.
     expect(within(recordsRegion).getByRole("link", { name: "CONT-001" })).toHaveAttribute("href", "/app/catalog/containers?detail=cont-1");
-    expect(screen.getByRole("link", { name: /Ver contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
+    expect(within(screen.getByRole("region", { name: "Registros" })).getByRole("link", { name: /Ver contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
     expect(screen.queryByRole("button", { name: /Editar|Eliminar|Dar de baja/i })).not.toBeInTheDocument();
   });
 
@@ -408,6 +408,7 @@ describe("IndicatorsDashboard", () => {
 
     const requested: string[] = [];
     server.use(http.get("*/api/indicators/:family", ({ request }) => { requested.push(new URL(request.url).search); return passthrough(); }));
+    await user.click(screen.getByRole("button", { name: "Más filtros" }));
     await user.click(await screen.findByRole("combobox", { name: "Zona operativa" }));
     await user.click(await screen.findByRole("option", { name: "Zona Sur real" }));
     await user.click(screen.getByRole("combobox", { name: "Tipo de servicio" }));
@@ -424,6 +425,7 @@ describe("IndicatorsDashboard", () => {
       http.get("*/api/service-types", async () => { await delay("infinite"); return HttpResponse.json({}); }),
     );
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Más filtros" }));
 
     expect(screen.getByLabelText("Zona operativa")).toBeDisabled();
     expect(screen.getByLabelText("Tipo de servicio")).toBeDisabled();
@@ -438,6 +440,7 @@ describe("IndicatorsDashboard", () => {
     let indicatorRequests = 0;
     server.use(http.get("*/api/indicators/:family", () => { indicatorRequests += 1; return HttpResponse.json({}, { status: 500 }); }));
 
+    await user.click(screen.getByRole("button", { name: "Más filtros" }));
     await chooseDate(user, "Desde", "2026-09-20");
     await chooseDate(user, "Hasta", "2026-09-01");
     await user.click(screen.getByRole("button", { name: "Actualizar" }));

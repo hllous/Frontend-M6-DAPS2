@@ -142,7 +142,7 @@ export type IndicatorBreakdown = { target?: IndicatorTarget; id: string; title: 
 export type IndicatorPeriod = { from: string; to: string };
 export type IndicatorFreshness = { updatedAt: string };
 
-export type CoverageIndicator = Pick<CoverageWire, "targets" | "series" | "previous" | "delta"> & {
+export type CoverageIndicator = Pick<CoverageWire, "totals" | "targets" | "series" | "previous" | "delta"> & {
   family: "coverage";
   seriesBucket?: "week" | "month";
   /** Mensaje del backend cuando rechazó el intervalo de la serie; el resto de la familia sí llegó. */
@@ -153,7 +153,7 @@ export type CoverageIndicator = Pick<CoverageWire, "targets" | "series" | "previ
   summaryMetrics: IndicatorMetric[];
   breakdowns: IndicatorBreakdown[];
 };
-export type ComplianceIndicator = Pick<ComplianceWire, "targets" | "series" | "previous" | "delta" | "schedulingDeviation"> & {
+export type ComplianceIndicator = Pick<ComplianceWire, "finished" | "targets" | "series" | "previous" | "delta" | "schedulingDeviation"> & {
   family: "compliance";
   period: IndicatorPeriod;
   freshness: IndicatorFreshness;
@@ -337,6 +337,7 @@ function coveragePoints(rows: CoverageWire["byZone"]): IndicatorPoint[] {
 function normalizeCoverage(wire: CoverageWire, readAt: string): CoverageIndicator {
   const coverageTarget = wire.targets === undefined ? defaultIndicatorTarget("coverage") : wire.targets.coveragePct ?? null;
   return {
+    totals: wire.totals,
     targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
     family: "coverage", period: wire.period, freshness: { updatedAt: readAt },
     primary: { value: wire.totals.coveragePct, label: "Cobertura de objetivos", unit: "%" },
@@ -361,6 +362,7 @@ function normalizeCompliance(wire: ComplianceWire, readAt: string): ComplianceIn
   return {
     targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
     schedulingDeviation: wire.schedulingDeviation,
+    finished: wire.finished,
     family: "compliance", period: wire.period, freshness: { updatedAt: readAt },
     primary: { value: wire.finished.onTimePct, label: "Cumplimiento en fecha", unit: "%" },
     summaryMetrics: [

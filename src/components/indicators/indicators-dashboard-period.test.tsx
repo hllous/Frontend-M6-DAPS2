@@ -17,12 +17,14 @@ afterEach(() => { server.resetHandlers(); server.events.removeAllListeners(); ol
 afterAll(() => server.close());
 
 describe("Atajos de período", () => {
-  it.each([["Última semana", "2026-09-28", "28/09/2026"], ["Último mes", "2026-09-05", "05/09/2026"], ["Último trimestre", "2026-07-07", "07/07/2026"]])("aplica %s y conserva el período en la URL", async (label, from, display) => {
+  it.each([["Semana", "2026-09-28", "28/09/2026"], ["Mes", "2026-09-05", "05/09/2026"], ["Trimestre", "2026-07-07", "07/07/2026"]])("aplica %s y conserva el período en la URL", async (label, from, display) => {
     const requests: string[] = [];
     server.events.on("request:start", ({ request }) => { if (request.url.includes("/api/indicators/coverage")) requests.push(request.url); });
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Más filtros" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Actualizar" })).toBeEnabled());
-    await userEvent.setup().click(screen.getByRole("button", { name: label }));
+    await user.click(screen.getByRole("button", { name: label }));
     await waitFor(() => expect(new URLSearchParams(window.location.search).get("from")).toBe(from));
     expect(new URLSearchParams(window.location.search).get("to")).toBe("2026-10-04");
     expect(screen.getByRole("button", { name: /^Desde/ })).toHaveTextContent(display);
@@ -38,7 +40,7 @@ describe("Atajos de período", () => {
       await delay(500);
       return HttpResponse.json({ ...coverageIndicatorFixture, totals: { ...coverageIndicatorFixture.totals, coveragePct: 42 } });
     }));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Última semana" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Semana" }));
     expect(band).toHaveAttribute("aria-busy", "true");
     expect(within(card).getByText("82,2 %")).toBeVisible();
     expect(within(card).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
@@ -53,7 +55,7 @@ describe("Atajos de período", () => {
     await waitFor(() => expect(band).toHaveAttribute("aria-busy", "false"));
     const card = within(band).getByRole("button", { name: /Cobertura: seleccionar familia/ });
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({ message: "Error" }, { status: 503 })));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Última semana" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Semana" }));
     expect(await within(band).findByRole("button", { name: "Reintentar Cobertura" })).toBeVisible();
     expect(within(card).getByText("82,2 %")).toBeVisible();
     expect(within(card).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
