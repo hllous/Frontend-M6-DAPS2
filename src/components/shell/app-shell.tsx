@@ -238,7 +238,7 @@ export function AppShell({
         ) : destination === "referrals" ? (
           <ReferralsWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
-          <CatalogLanding scenario={scenario} />
+          <CatalogLanding />
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (

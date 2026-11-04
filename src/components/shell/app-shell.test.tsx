@@ -97,6 +97,16 @@ describe("AppShell", () => {
     expect(screen.getByRole("link", { name: "Abrir Intervenciones de arbolado" })).toHaveAttribute("href", "/app/catalog/tree-interventions");
   });
 
+  it("shows only the title and cards for a Field actor", () => {
+    window.history.replaceState(null, "", "/app?destination=catalog");
+    render(<AppShell scenario={scenarios.fieldCrewLeader} />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Catálogo" })).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Catálogo" })).getAllByRole("listitem")).toHaveLength(12);
+    expect(screen.queryByText("Solo consulta")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "Zonas operativas" })).not.toBeInTheDocument();
+  });
+
   it("shows only the 12 catalog cards and does not request the zones list", async () => {
     let zoneRequests = 0;
     server.use(http.get("*/api/zones", () => {
