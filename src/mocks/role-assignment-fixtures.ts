@@ -1,8 +1,8 @@
-import { m6RoleSchema, type M6Role } from "@/lib/m6-roles";
+import { hasOfficeFieldRoleMix, m6RoleSchema, type M6Role } from "@/lib/m6-roles";
 import { DEMO_IDENTITIES } from "@/lib/demo-identities";
 import { z } from "zod";
 
-export const replacementSchema = z.object({ roles: z.array(m6RoleSchema).refine((roles) => new Set(roles).size === roles.length).refine((roles) => !(roles.some((role) => role === "M6_ADMIN" || role.startsWith("M6_OFICINA_")) && roles.some((role) => role.startsWith("M6_CAMPO_")))) }).strict();
+export const replacementSchema = z.object({ roles: z.array(m6RoleSchema).refine((roles) => new Set(roles).size === roles.length).refine((roles) => !hasOfficeFieldRoleMix(roles)) }).strict();
 export const validUserId = (id: string) => /^\d+$/.test(id);
 const seed: Record<string, M6Role[]> = {
   [DEMO_IDENTITIES["office-duty-queue"].sub]: ["M6_ADMIN"],

@@ -6,9 +6,9 @@ import { loginViaApi } from "./support/auth";
 test("administra roles con teclado y mouse y pasa axe", async ({ page }) => {
   await loginViaApi(page, "office-duty-queue");
   await page.goto("/app/access");
-  await expect(page.getByText(`${DEMO_IDENTITIES["office-duty-queue"].sub} (vos)`)).toBeVisible();
-  await page.getByLabel("Identificador de usuario M1").fill("98765");
-  await page.getByLabel("Identificador de usuario M1").press("Tab");
+  await expect(page.getByText(`${DEMO_IDENTITIES["office-duty-queue"].sub} (su usuario)`)).toBeVisible();
+  await page.getByLabel("Identificador numérico de persona").fill("98765");
+  await page.getByLabel("Identificador numérico de persona").press("Tab");
   await page.keyboard.press("Enter");
   await page.getByRole("checkbox", { name: /Campo, inspección/ }).click();
   await page.getByRole("button", { name: "Guardar roles" }).click();

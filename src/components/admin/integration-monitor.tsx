@@ -57,6 +57,7 @@ import {
 } from "@/lib/integration-monitor";
 import type { M6Role } from "@/lib/m6-roles";
 
+import { auditActionLabel, auditStatusLabel } from "./audit-labels";
 import styles from "./integration-monitor.module.css";
 
 type MonitorTab = "events" | "activity";
@@ -146,12 +147,6 @@ const roleLabels: Record<M6Role, string> = {
   M6_AUDITOR: "Auditor",
 };
 
-const actionLabels: Record<string, string> = {
-  REPORT_DAMAGE: "Informó un daño",
-  COMPLETE_SERVICE: "Completó un servicio",
-  START_REVIEW: "Inició una revisión",
-};
-
 function eventActivityHref(event: Pick<OutboxEvent, "aggregateType" | "aggregateId">): string | null {
   if (!AUDIT_ENTITY_TYPES.some((entityType) => entityType === event.aggregateType)) return null;
   const params = new URLSearchParams({
@@ -186,8 +181,15 @@ function AuditEntityLink({ entry }: { entry: AuditEntry }) {
   );
 }
 
-function auditActionLabel(action: string): string {
-  return actionLabels[action] ?? `Acción registrada: ${action}`;
+function AuditLabel({ value, showRawCode }: { value: { label: string; rawCode: string | null }; showRawCode: boolean }) {
+  return (
+    <>
+      {value.label}
+      {showRawCode && value.rawCode ? (
+        <span className="block break-all text-xs font-normal text-muted-foreground">Código: {value.rawCode}</span>
+      ) : null}
+    </>
+  );
 }
 
 function eventQuery(filters: EventFilters, page: number): string {
@@ -204,22 +206,6 @@ function auditQuery(filters: AuditFilters, page: number): string {
   if (filters.entityType) params.set("entityType", filters.entityType);
   if (filters.entityId) params.set("entityId", filters.entityId);
   return params.toString();
-}
-
-function statusLabel(value: string | null): string {
-  if (!value) return "—";
-  const labels: Record<string, string> = {
-    ACTIVE: "Activo",
-    DAMAGED: "Dañado",
-    IN_PROGRESS: "En curso",
-    COMPLETED: "Completado",
-    RECEIVED: "Recibido",
-    UNDER_REVIEW: "En revisión",
-    PENDING: "Pendiente",
-    SENT: "Enviado",
-    FAILED: "Fallido",
-  };
-  return labels[value] ?? value;
 }
 
 function EventActions({ event, canManage, onOpenDetail }: {
@@ -761,13 +747,13 @@ export function IntegrationMonitor({
                   <TableBody>
                     {auditRows.map((entry) => (
                       <TableRow key={entry.id}>
-                        <TableCell className="font-medium">{auditActionLabel(entry.action)}</TableCell>
+                        <TableCell className="font-medium"><AuditLabel value={auditActionLabel(entry.action)} showRawCode={canManage} /></TableCell>
                         <TableCell>
                           <AuditEntityLink entry={entry} />
                           <span className="block max-w-40 break-all text-xs text-muted-foreground">{entry.entityId}</span>
                         </TableCell>
-                        <TableCell>{statusLabel(entry.fromStatus)}</TableCell>
-                        <TableCell>{statusLabel(entry.toStatus)}</TableCell>
+                        <TableCell><AuditLabel value={auditStatusLabel(entry.entityType, entry.fromStatus)} showRawCode={canManage} /></TableCell>
+                        <TableCell><AuditLabel value={auditStatusLabel(entry.entityType, entry.toStatus)} showRawCode={canManage} /></TableCell>
                         <TableCell>
                           <span className="block">{entry.actorUserId}</span>
                           <span className="block text-xs text-muted-foreground">{entry.actorRoles.map((role) => roleLabels[role as M6Role] ?? "Otro perfil").join(", ")}</span>
@@ -783,14 +769,14 @@ export function IntegrationMonitor({
                 {auditRows.map((entry) => (
                   <li key={entry.id} className="flex min-w-0 flex-col gap-2 py-3">
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <span className="font-medium">{auditActionLabel(entry.action)}</span>
+                      <span className="font-medium"><AuditLabel value={auditActionLabel(entry.action)} showRawCode={canManage} /></span>
                       <time className="text-sm tabular-nums" dateTime={entry.occurredAt}>{dateTime(entry.occurredAt)}</time>
                     </div>
                     <p className="flex flex-wrap items-baseline gap-1 break-all text-sm">
                       <AuditEntityLink entry={entry} />
                       <span>{entry.entityId}</span>
                     </p>
-                    <p className="text-sm">{statusLabel(entry.fromStatus)} → {statusLabel(entry.toStatus)}</p>
+                    <p className="text-sm"><AuditLabel value={auditStatusLabel(entry.entityType, entry.fromStatus)} showRawCode={canManage} /> → <AuditLabel value={auditStatusLabel(entry.entityType, entry.toStatus)} showRawCode={canManage} /></p>
                     <p className="text-sm">Persona {entry.actorUserId} · {entry.actorRoles.map((role) => roleLabels[role as M6Role] ?? "Otro perfil").join(", ")}</p>
                     {entry.note ? <p className="break-words text-sm text-muted-foreground">{entry.note}</p> : null}
                   </li>

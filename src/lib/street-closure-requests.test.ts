@@ -364,6 +364,8 @@ describe("wire shape of StreetClosureRequestResponseDto", () => {
     ["sections that is not an array", { sections: "x" }],
     ["an unknown status", { status: "FOO" }],
     ["a foreign sourceModule", { sourceModule: "M2" }],
+    ["an invalid approvedFrom date-time", { approvedFrom: "not-a-date" }],
+    ["an invalid approvedTo date-time", { approvedTo: "2026-10-01T09:00" }],
   ])("rejects %s", (_name, override) => {
     expect(streetClosureRequestSchema.safeParse({ ...wire, ...override }).success).toBe(false);
   });
