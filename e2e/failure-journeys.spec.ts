@@ -87,40 +87,4 @@ test.describe("session lifecycle failure journeys @smoke", () => {
     expect(cookies.some((cookie) => cookie.name === "m6_session")).toBe(true);
   });
 
-  test("a malformed zones response surfaces the generic error state", async ({ page }) => {
-    await page.route("**/api/zones**", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "not valid json" });
-    });
-
-    await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app");
-    await page.getByRole("link", { name: "Catálogo" }).click();
-
-    await expect(page.getByText("No se pudieron cargar las zonas")).toBeVisible();
-  });
-
-  test("a network failure shows a retry action that recovers on success", async ({ page }) => {
-    let shouldFail = true;
-    await page.route("**/api/zones**", async (route) => {
-      if (shouldFail) {
-        await route.abort("failed");
-        return;
-      }
-      await route.continue();
-    });
-
-    await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app");
-    await page.getByRole("link", { name: "Catálogo" }).click();
-
-    await expect(page.getByText("No se pudieron cargar las zonas")).toBeVisible();
-    const retryButton = page.getByRole("button", { name: "Reintentar carga" });
-    await expect(retryButton).toBeVisible();
-
-    shouldFail = false;
-    await retryButton.click();
-
-    await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Belgrano", { exact: true })).toBeVisible();
-  });
 });

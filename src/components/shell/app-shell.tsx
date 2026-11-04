@@ -45,7 +45,6 @@ import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
 import { CatalogLanding } from "@/components/catalog/catalog-landing";
-import { ZonesPanel } from "./zones-panel";
 import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
 import { OfficeWorkPanel } from "./office-work-panel";
@@ -239,10 +238,7 @@ export function AppShell({
         ) : destination === "referrals" ? (
           <ReferralsWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
-          <div className="flex flex-col gap-8">
-            <CatalogLanding scenario={scenario} />
-            <ZonesPanel />
-          </div>
+          <CatalogLanding scenario={scenario} />
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (
