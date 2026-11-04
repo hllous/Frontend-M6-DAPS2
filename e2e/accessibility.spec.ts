@@ -43,11 +43,12 @@ test.describe("automated WCAG checks @smoke", () => {
     await expectNoViolations(page);
   });
 
-  test("the live app shell with the Zones success state has no axe violations", async ({ page }) => {
+  test("the live Catálogo destination has no axe violations", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
-    await page.goto("/app");
-    await page.getByRole("link", { name: "Catálogo" }).click();
-    await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
+    await page.goto("/app?destination=catalog");
+    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
+    await expect(page.locator("main li")).toHaveCount(12);
+    await expect(page.getByRole("heading", { name: "Zonas operativas", level: 2 })).toHaveCount(0);
 
     await expectNoViolations(page);
   });

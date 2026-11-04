@@ -10,9 +10,9 @@ test.describe("Office and Field mock entry and navigation @smoke", () => {
     await expect(page.getByText("Lucía Fernández")).toBeVisible();
 
     await page.getByRole("link", { name: "Catálogo" }).click();
-    await expect(page.getByRole("heading", { name: "Zonas operativas" })).toBeVisible();
-    await expect(page.getByText("Belgrano", { exact: true })).toBeVisible();
-    await expect(page.getByText(/^Z-[A-Z]{3}$/)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
+    await expect(page.locator("main li")).toHaveCount(12);
+    await expect(page.getByRole("link", { name: "Abrir Zonas operativas" })).toHaveAttribute("href", "/app/catalog/zones");
   });
 
   test("Field actor enters through the login form and reaches the Mapa destination", async ({ page }) => {

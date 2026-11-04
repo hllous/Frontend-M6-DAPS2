@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { AppShell } from "./app-shell";
@@ -94,6 +95,34 @@ describe("AppShell", () => {
       expect(screen.getByRole("link", { name: `Abrir ${name}` })).toBeVisible();
     }
     expect(screen.getByRole("link", { name: "Abrir Intervenciones de arbolado" })).toHaveAttribute("href", "/app/catalog/tree-interventions");
+  });
+
+  it("shows only the title and cards for a Field actor", () => {
+    window.history.replaceState(null, "", "/app?destination=catalog");
+    render(<AppShell scenario={scenarios.fieldCrewLeader} />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Catálogo" })).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Catálogo" })).getAllByRole("listitem")).toHaveLength(12);
+    expect(screen.queryByText("Solo consulta")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "Zonas operativas" })).not.toBeInTheDocument();
+  });
+
+  it("shows only the 12 catalog cards and does not request the zones list", async () => {
+    let zoneRequests = 0;
+    server.use(http.get("*/api/zones", () => {
+      zoneRequests += 1;
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 0 } });
+    }));
+    window.history.replaceState(null, "", "/app?destination=catalog");
+
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByRole("link", { name: "Abrir Intervenciones de arbolado" })).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Catálogo" })).getAllByRole("listitem")).toHaveLength(12);
+    expect(screen.queryByRole("heading", { level: 2, name: "Zonas operativas" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Belgrano", { exact: true })).not.toBeInTheDocument();
+    expect(zoneRequests).toBe(0);
+    expect(screen.getByRole("link", { name: "Abrir Zonas operativas" })).toHaveAttribute("href", "/app/catalog/zones");
   });
 
   it("navigates client-side on a plain click but leaves modified clicks to the browser", async () => {

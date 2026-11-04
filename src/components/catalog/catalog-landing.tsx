@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ArrowRight, Boxes, CalendarClock, MapPin, Recycle, Route as RouteIcon, Scissors, Trash2, Truck, Trees, UsersRound } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
-import type { OperationalScenario } from "@/lib/scenarios";
 
 const configurationCards = [
   {
@@ -86,7 +85,7 @@ const inventoryCards = [
 
 type Card = (typeof configurationCards)[number];
 
-function LandingGrid({ id, title, cards, scenario }: { id: string; title: string; cards: Card[]; scenario: OperationalScenario }) {
+function LandingGrid({ id, title, cards }: { id: string; title: string; cards: Card[] }) {
   return (
     <section aria-labelledby={id} className="flex w-full flex-col gap-6">
       <div>
@@ -112,16 +111,11 @@ function LandingGrid({ id, title, cards, scenario }: { id: string; title: string
         ))}
       </ul>
 
-      {scenario.actor.kind !== "OFFICE" && (
-        <p className="text-sm text-muted-foreground">
-          Solo consulta
-        </p>
-      )}
     </section>
   );
 }
 
 /** Catálogo de datos maestros y bienes urbanos. */
-export function CatalogLanding({ scenario }: { scenario: OperationalScenario }) {
-  return <LandingGrid id="catalog-title" title="Catálogo" cards={[...configurationCards, ...inventoryCards]} scenario={scenario} />;
+export function CatalogLanding() {
+  return <LandingGrid id="catalog-title" title="Catálogo" cards={[...configurationCards, ...inventoryCards]} />;
 }
