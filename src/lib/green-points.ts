@@ -1,3 +1,4 @@
+import { notifyMapInventoryChanged } from "./map-inventory-events";
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
@@ -170,14 +171,18 @@ export const greenPointsAdapter = {
     const parsedInput = greenPointCreateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new GreenPointContractError("Los datos para registrar el punto verde son inválidos.", { cause: parsedInput.error });
     const { payload } = await request("/api/green-points", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) });
-    return parseResource(payload, "No se pudo obtener información válida de la creación del punto verde. Reintente en unos segundos.");
+    const saved = parseResource(payload, "No se pudo obtener información válida de la creación del punto verde. Reintente en unos segundos.");
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async update(id: string, input: GreenPointUpdateInput): Promise<GreenPoint> {
     const parsedInput = greenPointUpdateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new GreenPointContractError("Los datos editables del punto verde son inválidos.", { cause: parsedInput.error });
     const { payload } = await request(`/api/green-points/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) });
-    return parseResource(payload, "No se pudo obtener información válida de la actualización del punto verde. Reintente en unos segundos.");
+    const saved = parseResource(payload, "No se pudo obtener información válida de la actualización del punto verde. Reintente en unos segundos.");
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async remove(id: string): Promise<void> {

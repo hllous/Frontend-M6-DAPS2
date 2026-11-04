@@ -1,11 +1,10 @@
 import { z } from "zod";
 
-import operationalZonesGeoJson from "@/data/operational-zones.json";
-
 import type { Route } from "./routes";
 import { routesAdapter } from "./routes";
 import { servicesAdapter, type Service, type ZoneResult, type ZoneResultStatus } from "./services";
 import { zonesAdapter, type Zone } from "./zones";
+import { mapWithConcurrency } from "./map-concurrency";
 
 const coordinateSchema = z.tuple([
   z.number().finite().min(-180).max(180),
@@ -111,11 +110,21 @@ export function parseOperationalZoneGeoJson(value: unknown): OperationalZoneGeom
 }
 
 let cachedOperationalZoneGeometries: OperationalZoneGeometry[] | undefined;
+let geometryLoad: Promise<OperationalZoneGeometry[]> | undefined;
+
+export function loadOperationalZoneGeometries(): Promise<OperationalZoneGeometry[]> {
+  if (cachedOperationalZoneGeometries) return Promise.resolve(cachedOperationalZoneGeometries);
+  if (!geometryLoad) {
+    geometryLoad = import("@/data/operational-zones.json").then((module) => {
+      cachedOperationalZoneGeometries = parseOperationalZoneGeoJson(module.default);
+      return cachedOperationalZoneGeometries;
+    }).catch((error: unknown) => { geometryLoad = undefined; throw error; });
+  }
+  return geometryLoad;
+}
 
 export function getOperationalZoneGeometries(): OperationalZoneGeometry[] {
-  if (cachedOperationalZoneGeometries) return cachedOperationalZoneGeometries;
-  cachedOperationalZoneGeometries = parseOperationalZoneGeoJson(operationalZonesGeoJson);
-  return cachedOperationalZoneGeometries;
+  return cachedOperationalZoneGeometries ?? [];
 }
 
 const boundaryTolerance = 1e-8;
@@ -236,10 +245,17 @@ export function resolveOperationalZones(
   }));
 }
 
+let pendingOperationalZones: Promise<OperationalZone[]> | undefined;
 export const operationalZonesAdapter = {
-  async list(): Promise<OperationalZone[]> {
-    const result = await zonesAdapter.list({ active: true, page: 1, pageSize: 100 });
-    return resolveOperationalZones(result.zones, getOperationalZoneGeometries());
+  list(): Promise<OperationalZone[]> {
+    if (pendingOperationalZones) return pendingOperationalZones;
+    const request = Promise.all([
+      zonesAdapter.list({ active: true, page: 1, pageSize: 100 }),
+      loadOperationalZoneGeometries(),
+    ]).then(([result, geometries]) => resolveOperationalZones(result.zones, geometries));
+    pendingOperationalZones = request;
+    void request.then(() => { if (pendingOperationalZones === request) pendingOperationalZones = undefined; }, () => { if (pendingOperationalZones === request) pendingOperationalZones = undefined; });
+    return request;
   },
 };
 
@@ -353,12 +369,19 @@ export async function loadTodayServiceCoverage(
     pageSize: 100,
   });
 
-  return Promise.all(
-    page.services.map(async (summary) => {
+  const remainingPages = await mapWithConcurrency(
+    Array.from({ length: Math.max(0, page.totalPages - 1) }, (_, index) => index + 2),
+    6,
+    (pageNumber) => servicesAdapter.list({ scheduledFrom: scheduledDate, scheduledTo: scheduledDate, page: pageNumber, pageSize: 100 }),
+  );
+  return mapWithConcurrency(
+    [page, ...remainingPages].flatMap((result) => result.services),
+    6,
+    async (summary) => {
       const service = await servicesAdapter.get(summary.id);
       const zoneResults = service.zoneResults ?? (await servicesAdapter.getZoneResults(service.id));
       return { service, zoneResults };
-    }),
+    },
   );
 }
 

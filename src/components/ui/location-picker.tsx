@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useId, useRef, useState } from "react";
 import { ADDRESS_SEARCH_FALLBACK_MESSAGE } from "@/lib/address-search-messages";
 import { roundCoordinate } from "@/lib/input-limits";
-import { getOperationalZoneGeometries, isCoordinateInsideOperationalZone } from "@/lib/operational-zones";
+import { getOperationalZoneGeometries, isCoordinateInsideOperationalZone, loadOperationalZoneGeometries } from "@/lib/operational-zones";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { Field, FieldLabel } from "./field";
@@ -29,6 +29,20 @@ export function locationPointLabel(point: LocationPoint): string {
   return getOperationalZoneGeometries().find((zone) =>
     isCoordinateInsideOperationalZone([point.lat, point.lng], zone),
   )?.name ?? "Fuera de las zonas operativas";
+}
+
+export function LocationPointStatus({ point, prefix = "" }: { point: LocationPoint; prefix?: string }) {
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    void loadOperationalZoneGeometries().then(() => { if (active) setState("ready"); }, () => { if (active) setState("error"); });
+    return () => { active = false; };
+  }, [attempt]);
+  return <p role="status" aria-live="polite" aria-atomic="true">
+    {prefix}{state === "loading" ? "Ubicando…" : state === "ready" ? locationPointLabel(point) : <><span>No se pudo ubicar la zona.</span> <Button type="button" variant="outline" size="sm" onClick={() => { setState("loading"); setAttempt((value) => value + 1); }}>Reintentar</Button></>}
+    <span className="sr-only">. {point.lat.toFixed(7)}, {point.lng.toFixed(7)}</span>
+  </p>;
 }
 
 /** Each mounted instance is one editing session; the dialog remounts it on open. */
@@ -150,14 +164,12 @@ export function LocationPicker({ currentPoint, initialAddress = "", searchAddres
     <LocationPickerMap point={point} accuracy={accuracy} onPick={(next) => {
       setPoint(next); setAccuracy(undefined); setSelectedLabel(undefined);
     }} />
-    <p role="status" aria-live="polite" aria-atomic="true">
-      {point ? <>Ubicación marcada: {locationPointLabel(point)}<span className="sr-only">. {point.lat.toFixed(7)}, {point.lng.toFixed(7)}</span></> : "Marque la ubicación"}
-    </p>
+    {point ? <LocationPointStatus point={point} prefix="Ubicación marcada: " /> : <p role="status">Marque la ubicación</p>}
     <div className="flex shrink-0 flex-wrap justify-end gap-2">
       <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-      <Button type="button" disabled={!point} onClick={() => point && onConfirm({
-        lat: roundCoordinate(point.lat), lng: roundCoordinate(point.lng),
-      }, selectedLabel)}>Confirmar ubicación</Button>
+    <Button type="button" disabled={!point} onClick={() => point && onConfirm({
+      lat: roundCoordinate(point.lat), lng: roundCoordinate(point.lng),
+    }, selectedLabel)}>Confirmar ubicación</Button>
     </div>
   </div>;
 }

@@ -39,7 +39,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet, 
 import { Input } from "@/components/ui/input";
 import { Item, ItemGroup } from "@/components/ui/item";
 import { LocationPickerDialog } from "@/components/ui/location-picker-dialog";
-import { locationPointLabel, type LocationPoint } from "@/components/ui/location-picker";
+import { LocationPointStatus, type LocationPoint } from "@/components/ui/location-picker";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ListItemsSkeleton } from "@/components/ui/loading-skeletons";
@@ -1110,7 +1110,7 @@ function CreateReportDialog({ open, onOpenChange, onSuccess }: { open: boolean; 
           <Field><FieldLabel htmlFor="environmental-report-description">Descripción del hallazgo <span aria-hidden="true">*</span></FieldLabel><Textarea id="environmental-report-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={submitting} rows={4} placeholder="Describa qué observó y cuándo." aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? "environmental-report-description-error" : undefined} className="resize-y" />{errors.description && <FieldError id="environmental-report-description-error">{errors.description}</FieldError>}<FieldDescription>No incluya datos personales.</FieldDescription></Field>
           <Field data-invalid={Boolean(errors.location)}>
             <FieldLabel htmlFor="environmental-report-location">Ubicación <span aria-hidden="true">*</span></FieldLabel>
-            {point && <p role="status">{locationPointLabel(point)}</p>}
+            {point && <LocationPointStatus point={point} />}
             <LocationPickerDialog open={locationOpen} onOpenChange={setLocationOpen} currentPoint={point} initialAddress={address} searchAddresses={searchAddresses} suggestStreets={suggestStreets} onConfirm={(selected, label) => {
               setPoint(selected);
               if (label && !address.trim()) setAddress(label);

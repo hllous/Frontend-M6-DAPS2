@@ -145,7 +145,7 @@ describe("Vehicle catalog pagination", () => {
     const user = userEvent.setup();
     render(<VehicleCatalogPanel scenario={scenarios.officeDutyQueue} />);
     expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Página siguiente" }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20 })));
     expect(await screen.findByText("Mostrando 21–40 de 57")).toBeVisible();
     for (const [label, option] of [["Estado", "Activos"], ["Tipo de vehículo", "Camioneta utilitaria"]]) {
@@ -153,7 +153,7 @@ describe("Vehicle catalog pagination", () => {
       await user.click(await screen.findByRole("option", { name: option }));
       await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
       expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
-      await user.click(screen.getByRole("button", { name: "Siguiente" }));
+      await user.click(screen.getByRole("button", { name: "Página siguiente" }));
       await screen.findByText("Mostrando 21–40 de 57");
     }
   });
@@ -170,10 +170,10 @@ it("clamps the current page after its last active vehicle is deactivated", async
   await screen.findByText("ZZ 999 ZZ");
   await user.click(screen.getByRole("combobox", { name: "Estado" }));
   await user.click(await screen.findByRole("option", { name: "Activos" }));
-  await user.click(await screen.findByRole("button", { name: "Siguiente" }));
-  await screen.findByText("Página 2 de 3");
-  await user.click(screen.getByRole("button", { name: "Siguiente" }));
-  await screen.findByText("Página 3 de 3");
+  await user.click(await screen.findByRole("button", { name: "Página siguiente" }));
+  await screen.findByLabelText("Página 2 de 3");
+  await user.click(screen.getByRole("button", { name: "Página siguiente" }));
+  await screen.findByLabelText("Página 3 de 3");
   const row = screen.getByRole("row", { name: /ZZ 999 ZZ/ });
   await user.click(within(row).getByRole("button", { name: "Ver detalle del vehículo ZZ 999 ZZ" }));
   const sheet = await screen.findByRole("dialog", { name: "Detalle de vehículo" });
@@ -181,6 +181,6 @@ it("clamps the current page after its last active vehicle is deactivated", async
   const dialog = screen.getByRole("dialog");
   expect(dialog).toHaveTextContent("ZZ 999 ZZ");
   await user.click(within(dialog).getByRole("button", { name: "Dar de baja" }));
-  expect(await screen.findByText("Página 2 de 2")).toBeVisible();
+  expect(await screen.findByLabelText("Página 2 de 2")).toBeVisible();
   await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, active: true })));
 });

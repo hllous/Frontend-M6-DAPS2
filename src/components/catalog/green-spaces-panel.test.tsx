@@ -164,14 +164,14 @@ describe("GreenSpacesPanel pagination", () => {
     const user = userEvent.setup();
     render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
     expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Página siguiente" }));
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, pageSize: 20 })));
     expect(await screen.findByText("Mostrando 21–40 de 57")).toBeVisible();
     for (const [label, value] of [["Estado", "true"], ["Tipo de espacio", "SQUARE"], ["Zona", "zone-1"]]) {
       await chooseCatalogOption(user, screen.getByRole("combobox", { name: label }), ({ true: "Activos", SQUARE: "Plaza", "zone-1": "Belgrano" } as Record<string, string>)[value]);
       await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
       expect(await screen.findByText("Mostrando 1–20 de 57")).toBeVisible();
-      await user.click(screen.getByRole("button", { name: "Siguiente" }));
+      await user.click(screen.getByRole("button", { name: "Página siguiente" }));
       await screen.findByText("Mostrando 21–40 de 57");
     }
   });
@@ -187,10 +187,10 @@ it("clamps the current page after its last active record is deactivated", async 
   render(<GreenSpacesPanel scenario={scenarios.officeDutyQueue} />);
   await screen.findByText("Plaza remota");
   await chooseCatalogOption(user, screen.getByLabelText("Estado"), "Activos");
-  await user.click(await screen.findByRole("button", { name: "Siguiente" }));
-  await screen.findByText("Página 2 de 3");
-  await user.click(screen.getByRole("button", { name: "Siguiente" }));
-  await screen.findByText("Página 3 de 3");
+  await user.click(await screen.findByRole("button", { name: "Página siguiente" }));
+  await screen.findByLabelText("Página 2 de 3");
+  await user.click(screen.getByRole("button", { name: "Página siguiente" }));
+  await screen.findByLabelText("Página 3 de 3");
   const row = screen.getByRole("row", { name: /Plaza remota/ });
   const detail = await openGreenSpaceDetail(user, row);
   await user.click(within(detail).getByRole("button", { name: "Dar de baja" }));
@@ -198,6 +198,6 @@ it("clamps the current page after its last active record is deactivated", async 
   expect(dialog).toHaveTextContent("Plaza remota");
   expect(remove).not.toHaveBeenCalled();
   await user.click(within(dialog).getByRole("button", { name: /Dar de baja el espacio verde Plaza remota/ }));
-  expect(await screen.findByText("Página 2 de 2")).toBeVisible();
+  expect(await screen.findByLabelText("Página 2 de 2")).toBeVisible();
   await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, active: true })));
 });

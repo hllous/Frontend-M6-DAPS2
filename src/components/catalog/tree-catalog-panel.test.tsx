@@ -194,22 +194,20 @@ describe("TreeCatalogPanel", () => {
     expect(seen[0]).toEqual({ page: "2", pageSize: "20" });
   });
 
-  it("removes link behavior from disabled pagination controls", async () => {
+  it("disables pagination controls at the boundaries", async () => {
     server.use(http.get("*/api/trees", ({ request }) => {
       const page = Number(new URL(request.url).searchParams.get("page") ?? 1);
       return HttpResponse.json({ data: [], meta: { total: 45, page, pageSize: 20, totalPages: 3 } });
     }));
     const firstPage = render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
-    expect(await screen.findByText("Página 1 de 3")).toBeVisible();
-    expect(screen.getByLabelText("Página anterior")).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByLabelText("Página anterior")).not.toHaveAttribute("href");
-    expect(screen.getByLabelText("Página siguiente")).toHaveAttribute("href", "/app/catalog/trees?page=2");
+    expect(await screen.findByLabelText("Página 1 de 3")).toBeVisible();
+    expect(screen.getByLabelText("Página anterior")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Página siguiente" })).toHaveAttribute("href", "/app/catalog/trees?page=2");
 
     firstPage.unmount();
     window.history.replaceState(null, "", "/app/catalog/trees?page=3");
     render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
-    expect(await screen.findByText("Página 3 de 3")).toBeVisible();
-    expect(screen.getByLabelText("Página siguiente")).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByLabelText("Página siguiente")).not.toHaveAttribute("href");
+    expect(await screen.findByLabelText("Página 3 de 3")).toBeVisible();
+    expect(screen.getByLabelText("Página siguiente")).toBeDisabled();
   });
 });

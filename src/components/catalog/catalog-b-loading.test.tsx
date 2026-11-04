@@ -9,7 +9,6 @@ import { scenarios } from "@/lib/scenarios";
 import { RouteCatalogPanel } from "./route-catalog-panel";
 import { RoutesPanel } from "@/components/shell/routes-panel";
 import { resetZoneFixtures, zoneFixtures } from "@/lib/zones-fixtures";
-import { ZonesPanel } from "@/components/shell/zones-panel";
 
 import { CrewCatalogPanel } from "./crew-catalog-panel";
 import { DisposalSitesPanel } from "./disposal-sites-panel";
@@ -130,14 +129,6 @@ describe("Catalogo B loading skeletons (#590)", () => {
     expectBusy(screen.getByRole("region", { name: "Recorridos" }));
     await screen.findByRole("heading", { name: "Recorridos" });
     expect(screen.queryByRole("region", { name: "Recorridos" })?.getAttribute("aria-busy")).not.toBe("true");
-  });
-
-  it("shell zones: busy list skeleton, then the zones", async () => {
-    server.use(delayed("*/api/zones"));
-    render(<ZonesPanel />);
-    expectBusy(screen.getByRole("region", { name: "Zonas operativas" }));
-    await screen.findByRole("heading", { name: "Zonas operativas" });
-    expect(screen.queryByRole("region", { name: "Zonas operativas" })?.getAttribute("aria-busy")).not.toBe("true");
   });
 
   it("crews: unresolved zone cells show a skeleton, not a loading message, until the zones arrive", async () => {

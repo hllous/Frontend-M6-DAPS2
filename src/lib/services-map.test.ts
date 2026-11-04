@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { containerFixtures } from "./containers-fixtures";
 import { greenPointFixtures } from "./green-point-fixtures";
 import { greenSpaceFixtures } from "./green-space-fixtures";
-import { resolveOperationalZones } from "./operational-zones";
+import { parseOperationalZoneGeoJson, resolveOperationalZones } from "./operational-zones";
+import zonesGeoJson from "@/data/operational-zones.json";
 import { resolveServiceMapLocations, summarizeServiceZones } from "./services-map";
 import { treeFixtures } from "./tree-fixtures";
 import type { Service } from "./services";
@@ -15,7 +16,7 @@ const mapData = {
   greenSpaces: greenSpaceFixtures,
   trees: treeFixtures,
 };
-const zones = resolveOperationalZones(zoneFixtures);
+const zones = resolveOperationalZones(zoneFixtures, parseOperationalZoneGeoJson(zonesGeoJson));
 
 function makeService(overrides: Partial<Service>): Service {
   return {
