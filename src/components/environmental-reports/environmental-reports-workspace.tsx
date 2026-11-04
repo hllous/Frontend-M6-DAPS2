@@ -355,7 +355,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-canvas)]">
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-end justify-between gap-4">
+        <div className="mx-auto flex w-full flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Control ambiental</h1>
           </div>
@@ -363,7 +363,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:px-6 sm:pt-5 sm:pb-6 lg:px-8 lg:pb-8">
+      <div className="mx-auto flex w-full flex-1 flex-col gap-5 p-4 sm:px-6 sm:pt-5 sm:pb-6 lg:px-8 lg:pb-8">
         <div role="status" className="sr-only">{announcement}</div>
         {!rangeError && loadState.status === "ready" && <DroppedRecordsAlert count={loadState.dropped} />}
         {scenario.actor.kind === "OFFICE" && <QueueFilters from={filterFrom} to={filterTo} rangeError={rangeError} onFrom={(value) => { setFilterFrom(value); setQueuePage(1); }} onTo={(value) => { setFilterTo(value); setQueuePage(1); }} onClearDates={() => { setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} filterStatus={filterStatus} filterType={filterType} filterPriority={filterPriority} search={search} onStatus={(value) => { setFilterStatus(value); setQueuePage(1); }} onType={(value) => { setFilterType(value); setQueuePage(1); }} onPriority={(value) => { setFilterPriority(value); setQueuePage(1); }} onSearch={(value) => { setSearch(value); setQueuePage(1); }} />}
@@ -371,7 +371,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
         {!rangeError && loadState.status === "loading" && <LoadingState />}
         {!rangeError && loadState.status === "error" && <ErrorState message={loadState.message} onRetry={loadReports} />}
         {!rangeError && loadState.status === "ready" && filteredReports.length === 0 && <EmptyState hasFilters={filterStatus.length > 0 || Boolean(filterType || filterPriority || search || filterFrom || filterTo)} onClear={() => { setFilterStatus([]); setFilterType(""); setFilterPriority(""); setSearch(""); setFilterFrom(""); setFilterTo(""); setQueuePage(1); }} canCreate={canCreateReport} onCreate={() => setCreateOpen(true)} />}
-        {!rangeError && loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"}><ItemGroup className="grid gap-3">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ItemGroup></section>}
+        {!rangeError && loadState.status === "ready" && filteredReports.length > 0 && <section aria-label={scenario.actor.kind === "OFFICE" ? "Cola de expedientes ambientales" : "Reportes ambientales asignados"}><ItemGroup className="grid gap-3 min-[1600px]:grid-cols-2">{filteredReports.map((report) => <ReportRow key={report.id} report={report} onOpen={() => { setSelectedId(report.id); setSelectedInspectionId(null); }} />)}</ItemGroup></section>}
         {!rangeError && loadState.status === "ready" && loadState.totalPages > 1 && <QueuePagination page={queuePage} totalPages={loadState.totalPages} total={loadState.total} onPage={setQueuePage} />}
       </div>
 
@@ -471,7 +471,7 @@ function QueueStatusFilter({ filterStatus, onStatus }: { filterStatus: Environme
 }
 
 function ReportRow({ report, onOpen }: { report: EnvironmentalReport; onOpen: () => void }) {
-  return <Item variant="outline" className="p-0" render={<Button type="button" variant="ghost" onClick={onOpen} className="h-auto min-h-12 w-full justify-start gap-4 rounded-lg px-4! py-3.5! text-left whitespace-normal" aria-label={`${reportLabel(report)}, ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}, ${reportAddress(report)}, ${ENVIRONMENTAL_REPORT_STATUS_LABELS[report.status]}`} />}><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-info-fill)] text-[var(--color-action)]"><MapPin className="h-4 w-4" aria-hidden /></span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="font-bold tabular-nums text-[var(--color-text)]">{reportLabel(report)}</span><span className="text-xs font-semibold text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}</span></span><span className="mt-1.5 block truncate text-sm text-[var(--color-text)]">{reportAddress(report)}</span><span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">Actualizado {formatDate(report.updatedAt)}{report.escalated ? " · Escalado" : ""}</span></span><StatusBadge status={report.status} /><ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)] sm:mt-0" aria-hidden /></Item>;
+  return <Item variant="outline" className="h-full p-0" render={<Button type="button" variant="ghost" onClick={onOpen} className="h-auto min-h-12 w-full justify-start gap-4 rounded-lg px-4! py-3.5! text-left whitespace-normal" aria-label={`${reportLabel(report)}, ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}, ${reportAddress(report)}, ${ENVIRONMENTAL_REPORT_STATUS_LABELS[report.status]}`} />}><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-info-fill)] text-[var(--color-action)]"><MapPin className="h-4 w-4" aria-hidden /></span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="font-bold tabular-nums text-[var(--color-text)]">{reportLabel(report)}</span><span className="text-xs font-semibold text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}</span></span><span className="mt-1.5 block truncate text-sm text-[var(--color-text)]">{reportAddress(report)}</span><span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">Actualizado {formatDate(report.updatedAt)}{report.escalated ? " · Escalado" : ""}</span></span><StatusBadge status={report.status} /><ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)] sm:mt-0" aria-hidden /></Item>;
 }
 
 function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction, onReportUpdated }: { report: EnvironmentalReport; scenario: OperationalScenario; focusedInspectionId: string | null; onBack: () => void; onAction: (action: Action, report: EnvironmentalReport, reason?: string) => Promise<string | null>; onReportUpdated: (report: EnvironmentalReport) => void }) {

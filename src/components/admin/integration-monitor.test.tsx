@@ -56,7 +56,7 @@ describe("IntegrationMonitor", () => {
     expect(confirmation).toHaveTextContent("Esta acción no corrige un contenido que el sistema receptor haya rechazado");
     await user.click(within(confirmation).getByRole("button", { name: "Confirmar reintento" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("El evento se reencoló y ahora está pendiente.");
+    expect(await screen.findByText("El evento se reencoló y ahora está pendiente.")).toHaveAttribute("role", "status");
     expect((await screen.findAllByLabelText("Estado: Pendiente"))[0]).toBeVisible();
   });
 
@@ -93,7 +93,7 @@ describe("IntegrationMonitor", () => {
     await user.type(within(confirmation).getByRole("spinbutton", { name: "Límite de reintentos" }), "1");
     await user.click(within(confirmation).getByRole("button", { name: "Confirmar reintento masivo" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Se reencoló 1 evento; queda 1 evento fallido.");
+    expect(await screen.findByText("Se reencoló 1 evento; queda 1 evento fallido.")).toHaveAttribute("role", "status");
   });
 
   it("filters the activity log by entity type and identifier", async () => {

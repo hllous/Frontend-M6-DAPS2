@@ -141,6 +141,7 @@ export function AppShell({
           : requestedDestination && navigation.some((item) => item.id === requestedDestination)
             ? requestedDestination
             : "work";
+  const dataWidth = ["map", "catalog", "dashboards", "integration-monitor"].includes(destination) || (["services", "environment", "referrals"].includes(destination) && !searchParams.has("detail"));
   const mainRef = useRef<HTMLElement>(null);
   const previousDestination = useRef(destination);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -223,7 +224,7 @@ export function AppShell({
 
       <main
         ref={mainRef}
-        className={cn(styles.main, destination === "services" && styles.servicesMain)}
+        className={cn(styles.main, dataWidth ? styles.dataWidth : styles.readingWidth, destination === "services" && styles.servicesMain)}
         id="contenido-principal"
         tabIndex={-1}
       >
