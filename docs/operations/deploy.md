@@ -51,6 +51,7 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 |---|---|
 | `M6_AUTH_MODE` | `mock` para escenarios locales; `backend-development` para integrar con el backend usando un JWT de desarrollo. `real-m1` todavía falla de forma cerrada. Configurar el modo explícitamente en producción: si se omite, el código selecciona `real-m1`. |
 | `M6_BACKEND_ORIGIN` | Origen privado de M6 Backend; requerido en `backend-development`. |
+| `BFF_SHARED_KEY` | Opcional. Secreto compartido con el backend: el **mismo** valor que su `BFF_SHARED_KEY` (Render), 32 caracteres o más (`openssl rand -base64 32`; en el repositorio solo placeholders). Con él, `fetchPublicBackend` manda `X-M6-BFF-Key` y el backend cuenta, en el límite de tasa del portal, la IP del vecino que va en `X-Forwarded-For`; sin él (o con otro valor) cuenta la IP del BFF y todos los vecinos comparten un solo límite. Se manda solo en `/api/public/*`, nunca en las rutas autenticadas ni al navegador; solo servidor, sin `NEXT_PUBLIC_`. Se rota cambiándolo en Vercel y Render a la vez. |
 | `M6_JWT_SECRET` | `JWT_SECRET` del backend (base64). Si está, el BFF firma un token HS256 de 5 minutos por petición con la persona del seed del perfil elegido (#740) y la sesión dura horas (#745). Solo servidor, guardar como secreto, nunca `NEXT_PUBLIC_*`. |
 | `M6_JWT_ISSUER` | Emisor (`iss`) de esos tokens; por defecto `modulo1-ciudadanos`. Debe coincidir con `JWT_ISSUER` del backend. |
 | `M6_DEV_JWT` | Alternativa sin `M6_JWT_SECRET`: JWT de desarrollo único, aceptado por el backend (vence a los 15 min salvo fecha límite). Con `M6_JWT_SECRET` se ignora. Guardar como secreto. |
@@ -61,6 +62,10 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 > **Solo para la demo desplegada.** `M6_AUTH_MODE=backend-development` con `M6_JWT_SECRET` hace que el login abierto emita, sin credenciales, tokens de cualquier persona del seed (administración incluida) contra el backend. No cargar ese secreto en un ambiente con usuarios reales ni reutilizarlo fuera de la demo: cualquiera que abra la URL puede elegir cualquier perfil. La sesión dura 8 horas desde el login, sin corte por inactividad. Cuando M1 esté hosteado se borra `src/lib/demo-jwt.ts` y el login pasa a ser el de M1.
 
 La cookie de sesión es `httpOnly`, `Secure` en producción y `SameSite=Lax`. La implementación actual la cifra con AES-256-GCM; aún no autentica contra M1. Para una demo aislada, el modo `mock` usa fixtures. Para probar llamadas al backend, usá `backend-development` y un JWT temporal válido. No publiques secretos en el repositorio ni los incluyas en variables públicas.
+
+### IP del vecino y `X-Forwarded-For`
+
+Según la [documentación de Vercel](https://vercel.com/docs/headers/request-headers#x-forwarded-for), `x-forwarded-for` lleva la IP pública del cliente, Vercel lo sobrescribe y no reenvía IPs externas (para evitar suplantación); `x-real-ip` es idéntico. Por eso, desplegado en Vercel, el primer salto es la IP real y el BFF lo reenvía. Si se pone un proxy delante de Vercel, ese header trae la IP del proxy (no la del vecino). Fuera de Vercel (Docker, local) no hay garantía: un cliente podría mandar el header, así que ahí no se debe activar `BFF_SHARED_KEY` salvo que un proxy propio lo sobrescriba. El backend además descarta una primera entrada que no sea una IP válida.
 
 ## Variables principales del backend
 
