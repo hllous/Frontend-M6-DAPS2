@@ -81,8 +81,8 @@ export type OperationalScenario = {
     crewId?: string;
     crewName?: string;
     /**
-   * Nombre exacto de la cuadrilla en Backend (el seed no le da código y el id cambia con cada seed).
-   * En real-m1, el login lo resuelve contra GET /me y la sesión guarda el id real.
+     * Nombre exacto de la cuadrilla en Backend (el seed no le da código y el id cambia con cada seed).
+     * En real-m1, el login lo resuelve contra GET /me y la sesión guarda el id real.
      */
     backendCrewName?: string;
   };
