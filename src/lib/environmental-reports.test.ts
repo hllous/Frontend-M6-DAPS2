@@ -113,7 +113,7 @@ describe("environmental reports adapter", () => {
     expect((await environmentalReportsAdapter.forward("ER-1001", { reason: "Corresponde a otra dependencia." })).status).toBe("FORWARDED");
     expect((await environmentalReportsAdapter.close("ER-1001")).status).toBe("CLOSED");
     server.use(http.get("*/api/environmental-reports/ER-1001", () => HttpResponse.json({ broken: true })));
-    await expect(environmentalReportsAdapter.get("ER-1001")).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    await expect(environmentalReportsAdapter.get("ER-1001")).rejects.toMatchObject({ message: "No se pudo obtener información válida del detalle del expediente. Reintente en unos segundos." });
   });
 
   it("sends the required reason as JSON on forward and dismiss, and rejects an empty one before the request", async () => {

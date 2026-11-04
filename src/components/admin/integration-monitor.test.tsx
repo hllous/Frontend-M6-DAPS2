@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
-import { resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
+import { getOutboxFixture, listOutboxFixtures, resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 import { IntegrationMonitor } from "./integration-monitor";
 
@@ -30,6 +30,34 @@ describe("IntegrationMonitor", () => {
     expect(await screen.findByLabelText("Eventos fallidos")).toHaveTextContent("2 eventos fallidos");
     expect(screen.getByRole("heading", { name: "Conexiones con otras áreas" })).toBeVisible();
     expectNoInternalJargon(container);
+  });
+
+  it("filters using a partial Spanish event name", async () => {
+    const user = userEvent.setup();
+    render(<IntegrationMonitor canManage initialTab="events" />);
+    await screen.findByRole("table", { name: "Envíos a otras áreas" });
+    await user.type(screen.getByRole("textbox", { name: "Tipo de evento" }), "Daño");
+    await user.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    const table = await screen.findByRole("table", { name: "Envíos a otras áreas" });
+    expect(within(table).getByText("Daño en contenedor")).toBeVisible();
+    expect(within(table).queryByText("Servicio finalizado")).not.toBeInTheDocument();
+  });
+
+  it("keeps an unknown event type available as a support identifier in its detail", async () => {
+    const user = userEvent.setup();
+    const page = listOutboxFixtures({ page: 1, pageSize: 20 });
+    const event = { ...page.data[0], eventType: "futureEventType" };
+    const detail = { ...getOutboxFixture(event.id)!, eventType: event.eventType };
+    server.use(
+      http.get("*/api/events/outbox", () => HttpResponse.json({ ...page, data: [event] })),
+      http.get("*/api/events/outbox/:id", () => HttpResponse.json(detail)),
+    );
+    render(<IntegrationMonitor canManage initialTab="events" />);
+    const table = await screen.findByRole("table", { name: "Envíos a otras áreas" });
+    expect(within(table).getByText("Otro envío")).toBeVisible();
+    expect(within(table).queryByText("futureEventType")).not.toBeInTheDocument();
+    await user.click(within(table).getByRole("button", { name: "Ver detalle de Otro envío" }));
+    expect(await screen.findByText("Tipo técnico: futureEventType")).toBeVisible();
   });
 
   it("announces calendar days in Spanish", async () => {

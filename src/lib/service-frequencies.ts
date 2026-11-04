@@ -132,14 +132,14 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
 function parseResource(payload: unknown): ServiceFrequency {
   const raw = payload && typeof payload === "object" && "data" in payload && !("id" in payload) ? (payload as { data: unknown }).data : payload;
   const parsed = serviceFrequencySchema.safeParse(raw);
-  if (!parsed.success) throw new ServiceFrequencyContractError("La frecuencia no respeta el contrato esperado.", { cause: parsed.error });
+  if (!parsed.success) throw new ServiceFrequencyContractError("No se pudo obtener información válida de la frecuencia. Reintente en unos segundos.", { cause: parsed.error });
   return parsed.data;
 }
 
 export const serviceFrequenciesAdapter = {
   async list(query: ServiceFrequencyQuery = {}): Promise<ServiceFrequenciesPage> {
     const parsed = pageSchema.safeParse(await requestJson(`/api/service-frequencies${queryString(query)}`));
-    if (!parsed.success) throw new ServiceFrequencyContractError("La lista de frecuencias no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new ServiceFrequencyContractError("No se pudo obtener información válida de la lista de frecuencias. Reintente en unos segundos.", { cause: parsed.error });
     return { serviceFrequencies: parsed.data.data, ...parsed.data.meta };
   },
   async get(id: string): Promise<ServiceFrequency> {

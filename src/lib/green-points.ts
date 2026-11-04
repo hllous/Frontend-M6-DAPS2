@@ -157,27 +157,27 @@ export const greenPointsAdapter = {
   async list(query: GreenPointQuery = {}): Promise<GreenPointsPage> {
     const { payload } = await request(`/api/green-points${queryString(query)}`);
     const parsed = pageSchema.safeParse(payload);
-    if (!parsed.success) throw new GreenPointContractError("La lista de puntos verdes no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new GreenPointContractError("No se pudo obtener información válida de la lista de puntos verdes. Reintente en unos segundos.", { cause: parsed.error });
     return { greenPoints: parsed.data.data, page: parsed.data.meta.page, pageSize: parsed.data.meta.pageSize, total: parsed.data.meta.total, totalPages: parsed.data.meta.totalPages };
   },
 
   async get(id: string): Promise<GreenPoint> {
     const { payload } = await request(`/api/green-points/${id}`);
-    return parseResource(payload, "El detalle del punto verde no respeta el contrato esperado.");
+    return parseResource(payload, "No se pudo obtener información válida del detalle del punto verde. Reintente en unos segundos.");
   },
 
   async create(input: GreenPointCreateInput): Promise<GreenPoint> {
     const parsedInput = greenPointCreateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new GreenPointContractError("Los datos para registrar el punto verde son inválidos.", { cause: parsedInput.error });
     const { payload } = await request("/api/green-points", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) });
-    return parseResource(payload, "La respuesta de creación del punto verde no respeta el contrato esperado.");
+    return parseResource(payload, "No se pudo obtener información válida de la creación del punto verde. Reintente en unos segundos.");
   },
 
   async update(id: string, input: GreenPointUpdateInput): Promise<GreenPoint> {
     const parsedInput = greenPointUpdateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new GreenPointContractError("Los datos editables del punto verde son inválidos.", { cause: parsedInput.error });
     const { payload } = await request(`/api/green-points/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) });
-    return parseResource(payload, "La respuesta de actualización del punto verde no respeta el contrato esperado.");
+    return parseResource(payload, "No se pudo obtener información válida de la actualización del punto verde. Reintente en unos segundos.");
   },
 
   async remove(id: string): Promise<void> {

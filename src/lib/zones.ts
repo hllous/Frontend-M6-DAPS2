@@ -197,7 +197,7 @@ async function handleSingleZoneResponse(response: Response, resource: "zones" = 
   const parsed = zoneWireSchema.safeParse(payload);
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
-    throw new ZoneContractError("La respuesta de zona no respeta el contrato esperado.", {
+    throw new ZoneContractError("No se pudo obtener información válida de zona. Reintente en unos segundos.", {
       cause: parsed.error,
     });
   }
@@ -224,7 +224,7 @@ export const zonesAdapter = {
     const parsed = zonesEnvelopeSchema.safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "zones" });
-      throw new ZoneContractError("La respuesta de zonas no respeta el contrato esperado.", {
+      throw new ZoneContractError("No se pudo obtener información válida de zonas. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }
@@ -353,7 +353,7 @@ export const zonesAdapter = {
     const parsed = zoneReferenceReportSchema.safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "zones" });
-      throw new ZoneContractError("La respuesta de referencias de zona no respeta el contrato esperado.", {
+      throw new ZoneContractError("No se pudo obtener información válida de referencias de zona. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }

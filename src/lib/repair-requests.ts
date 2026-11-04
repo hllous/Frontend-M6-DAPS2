@@ -201,7 +201,7 @@ export const repairRequestsAdapter = {
     }).safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "repair-requests" });
-      throw new RepairRequestContractError("La lista de derivaciones no respeta el contrato esperado.", { cause: parsed.error });
+      throw new RepairRequestContractError("No se pudo obtener información válida de la lista de derivaciones. Reintente en unos segundos.", { cause: parsed.error });
     }
     return {
       repairRequests: parsed.data.data,
@@ -215,7 +215,7 @@ export const repairRequestsAdapter = {
   async get(id: string): Promise<RepairRequest> {
     return parseResource(
       await requestJson(`/api/repair-requests/${id}`),
-      "El detalle de la derivación no respeta el contrato esperado.",
+      "No se pudo obtener información válida del detalle de la derivación. Reintente en unos segundos.",
     );
   },
 
@@ -230,7 +230,7 @@ export const repairRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de creación de la derivación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la creación de la derivación. Reintente en unos segundos.",
     );
   },
 
@@ -243,7 +243,7 @@ export const repairRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de inicio de la derivación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la inicio de la derivación. Reintente en unos segundos.",
     );
   },
 
@@ -256,7 +256,7 @@ export const repairRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de cierre de la derivación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la cierre de la derivación. Reintente en unos segundos.",
     );
   },
 };

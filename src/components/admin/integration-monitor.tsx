@@ -205,12 +205,16 @@ const eventLabels: Record<string, string> = {
 };
 
 function eventLabel(type: string): string {
-  return eventLabels[type] ?? "Otro envío";
+  return Object.hasOwn(eventLabels, type) ? eventLabels[type] : "Otro envío";
 }
 
 function eventTypeFilter(value: string): string {
-  const match = Object.entries(eventLabels).find(([, label]) => label.toLocaleLowerCase("es-AR") === value.toLocaleLowerCase("es-AR"));
-  return match?.[0] ?? value;
+  const normalized = value.toLocaleLowerCase("es-AR");
+  const entries = Object.entries(eventLabels);
+  const exact = entries.find(([, label]) => label.toLocaleLowerCase("es-AR") === normalized);
+  if (exact) return exact[0];
+  const matches = entries.filter(([, label]) => label.toLocaleLowerCase("es-AR").includes(normalized));
+  return matches.length === 1 ? matches[0][0] : value;
 }
 
 function eventQuery(filters: EventFilters, page: number): string {
@@ -825,6 +829,7 @@ export function IntegrationMonitor({
               <DialogHeader>
                 <DialogTitle>Detalle del evento</DialogTitle>
                 <DialogDescription>{selectedEvent ? eventLabel(selectedEvent.eventType) : ""} · {selectedEvent ? dateTime(selectedEvent.occurredAt) : ""}</DialogDescription>
+                {selectedEvent && !Object.hasOwn(eventLabels, selectedEvent.eventType) ? <p className="text-sm text-muted-foreground">Tipo técnico: {selectedEvent.eventType}</p> : null}
               </DialogHeader>
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-3">
                 {detailLoading ? <p role="status">Cargando detalle del evento.</p> : null}

@@ -237,13 +237,13 @@ async function requestJson(path: string): Promise<unknown> {
 export const referralsAdapter = {
   async list(): Promise<ReferralsPage> {
     const parsed = referralsPageSchema.safeParse(await requestJson("/api/referrals"));
-    if (!parsed.success) throw new ReferralContractError("La lista de derivaciones no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new ReferralContractError("No se pudo obtener información válida de la lista de derivaciones. Reintente en unos segundos.", { cause: parsed.error });
     return { referrals: parsed.data.data as Referral[], total: parsed.data.meta.total, invalid: parsed.data.meta.invalid ?? 0 };
   },
 
   async get(id: string): Promise<Referral> {
     const parsed = referralSchema.safeParse(await requestJson(`/api/referrals/${encodeURIComponent(id)}`));
-    if (!parsed.success) throw new ReferralContractError("El detalle de la derivación no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new ReferralContractError("No se pudo obtener información válida del detalle de la derivación. Reintente en unos segundos.", { cause: parsed.error });
     return parsed.data as Referral;
   },
 };

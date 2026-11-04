@@ -298,7 +298,7 @@ async function request(path: string) {
   }
   if (!response.ok) {
     const parsed = z.object({ statusCode: z.number(), message: z.union([z.string(), z.array(z.string())]) }).safeParse(payload);
-    if (!parsed.success) throw new IndicatorContractError("La respuesta de error de indicadores no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new IndicatorContractError("No se pudo obtener información válida de error de indicadores. Reintente en unos segundos.", { cause: parsed.error });
     const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
     throw new IndicatorRequestError(message, parsed.data.statusCode);
   }

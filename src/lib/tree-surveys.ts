@@ -139,17 +139,17 @@ export const treeSurveysAdapter = {
   async getTreeSurveys(treeId: string, query: TreeSurveyQuery = {}): Promise<TreeSurveysPage> {
     const payload = await request(`/api/trees/${encodeURIComponent(treeId)}/surveys${queryString(query)}`);
     const parsed = pageSchema.safeParse(payload);
-    if (!parsed.success) throw new TreeSurveyContractError("El historial de relevamientos no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new TreeSurveyContractError("No se pudo obtener información válida del historial de relevamientos. Reintente en unos segundos.", { cause: parsed.error });
     return { surveys: parsed.data.data, page: parsed.data.meta.page, pageSize: parsed.data.meta.pageSize, total: parsed.data.meta.total, totalPages: parsed.data.meta.totalPages };
   },
 
   async createTreeSurvey(treeId: string, input: TreeSurveyCreateInput): Promise<TreeSurvey> {
     const parsedInput = treeSurveyCreateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new TreeSurveyContractError("Los datos del relevamiento son inválidos.", { cause: parsedInput.error });
-    return parseSurvey(await request(`/api/trees/${encodeURIComponent(treeId)}/surveys`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) }), "La respuesta de creación del relevamiento no respeta el contrato esperado.");
+    return parseSurvey(await request(`/api/trees/${encodeURIComponent(treeId)}/surveys`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) }), "No se pudo obtener información válida de la creación del relevamiento. Reintente en unos segundos.");
   },
 
   async getTreeSurvey(treeId: string, surveyId: string): Promise<TreeSurvey> {
-    return parseSurvey(await request(`/api/trees/${encodeURIComponent(treeId)}/surveys/${encodeURIComponent(surveyId)}`), "El detalle del relevamiento no respeta el contrato esperado.");
+    return parseSurvey(await request(`/api/trees/${encodeURIComponent(treeId)}/surveys/${encodeURIComponent(surveyId)}`), "No se pudo obtener información válida del detalle del relevamiento. Reintente en unos segundos.");
   },
 };

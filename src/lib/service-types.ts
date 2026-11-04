@@ -166,7 +166,7 @@ function parseResource(payload: unknown): ServiceType {
     ? (payload as { data: unknown }).data
     : payload;
   const parsed = serviceTypeSchema.safeParse(raw);
-  if (!parsed.success) throw new ServiceTypeContractError("El tipo de servicio no respeta el contrato esperado.", { cause: parsed.error });
+  if (!parsed.success) throw new ServiceTypeContractError("No se pudo obtener información válida del tipo de servicio. Reintente en unos segundos.", { cause: parsed.error });
   return parsed.data;
 }
 
@@ -174,7 +174,7 @@ export const serviceTypesAdapter = {
   async list(query: ServiceTypeQuery = {}): Promise<ServiceTypesPage> {
     const payload = await requestJson(`/api/service-types${queryString(query)}`);
     const parsed = pageSchema.safeParse(payload);
-    if (!parsed.success) throw new ServiceTypeContractError("La lista de tipos de servicio no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new ServiceTypeContractError("No se pudo obtener información válida de la lista de tipos de servicio. Reintente en unos segundos.", { cause: parsed.error });
     return {
       serviceTypes: parsed.data.data,
       page: parsed.data.meta.page,

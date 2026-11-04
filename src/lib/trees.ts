@@ -176,27 +176,27 @@ export const treesAdapter = {
   async list(query: TreeQuery = {}): Promise<TreesPage> {
     const { payload } = await request(`/api/trees${queryString(query)}`);
     const parsed = pageSchema.safeParse(payload);
-    if (!parsed.success) throw new TreeContractError("La lista de árboles no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new TreeContractError("No se pudo obtener información válida de la lista de árboles. Reintente en unos segundos.", { cause: parsed.error });
     return { trees: parsed.data.data, page: parsed.data.meta.page, pageSize: parsed.data.meta.pageSize, total: parsed.data.meta.total, totalPages: parsed.data.meta.totalPages };
   },
 
   async get(id: string): Promise<Tree> {
     const { payload } = await request(`/api/trees/${id}`);
-    return parseResource(payload, "El detalle del árbol no respeta el contrato esperado.");
+    return parseResource(payload, "No se pudo obtener información válida del detalle del árbol. Reintente en unos segundos.");
   },
 
   async create(input: TreeCreateInput): Promise<Tree> {
     const parsedInput = treeCreateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new TreeContractError("Los datos para registrar el árbol son inválidos.", { cause: parsedInput.error });
     const { payload } = await request("/api/trees", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) });
-    return parseResource(payload, "La respuesta de creación del árbol no respeta el contrato esperado.");
+    return parseResource(payload, "No se pudo obtener información válida de la creación del árbol. Reintente en unos segundos.");
   },
 
   async update(id: string, input: TreeUpdateInput): Promise<Tree> {
     const parsedInput = treeUpdateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new TreeContractError("Los datos editables del árbol son inválidos.", { cause: parsedInput.error });
     const { payload } = await request(`/api/trees/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) });
-    return parseResource(payload, "La respuesta de actualización del árbol no respeta el contrato esperado.");
+    return parseResource(payload, "No se pudo obtener información válida de la actualización del árbol. Reintente en unos segundos.");
   },
 
   async remove(id: string): Promise<void> {

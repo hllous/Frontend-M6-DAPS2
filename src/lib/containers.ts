@@ -268,7 +268,7 @@ export const containersAdapter = {
     const parsed = containersEnvelopeSchema.safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
-      throw new ContainerContractError("La respuesta de contenedores no respeta el contrato esperado.", {
+      throw new ContainerContractError("No se pudo obtener información válida de contenedores. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }
@@ -284,7 +284,7 @@ export const containersAdapter = {
   async get(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}`),
-      "El detalle de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida del detalle de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -301,7 +301,7 @@ export const containersAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de creación de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la creación de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -318,7 +318,7 @@ export const containersAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de actualización de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la actualización de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -327,7 +327,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/report-overflow`, {
         method: "POST",
       }),
-      "La respuesta de reporte de desborde no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la reporte de desborde. Reintente en unos segundos.",
     );
   },
 
@@ -344,28 +344,28 @@ export const containersAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de reporte de daño no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la reporte de daño. Reintente en unos segundos.",
     );
   },
 
   async startRepair(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}/start-repair`, { method: "POST" }),
-      "La respuesta de inicio de reparación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la inicio de reparación. Reintente en unos segundos.",
     );
   },
 
   async completeRepair(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}/complete-repair`, { method: "POST" }),
-      "La respuesta de finalización de reparación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la finalización de reparación. Reintente en unos segundos.",
     );
   },
 
   async remove(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}/remove`, { method: "POST" }),
-      "La respuesta de retiro de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la retiro de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -436,7 +436,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/empty`, {
         method: "POST",
       }),
-      "La respuesta de vaciado de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la vaciado de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -445,7 +445,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/relocate`, {
         method: "POST",
       }),
-      "La respuesta de inicio de reubicación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la inicio de reubicación. Reintente en unos segundos.",
     );
   },
 
@@ -462,7 +462,7 @@ export const containersAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de confirmación de reubicación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la confirmación de reubicación. Reintente en unos segundos.",
     );
   },
 };

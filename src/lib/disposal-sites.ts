@@ -57,14 +57,14 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
 function parseResource(payload: unknown): DisposalSite {
   const raw = payload && typeof payload === "object" && "data" in payload && !("id" in payload) ? (payload as { data: unknown }).data : payload;
   const parsed = disposalSiteSchema.safeParse(raw);
-  if (!parsed.success) throw new DisposalSiteContractError("El sitio de disposición no respeta el contrato esperado.", { cause: parsed.error });
+  if (!parsed.success) throw new DisposalSiteContractError("No se pudo obtener información válida del sitio de disposición. Reintente en unos segundos.", { cause: parsed.error });
   return parsed.data;
 }
 
 export const disposalSitesAdapter = {
   async list(query: DisposalSiteQuery = {}): Promise<DisposalSitesPage> {
     const parsed = pageSchema.safeParse(await requestJson(`/api/disposal-sites${queryString(query)}`));
-    if (!parsed.success) throw new DisposalSiteContractError("La lista de sitios de disposición no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new DisposalSiteContractError("No se pudo obtener información válida de la lista de sitios de disposición. Reintente en unos segundos.", { cause: parsed.error });
     return { disposalSites: parsed.data.data, page: parsed.data.meta.page, pageSize: parsed.data.meta.pageSize, total: parsed.data.meta.total, totalPages: parsed.data.meta.totalPages };
   },
   async get(id: string) { return parseResource(await requestJson(`/api/disposal-sites/${id}`)); },

@@ -151,24 +151,24 @@ function parseIntervention(payload: unknown, message: string): TreeInterventionD
 export const treeInterventionsAdapter = {
   async list(query: TreeInterventionQuery = {}): Promise<TreeInterventionsPage> {
     const parsed = pageSchema.safeParse(await request(`/api/tree-interventions${queryString(query)}`));
-    if (!parsed.success) throw new TreeInterventionContractError("La lista de intervenciones no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new TreeInterventionContractError("No se pudo obtener información válida de la lista de intervenciones. Reintente en unos segundos.", { cause: parsed.error });
     return { interventions: parsed.data.data, page: parsed.data.meta.page, pageSize: parsed.data.meta.pageSize, total: parsed.data.meta.total, totalPages: parsed.data.meta.totalPages };
   },
 
   async get(id: string): Promise<TreeInterventionDetail> {
-    return parseIntervention(await request(`/api/tree-interventions/${encodeURIComponent(id)}`), "El detalle de la intervención no respeta el contrato esperado.");
+    return parseIntervention(await request(`/api/tree-interventions/${encodeURIComponent(id)}`), "No se pudo obtener información válida del detalle de la intervención. Reintente en unos segundos.");
   },
 
   async create(input: TreeInterventionCreateInput): Promise<TreeInterventionDetail> {
     const parsedInput = treeInterventionCreateInputSchema.safeParse(input);
     if (!parsedInput.success) throw new TreeInterventionContractError("Los datos de la intervención son inválidos.", { cause: parsedInput.error });
-    return parseIntervention(await request("/api/tree-interventions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) }), "La respuesta de creación de la intervención no respeta el contrato esperado.");
+    return parseIntervention(await request("/api/tree-interventions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsedInput.data) }), "No se pudo obtener información válida de la creación de la intervención. Reintente en unos segundos.");
   },
 
   async submitForAuthorization(id: string): Promise<TreeInterventionDetail> {
     return parseIntervention(
       await request(`/api/tree-interventions/${encodeURIComponent(id)}/submit-for-authorization`, { method: "POST" }),
-      "La respuesta de envío a autorización no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la envío a autorización. Reintente en unos segundos.",
     );
   },
 
@@ -176,14 +176,14 @@ export const treeInterventionsAdapter = {
   async authorize(id: string): Promise<TreeInterventionDetail> {
     return parseIntervention(
       await request(`/api/tree-interventions/${encodeURIComponent(id)}/authorize`, { method: "POST" }),
-      "La respuesta de autorización no respeta el contrato esperado.",
+      "No se pudo obtener información válida de autorización. Reintente en unos segundos.",
     );
   },
 
   async reject(id: string): Promise<TreeInterventionDetail> {
     return parseIntervention(
       await request(`/api/tree-interventions/${encodeURIComponent(id)}/reject`, { method: "POST" }),
-      "La respuesta de rechazo no respeta el contrato esperado.",
+      "No se pudo obtener información válida de rechazo. Reintente en unos segundos.",
     );
   },
 
@@ -196,7 +196,7 @@ export const treeInterventionsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de asociación del servicio no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la asociación del servicio. Reintente en unos segundos.",
     );
   },
 };
