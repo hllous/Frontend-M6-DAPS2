@@ -368,7 +368,7 @@ export function IntegrationMonitor({
     const input = eventDraft.eventType.trim().toLocaleLowerCase("es-AR");
     const matchingLabels = Object.values(eventLabels).filter((label) => label.toLocaleLowerCase("es-AR").includes(input));
     if (input && matchingLabels.length > 1 && !matchingLabels.some((label) => label.toLocaleLowerCase("es-AR") === input)) {
-      setEventFilterError("Los filtros de envíos a otras áreas no son válidos.");
+      setEventFilterError("Escriba un nombre de evento más específico.");
       return;
     }
     setEventFilterError("");
