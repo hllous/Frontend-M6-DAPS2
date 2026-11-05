@@ -114,7 +114,8 @@ it("no muestra detalles emergentes al pasar por las barras de zona y familia", a
   const zoneChart = await within(zones).findByRole("group", { name: /Barras de/ });
   await user.hover(within(zoneChart).getAllByRole("button")[0]);
   expect(within(zoneChart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Cumplimiento" }));
+  await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Cumplimiento" }));
   const familyChart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
   await user.hover(within(familyChart).getAllByRole("button")[0]);
   expect(within(familyChart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
