@@ -1,0 +1,16 @@
+- [Orchestration usage budget](orchestration-usage-budget.md) — check usage per batch; heartbeat nudges cost coordinator turns; coordinator runs the one full suite
+- [Orca single waiter](orca-single-waiter.md) — one check --wait per Run; extra waits fail instantly with waiter_exists
+- [Disk E only](disk-e-only.md) — worktrees, scratch, temp and worker outputs only on E:, use .orca/tmp
+- [Talk in English](talk-english.md) — reply in English, not Spanish, despite handoff notes
+- [Interaction checks](interaction-checks.md) — verify UI with real mouse/touch input, not screenshots; PO requirement
+- [Dev servers: file logs](dev-servers-file-logs.md) — servers started in worker terminals freeze after release; coordinator starts them with file logs
+- [Worker skills](worker-skills.md) — specs require tdd + playwright-cli/shadcn/impeccable (UI) + chrome-devtools-cli (perf); Playwright visual loop + impeccable critique on UI changes; report lists them
+- [No rebase of pushed branches](no-rebase-pushed-branches.md) — merge origin/develop instead; Claude auto mode blocks force-push
+- [PR merges](pr-merge-by-user.md) — offer `!` lines by default; merge directly when the user says "do it yourself"
+- [Scratch junctions](scratch-junctions.md) — worker scratch copies may link a worktree node_modules; unlink before deleting
+- [No extra promotions](no-extra-promotions.md) — if a promotion's PRs are already merged, close the issue; don't open new promotions
+- [Hidden user skills](hidden-user-skills.md) — /wait-what, /grill-with-docs etc. live in ~/.claude/skills, not in the listing; check before saying missing
+- [to-spec on every issue](to-spec-every-issue.md) — PO rule: spec every issue, even small bugs; skills at ~/.claude/skills, read SKILL.md
+- [Codex compaction stall](codex-compaction-stall.md) — luna workers idle after compaction; read terminal, nudge, add re-read line to specs
+- [Codex usage-limit recovery](codex-usage-limit-recovery.md) — mail can't wake a limit-stopped worker; worker-stop + worker-start --retry-of + resume mail
+- [PO preview before UI merge](po-preview-before-ui-merge.md) — show visible UI changes (always Tableros) on the dev server and get an OK before merging
