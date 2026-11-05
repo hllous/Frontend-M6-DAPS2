@@ -20,6 +20,11 @@ test.describe("Tableros: Requiere atención (#861)", () => {
     await expect(section.getByRole("group", { name: "Servicios fuera de horario" })).toContainText("46");
     await expect(section.getByRole("group", { name: "Contenedores desbordados" })).toContainText("2 menos que antes");
     await expect(page.getByRole("combobox", { name: "Familia" })).toHaveCount(0);
+    await expect(section.getByRole("button", { name: /Ver datos de/ })).toHaveCount(0);
+    const list = await section.getByRole("link", { name: "Ver lista de servicios sin realizar" }).boundingBox();
+    const detail = await section.getByRole("button", { name: "Ver detalle de Servicios sin realizar" }).boundingBox();
+    expect(Math.abs(list!.y - detail!.y)).toBeLessThan(2);
+    expect((await section.getByRole("group", { name: "Servicios sin realizar" }).boundingBox())!.height).toBeLessThan(180);
 
     await clickWithMouse(page, page.getByRole("button", { name: "Semana", exact: true }));
     await expect(page.getByRole("button", { name: "Semana", exact: true })).toHaveAttribute("aria-pressed", "true");
