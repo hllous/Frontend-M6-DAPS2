@@ -55,8 +55,10 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
   });
 
   it("shows the trend module as a busy region with a skeleton, then the chart takes its place", async () => {
+    let release!: () => void;
+    const responseReady = new Promise<void>((resolve) => { release = resolve; });
     server.use(http.get("*/api/indicators/coverage", async () => {
-      await delay(150);
+      await responseReady;
       return HttpResponse.json(coverageIndicatorFixture);
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
@@ -66,9 +68,10 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expectBusy(trend);
     expect(trend.querySelector('[data-slot="skeleton"]')).not.toBeNull();
 
+    release();
     const loaded = await screen.findByRole("heading", { name: "Cobertura por tipo de servicio" });
     expect(loaded).toBeVisible();
-    expect(screen.getByRole("region", { name: "Por categoría" })).not.toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("region", { name: "Por categoría" })).not.toHaveAttribute("aria-busy");
     expect(within(screen.getByRole("region", { name: "Por categoría" })).queryByText("Cargando")).toBeNull();
   });
 
