@@ -8,7 +8,7 @@ import { CalendarClock, CheckCircle2, CircleX, Clock3, Eye, Info, Plus, RefreshC
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { CompactPager } from "@/components/ui/compact-pager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -617,7 +617,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de autorización</dt><dd className="mt-1 tabular-nums">{dateTimeLabel(detail.authorizedAt)}</dd></div>
                   </dl>
                 ) : null}
-                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className="font-semibold underline" aria-label={`Servicio: ${(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "sin título disponible"}`} href={serviceSourceHref(detail.serviceId)}>{(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "Servicio sin título disponible"}</Link>.</AlertDescription></Alert> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className={buttonVariants({ variant: "link" })} href={serviceSourceHref(detail.serviceId)} aria-label={`Servicio: ${(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "sin título disponible"}`}>{(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "Servicio sin título disponible"}</Link>.</AlertDescription></Alert> : null}
                 {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && scheduleOpen ? (
                   <form
                     aria-label="Programar servicio para la intervención"
