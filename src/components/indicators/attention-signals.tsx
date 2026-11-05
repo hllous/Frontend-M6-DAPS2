@@ -111,6 +111,15 @@ function Trend({ change }: { change: number | null }) {
   );
 }
 
+/** Marca solo el último valor del minigráfico: es el número que muestra la tarjeta. */
+function endDot(series: { value: number | null }[]) {
+  const last = series.reduce((found, point, index) => (point.value === null ? found : index), -1);
+  return ({ cx, cy, index }: { cx?: number; cy?: number; index?: number }) =>
+    index === last && cx !== undefined && cy !== undefined
+      ? <circle key={index} cx={cx} cy={cy} r={3} fill="var(--color-value)" />
+      : <g key={index} />;
+}
+
 function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { signal: AttentionSignal; status: LoadStatus; onRetry: () => void; onDetail: (trigger: HTMLElement) => void; series: { from: string; value: number | null }[]; bucket: "week" | "month" }) {
   const titleId = `signal-${signal.id}-title`;
   const descriptionId = `signal-${signal.id}-description`;
@@ -157,8 +166,8 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
             <p className="text-3xl leading-none font-semibold tabular-nums tracking-tight" aria-hidden="true">{plainNumber(signal.value)}</p>
             <Trend change={change} />
           </div>
-          {hasSeries ? <div aria-hidden="true" className="w-28 shrink-0"><ChartContainer config={{ value: { label: signal.label, color: "var(--primary)" } }} className="h-10 w-full" style={{ aspectRatio: "auto" }}>
-            <LineChart data={series}><YAxis hide domain={[0, "auto"]} /><Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={series.filter((point) => point.value !== null).length === 1} isAnimationActive={false} /></LineChart>
+          {hasSeries ? <div aria-hidden="true" className="w-28 shrink-0"><ChartContainer config={{ value: { label: signal.label, color: worse ? "var(--destructive)" : "var(--primary)" } }} className="h-10 w-full" style={{ aspectRatio: "auto" }}>
+            <LineChart data={series} margin={{ top: 4, right: 6, bottom: 4, left: 4 }}><YAxis hide domain={["dataMin - 1", "dataMax + 1"]} /><Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={endDot(series)} isAnimationActive={false} connectNulls /></LineChart>
           </ChartContainer></div> : <p className="text-xs text-muted-foreground">Sin datos en el período.</p>}
         </div>
         <CardDescription aria-hidden="true" className="text-xs">{signal.context}</CardDescription>
