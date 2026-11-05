@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
-import { coverageIndicatorFixture } from "@/lib/indicator-fixtures";
+import { coverageIndicatorFixture, coverageWithoutSeriesFixture } from "@/lib/indicator-fixtures";
 import { scenarios } from "@/lib/scenarios";
 import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
@@ -26,6 +26,23 @@ async function signals() {
 }
 
 describe("Requiere atención", () => {
+  it("muestra la evolución semanal y cobertura como tabla", async () => {
+    const section = await signals();
+    expect(within(section).getAllByText(/Evolución por semana/)).toHaveLength(3);
+    await userEvent.click(within(section).getByRole("button", { name: "Ver datos de Servicios sin realizar" }));
+    expect(within(section).getByRole("table", { name: "Valores de Servicios sin realizar por semana" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Cobertura por semana" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Tabla" }));
+    expect(screen.getByRole("table", { name: "Cobertura por período" })).toBeVisible();
+  });
+  it("mantiene la tarjeta y explica la ausencia de serie", async () => {
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(coverageWithoutSeriesFixture)));
+    const section = await signals();
+    const card = within(section).getByRole("group", { name: "Servicios sin realizar" });
+    expect(within(card).getByText("24")).toBeVisible();
+    expect(within(card).getByText("Sin datos en el período.")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Cobertura por semana" })).getByText("Sin datos en el período.")).toBeVisible();
+  });
   it("muestra las tres señales con el valor real, la variación contra el período anterior y la meta", async () => {
     const section = await signals();
 

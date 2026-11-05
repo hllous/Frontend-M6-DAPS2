@@ -96,7 +96,7 @@ describe("indicatorsAdapter", () => {
     });
   });
 
-  it("requests a bucket only for coverage and keeps catalog filters family-specific", async () => {
+  it("requests weekly series for attention signals and keeps catalog filters family-specific", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const path = String(input);
       if (path.includes("/coverage")) return new Response(JSON.stringify(coverageIndicatorFixture));
@@ -112,8 +112,8 @@ describe("indicatorsAdapter", () => {
 
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       "/api/indicators/coverage?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week&zoneId=zone-2&serviceTypeId=service-sweeping",
-      "/api/indicators/compliance?from=2026-08-08&to=2026-09-06&compare=previous&zoneId=zone-2&serviceTypeId=service-sweeping",
-      "/api/indicators/incidents?from=2026-08-08&to=2026-09-06&compare=previous",
+      "/api/indicators/compliance?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week&zoneId=zone-2&serviceTypeId=service-sweeping",
+      "/api/indicators/incidents?from=2026-08-08&to=2026-09-06&compare=previous&bucket=week",
       "/api/indicators/waste?from=2026-08-08&to=2026-09-06&compare=previous",
     ]);
   });

@@ -422,6 +422,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const returnFocusRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(initialUrlState.view);
+  const [overviewView, setOverviewView] = useState<"bars" | "table">("bars");
   const [selectedSignal, setSelectedSignal] = useState<SelectedSignal | null>(null);
   const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
   const [records, setRecords] = useState<TraceRecord[]>([]);
@@ -648,9 +649,9 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       <Collapsible className={styles.quickFilters}>
         <div className={styles.quickBar}>
           <ToggleGroup variant="outline" value={activeQuickPeriod ? [activeQuickPeriod.id] : []} onValueChange={(values) => { const item = quickPeriods.find((entry) => entry.id === values[0]); if (item) applyPeriod(item.days); }} aria-label="Período" className={styles.quickPeriods}>
-            {quickPeriods.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="min-h-11 min-w-20 aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary sm:min-h-8">{item.label}</ToggleGroupItem>)}
+            {quickPeriods.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="h-10 min-w-20 aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary [@media(max-width:760px)]:h-12">{item.label}</ToggleGroupItem>)}
           </ToggleGroup>
-          <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="group/filters min-h-11 sm:min-h-8" />}>
+          <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="group/filters" />}>
             <SlidersHorizontal data-icon="inline-start" aria-hidden />
             Más filtros
             <ChevronDown data-icon="inline-end" aria-hidden className="transition-transform group-aria-expanded/filters:rotate-180" />
@@ -671,9 +672,13 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
       {!detailOpen ? <>
       <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family, trigger) => openDetail(family, trigger)} />
-      <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} data-detail-trigger={`family-${family}`} type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-8" onClick={(event) => openDetail(family, event.currentTarget)}>{familyMeta[family].label}</Button>)}</nav>
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><div className="min-w-0">
+        <div className="flex gap-2"><Button type="button" variant={overviewView === "bars" ? "default" : "outline"} aria-pressed={overviewView === "bars"} onClick={() => setOverviewView("bars")}>Gráfico</Button><Button type="button" variant={overviewView === "table" ? "default" : "outline"} aria-pressed={overviewView === "table"} onClick={() => setOverviewView("table")}>Tabla</Button></div>
+        {familyStates.coverage.data?.family === "coverage" ? <CoverageTrend data={familyStates.coverage.data} viewMode={overviewView} overview /> : familyStates.coverage.status === "loading" ? <p>Cargando cobertura…</p> : familyStates.coverage.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo cargar la cobertura.</AlertTitle><Button type="button" variant="outline" onClick={() => retryFamily("coverage")}>Reintentar</Button></Alert> : <p>Sin datos en el período.</p>}
+      </div></div>
+      <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} data-detail-trigger={`family-${family}`} type="button" variant="outline" size="sm" onClick={(event) => openDetail(family, event.currentTarget)}>{familyMeta[family].label}</Button>)}</nav>
       </> : <>
-      <Button type="button" variant="outline" className="min-h-11 self-start sm:min-h-10" onClick={closeDetail}>Volver a Tableros</Button>
+      <Button type="button" variant="outline" className="self-start" onClick={closeDetail}>Volver a Tableros</Button>
       <h2 ref={detailHeadingRef} tabIndex={-1}>Detalle de {familyMeta[selectedFamily].label}</h2>
       {selectedFamilyState.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo actualizar {familyMeta[selectedFamily].label}. Los datos pueden estar desactualizados.</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => retryFamily(selectedFamily)}>Reintentar</Button></Alert> : null}
       <FamilyDetailSummary family={selectedFamily} state={selectedFamilyState} />
