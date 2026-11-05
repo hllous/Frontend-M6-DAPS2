@@ -29,6 +29,8 @@ describe("Requiere atención", () => {
   it("muestra la evolución semanal y cobertura como tabla", async () => {
     const section = await signals();
     expect(within(section).getAllByText(/Evolución por semana/)).toHaveLength(3);
+    await userEvent.click(within(section).getByRole("button", { name: "Ver datos de Servicios sin realizar" }));
+    expect(within(section).getByRole("table", { name: "Valores de Servicios sin realizar por semana" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Cobertura por semana" })).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Tabla" }));
     expect(screen.getByRole("table", { name: "Cobertura por período" })).toBeVisible();

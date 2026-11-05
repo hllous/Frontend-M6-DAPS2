@@ -8,9 +8,11 @@ import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer } from "@/components/ui/chart";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { IndicatorData } from "@/lib/indicators";
+import { coverageBucket, type IndicatorData } from "@/lib/indicators";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
 import { cn } from "@/lib/utils";
 
@@ -141,9 +143,11 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
         <p className="text-xs text-muted-foreground">Evolución por {bucket === "month" ? "mes" : "semana"}</p>
         {series.some((point) => point.value !== null) ? <>
           <div aria-hidden="true"><ChartContainer config={{ value: { label: signal.label, color: "var(--primary)" } }} className="h-12 w-full" style={{ aspectRatio: "auto" }}>
-            <LineChart data={series}><YAxis hide domain={[0, "auto"]} /><Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={series.length === 1} isAnimationActive={false} /></LineChart>
+            <LineChart data={series}><YAxis hide domain={[0, "auto"]} /><Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={series.filter((point) => point.value !== null).length === 1} isAnimationActive={false} /></LineChart>
           </ChartContainer></div>
-          <span className="sr-only">{series.map((point) => `${formatArgentinaCalendarDate(point.from)}: ${point.value === null ? "sin datos" : plainNumber(point.value)}`).join("; ")}</span>
+          <Collapsible><CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="min-h-12" />}>Ver datos de {signal.label}</CollapsibleTrigger>
+            <CollapsibleContent><Table><TableCaption>Valores de {signal.label} por {bucket === "month" ? "mes" : "semana"}</TableCaption><TableHeader><TableRow><TableHead>Desde</TableHead><TableHead>Cantidad</TableHead></TableRow></TableHeader><TableBody>{series.map((point) => <TableRow key={point.from}><TableCell>{formatArgentinaCalendarDate(point.from)}</TableCell><TableCell>{point.value === null ? "Sin datos" : plainNumber(point.value)}</TableCell></TableRow>)}</TableBody></Table></CollapsibleContent>
+          </Collapsible>
         </> : <p className="text-xs text-muted-foreground">Sin datos en el período.</p>}
         <span className="sr-only" id={descriptionId}>{`${plainNumber(signal.value)}. ${comparison} ${signal.context}.`}</span>
         <Button render={<Link href={signal.href} aria-label={signal.linkLabel} />} nativeButton={false} role="link" variant="outline" size="sm" className="mt-2 min-h-11 self-start sm:min-h-0">
@@ -157,8 +161,7 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
 
 export function AttentionSignals({ states, period, onRetry, onDetail }: { states: Record<FamilyKey, SignalFamilyState>; period: Period; onRetry: (family: FamilyKey) => void; onDetail: (family: FamilyKey, trigger: HTMLElement) => void }) {
   const signals = buildAttentionSignals(states, period);
-  const coverage = states.coverage.data?.family === "coverage" ? states.coverage.data : undefined;
-  const bucket = coverage?.seriesBucket ?? "week";
+  const bucket = coverageBucket(period);
   const seriesFor = (family: FamilyKey) => {
     const data = states[family].data;
     if (data?.family === "coverage") return (data.series ?? []).map((point) => ({ from: point.from, value: point.notServiced }));

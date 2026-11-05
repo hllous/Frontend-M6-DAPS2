@@ -262,7 +262,7 @@ export function serializeIndicatorUrlState(state: Omit<IndicatorUrlState, "query
   return params.toString();
 }
 
-function coverageBucket(query: IndicatorQuery): "week" | "month" {
+export function coverageBucket(query: IndicatorQuery): "week" | "month" {
   const resolved = resolveIndicatorQuery(query);
   const start = new Date(`${resolved.from}T00:00:00Z`);
   const days = (Date.parse(`${resolved.to}T00:00:00Z`) - start.getTime()) / 86400000 + 1;
