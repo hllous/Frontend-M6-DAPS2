@@ -18,7 +18,7 @@ it("abre el detalle de cada familia y vuelve al tablero", async () => {
   const user = userEvent.setup();
   for (const family of ["Cobertura", "Cumplimiento", "Incidencias", "Residuos"]) {
     await user.click(within(screen.getByRole("navigation", { name: "Detalle por familia" })).getByRole("button", { name: family }));
-    expect(await screen.findByRole("heading", { name: family })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: `Detalle de ${family}` })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Volver a Tableros" }));
   }
 });

@@ -27,7 +27,7 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
     currentSearch = "family=incidents&from=2026-09-01&to=2026-09-15&zoneId=z1&serviceTypeId=s1&view=table";
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Incidencias" });
+    await screen.findByRole("heading", { name: "Detalle de Incidencias" });
     await userEvent.setup().click(screen.getByRole("button", { name: "Más filtros" }));
     expect(screen.getByRole("button", { name: /^Desde/ })).toHaveTextContent("01/09/2026");
     expect(screen.getByRole("button", { name: /^Hasta/ })).toHaveTextContent("15/09/2026");
@@ -38,11 +38,11 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
   it("no avisa en coverage y escribe familia y vista en la URL conservando destination", async () => {
     window.history.replaceState(null, "", "/app?destination=dashboards");
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await screen.findByRole("heading", { name: "Cobertura" });
+    await screen.findByRole("navigation", { name: "Detalle por familia" });
     expect(screen.queryByText(/Filtros sin efecto/)).not.toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Residuos: seleccionar familia" }));
+    await user.click(screen.getByRole("button", { name: "Residuos" }));
     await user.click(screen.getByRole("button", { name: "Tabla" }));
 
     const params = new URLSearchParams(window.location.search);

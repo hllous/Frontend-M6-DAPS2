@@ -34,8 +34,8 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias" });
-    await user.click(within(familyBand).getByRole("button", { name: "Cumplimiento: seleccionar familia" }));
+    const familyBand = await screen.findByRole("navigation", { name: "Detalle por familia" });
+    await user.click(within(familyBand).getByRole("button", { name: "Cumplimiento" }));
 
     const chart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
     expect(within(chart).getByText("Favorable")).toBeVisible();
@@ -46,8 +46,8 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias" });
-    await user.click(within(familyBand).getByRole("button", { name: /Cumplimiento: seleccionar familia/i }));
+    const familyBand = await screen.findByRole("navigation", { name: "Detalle por familia" });
+    await user.click(within(familyBand).getByRole("button", { name: /Cumplimiento/i }));
 
     const chart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
     const bar = within(chart).getByRole("button", { name: /En fecha.*344 servicios/i });
@@ -84,8 +84,8 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias" });
-    await user.click(within(familyBand).getByRole("button", { name: `${family}: seleccionar familia` }));
+    const familyBand = await screen.findByRole("navigation", { name: "Detalle por familia" });
+    await user.click(within(familyBand).getByRole("button", { name: family }));
 
     const chart = await screen.findByRole("group", { name: chartName });
     const bar = within(chart).getByRole("button", { name: barName });
