@@ -410,7 +410,7 @@ export function CreateRepairRequestDialog({
                   : "Derivada a Obras Públicas."}
             </AlertTitle>
             <AlertDescription>
-              Seguimiento {resolvedRequest.id} · {isInspection ? `Inspección ${sourceId}` : `Servicio ${sourceId}`}
+              {sourceLabel}
             </AlertDescription>
           </Alert>
         )}
