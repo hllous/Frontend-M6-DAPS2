@@ -555,7 +555,7 @@ export function ServiceDetail({
               {service.ticketId && (
                 <div>
                   <span className="font-semibold text-[var(--color-text-secondary)]">Reclamo:</span>
-                  <p className="mt-1 font-medium text-[var(--color-text)]">{service.ticketId}</p>
+                  <p className="mt-1 font-medium text-[var(--color-text)]">Reclamo ciudadano</p>
                 </div>
               )}
             </div>
@@ -568,7 +568,7 @@ export function ServiceDetail({
                 Notas
               </div>
               <p className="mt-2 text-sm text-[var(--color-text)]">
-                {service.notes}
+                {service.notes.replace(/^Intervención de arbolado .+\.$/, "Intervención de arbolado.")}
               </p>
             </div>
           )}
@@ -597,7 +597,7 @@ export function ServiceDetail({
                   {repairRequests.map((request) => (
                     <li key={request.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
                       <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="font-bold text-[var(--color-text)]">{request.id}</span>
+                        <span className="font-bold text-[var(--color-text)]">Derivación a Obras Públicas</span>
                         <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 font-semibold text-[var(--color-text)]">
                           {REPAIR_REQUEST_STATUS_LABEL[request.status]}
                         </span>

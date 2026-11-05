@@ -10,8 +10,8 @@ export function shortId(id: string): string {
 }
 
 /** Public report number or an understandable description when no number exists. */
-export function reportLabel(report: { reportType: EnvironmentalReportType; address: string | null; publicId?: string | null }): string {
-  return report.publicId || `${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · ${report.address || "sin dirección"}`;
+export function reportLabel(report: { reportType: EnvironmentalReportType; address?: string | null; location?: { address?: string | null } | null; publicId?: string | null }): string {
+  return report.publicId || `${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · ${report.address || report.location?.address || "sin dirección"}`;
 }
 
 type ReferralLike =

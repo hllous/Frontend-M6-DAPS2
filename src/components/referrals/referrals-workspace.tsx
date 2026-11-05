@@ -19,7 +19,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { CopyableId } from "@/components/ui/copyable-id";
 import { referralLabel } from "@/lib/display-ids";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -206,22 +205,6 @@ function statusLabel(referral: Referral): string {
   return referral.kind === "REPAIR_REQUEST"
     ? repairStatusLabel[referral.status]
     : closureStatusLabel[referral.status];
-}
-
-function formatDate(value: string): string {
-  const calendarDay = value.slice(0, 10);
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(calendarDay);
-  if (match && new Date(`${calendarDay}T00:00:00Z`).toISOString().slice(0, 10) === calendarDay) {
-    return `${match[3]}/${match[2]}/${match[1]}`;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return value;
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "America/Argentina/Buenos_Aires",
-  }).format(date);
 }
 
 // Una hora sin zona (`2026-09-05T08:00`) es hora argentina (UTC-3, sin horario de verano), no la de la máquina.
