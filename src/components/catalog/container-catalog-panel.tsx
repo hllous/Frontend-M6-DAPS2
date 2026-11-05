@@ -1,4 +1,5 @@
 "use client";
+import { serviceSourceHref } from "@/lib/referrals";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
@@ -1183,7 +1184,7 @@ export function ContainerCatalogPanel({
                     detailInFlight ? (
                       <Badge variant="info" className="w-fit max-w-full">
                         <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
+                        Servicio en curso: <a href={serviceSourceHref(detailInFlight.id)} className="underline">{detailInFlight.title}</a>
                       </Badge>
                     ) : (
                       <Button
@@ -1206,7 +1207,7 @@ export function ContainerCatalogPanel({
                     detailInFlight ? (
                       <Badge variant="info" className="w-fit max-w-full">
                         <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
+                        Servicio en curso: <a href={serviceSourceHref(detailInFlight.id)} className="underline">{detailInFlight.title}</a>
                       </Badge>
                     ) : (
                       <Button
@@ -1229,7 +1230,7 @@ export function ContainerCatalogPanel({
                     detailInFlight ? (
                       <Badge variant="info" className="w-fit max-w-full">
                         <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
+                        Servicio en curso: <a href={serviceSourceHref(detailInFlight.id)} className="underline">{detailInFlight.title}</a>
                       </Badge>
                     ) : (
                       <Button
@@ -1283,7 +1284,7 @@ export function ContainerCatalogPanel({
                   ) : detailInFlight ? (
                     <Badge variant="info" className="w-fit max-w-full">
                       <Clock data-icon="inline-start" aria-hidden />
-                      Servicio en curso ({detailInFlight.id})
+                      Servicio en curso: <a href={serviceSourceHref(detailInFlight.id)} className="underline">{detailInFlight.title}</a>
                     </Badge>
                   ) : (
                     <Button

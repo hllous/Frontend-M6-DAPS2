@@ -274,6 +274,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestPrefill, setRequestPrefill] = useState<Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification">>({});
   const [detail, setDetail] = useState<TreeInterventionDetail | null>(null);
+  const [linkedService, setLinkedService] = useState<Service | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -312,6 +313,12 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       .catch(() => { if (current) setResources("error"); });
     return () => { current = false; };
   }, [scheduleOpen]);
+
+  useEffect(() => {
+    let active = true;
+    if (detail?.serviceId) void servicesAdapter.get(detail.serviceId).then((service) => { if (active) setLinkedService(service); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [detail?.serviceId]);
 
   const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); };
   const verifyExistingService = useCallback(async (intervention: TreeInterventionDetail) => {
@@ -460,8 +467,8 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     }
   };
   const linkNotice = (serviceId: string, linkedTo: string) => linkedTo === serviceId
-    ? `Intervención programada. Servicio ${serviceId} vinculado correctamente.`
-    : `Ya estaba vinculada al servicio ${linkedTo}. Cancele el servicio ${serviceId} desde Servicios.`;
+    ? "Intervención programada. Servicio vinculado correctamente."
+    : "Ya estaba vinculada a otro servicio. Cancele el servicio duplicado desde Servicios.";
 
   const retryServiceLink = async () => {
     if (!detail || !unsyncedService) return;
@@ -596,7 +603,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           {detail && !detailLoading && !detailError ? (
             <>
               {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
-              {unsyncedService ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El Servicio {unsyncedService.id}{unsyncedService.title ? ` — ${unsyncedService.title}` : ""} fue creado, pero quedó sin vincular. La vinculación quedó pendiente. Complétela antes de salir de esta página.</span><Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button></AlertDescription></Alert> : null}
+              {unsyncedService ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El servicio {unsyncedService.title ?? "sin título disponible"} fue creado, pero quedó sin vincular. La vinculación quedó pendiente. Complétela antes de salir de esta página.</span><Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button></AlertDescription></Alert> : null}
               {canSchedule && detail.status === "AUTHORIZED" && serviceLookupStatus === "loading" ? <Alert role="status"><AlertDescription>Verificando si ya existe un servicio para esta intervención…</AlertDescription></Alert> : null}
               {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && serviceLookupStatus === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{SERVICE_LOOKUP_FAILURE}</span><Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => void verifyExistingService(detail)}>Reintentar</Button></AlertDescription></Alert> : null}
               <div className="flex flex-col gap-3">
@@ -606,7 +613,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de autorización</dt><dd className="mt-1 tabular-nums">{dateTimeLabel(detail.authorizedAt)}</dd></div>
                   </dl>
                 ) : null}
-                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className="font-mono font-semibold underline" href={serviceSourceHref(detail.serviceId)}>{detail.serviceId}</Link>.</AlertDescription></Alert> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className="font-semibold underline" aria-label={`Servicio: ${(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "sin título disponible"}`} href={serviceSourceHref(detail.serviceId)}>{(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "Servicio sin título disponible"}</Link>.</AlertDescription></Alert> : null}
                 {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && scheduleOpen ? (
                   <form
                     aria-label="Programar servicio para la intervención"

@@ -229,10 +229,11 @@ describe("TreeInterventionsPanel", () => {
     for (const control of within(fromGroup).getAllByRole("combobox")) expect(control).toHaveAttribute("aria-required", "true");
     for (const control of within(toGroup).getAllByRole("combobox")) expect(control).toHaveAttribute("aria-required", "true");
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
-    expect(await within(detail).findByRole("alert")).toHaveTextContent(/Servicio vinculado: SVC-/);
+    expect(await within(detail).findByRole("alert")).toHaveTextContent(/Servicio vinculado:/);
     expect(within(detail).getByText(/ARB-00443/)).toBeVisible();
     expect(within(detail).getByText(/ARB-00445/)).toBeVisible();
-    const serviceId = detail.textContent?.match(/Servicio vinculado: (SVC-\d+)/)?.[1];
+    const serviceHref = within(detail).getByRole("link", { name: /servicio/i }).getAttribute("href") ?? "";
+    const serviceId = new URL(serviceHref, "http://localhost").searchParams.get("detail");
     const linkedService = serviceFixtures.find((service) => service.id === serviceId);
     expect(linkedService).toMatchObject({ mode: "POINT", targetType: "TREE", targetId: "tree-2", zoneIds: ["zone-2"] });
     expect(linkedService?.targetRef).toMatch(/ARB-00443/);
@@ -257,7 +258,7 @@ describe("TreeInterventionsPanel", () => {
     const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
-    expect(await within(detail).findByRole("alert")).toHaveTextContent(/Servicio vinculado: SVC-/);
+    expect(await within(detail).findByRole("alert")).toHaveTextContent(/Servicio vinculado:/);
     expect(createSpy).toHaveBeenCalledTimes(1);
     expect(createSpy.mock.calls[0][0].serviceTypeId).toBe(backendServiceTypeId);
     createSpy.mockRestore();
@@ -302,7 +303,7 @@ describe("TreeInterventionsPanel", () => {
     const form = within(detail).getByRole("form", { name: "Programar servicio para la intervención" });
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
-    expect(await within(detail).findByText(/La vinculación quedó pendiente/)).toHaveTextContent(/SVC-\d+.*Tratamiento/);
+    expect(await within(detail).findByText(/La vinculación quedó pendiente/)).toHaveTextContent(/Tratamiento/);
     expect(within(detail).getByRole("button", { name: "Reintentar vinculación" })).toBeVisible();
     expect(within(detail).queryByText(/La intervención fue programada/)).not.toBeInTheDocument();
   });
@@ -325,7 +326,7 @@ describe("TreeInterventionsPanel", () => {
     await user.click(within(first.form).getByRole("button", { name: "Programar servicio de intervención" }));
 
     const pendingWarning = await within(first.detail).findByText(/La vinculación quedó pendiente/);
-    expect(pendingWarning).toHaveTextContent(/SVC-\d+/);
+    expect(pendingWarning).not.toHaveTextContent(/SVC-\d+/);
     expect(pendingWarning).toHaveTextContent("Tratamiento · Av. Mitre 1140");
     expect(pendingWarning).toHaveTextContent("antes de salir de esta página");
     const createdService = serviceFixtures.find((service) => service.notes === "Intervención de arbolado intervention-2.");
@@ -421,9 +422,10 @@ describe("TreeInterventionsPanel", () => {
 
     expect(create).toHaveBeenCalledTimes(2);
     expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ overrideNote: "Refuerzo coordinado para la intervención." }));
-    const serviceId = (await within(detail).findByRole("link", { name: /SVC-\d+/ })).textContent;
+    const serviceLink = await within(detail).findByRole("link", { name: /Servicio:/ });
+    const serviceId = new URL(serviceLink.getAttribute("href")!, "http://localhost").searchParams.get("detail");
     expect(serviceFixtures.find((service) => service.id === serviceId)).toMatchObject({ crewId: "crew-a", vehicleId: "vehicle-1" });
-    expect(within(detail).getByRole("link", { name: /SVC-\d+/ })).toHaveAttribute("href", expect.stringContaining(`detail=${serviceId}`));
+    expect(within(detail).getByRole("link", { name: /Servicio:/ })).toHaveAttribute("href", expect.stringContaining(`detail=${serviceId}`));
   });
 
   it("un 409 que no pide justificación muestra su error y no abre la justificación", async () => {
@@ -447,7 +449,7 @@ describe("TreeInterventionsPanel", () => {
     const { detail, form } = await openScheduleForm(user, /intervention-2|Tratamiento/i);
     await user.click(within(form).getByRole("button", { name: "Programar servicio de intervención" }));
 
-    expect(await within(detail).findByRole("link", { name: "SVC-7777" })).toBeVisible();
+    expect(await within(detail).findByRole("link", { name: /Servicio:/ })).toBeVisible();
     expect(within(detail).queryByRole("button", { name: "Reintentar vinculación" })).not.toBeInTheDocument();
   });
 
@@ -467,7 +469,7 @@ describe("TreeInterventionsPanel", () => {
     await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
     const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
     await user.click(await within(detail).findByRole("button", { name: "Reintentar vinculación" }));
-    expect(await within(detail).findByRole("link", { name: /SVC-\d+/ })).toBeVisible();
+    expect(await within(detail).findByRole("link", { name: /Servicio:/ })).toBeVisible();
     expect(window.localStorage.length).toBe(0);
   });
 
