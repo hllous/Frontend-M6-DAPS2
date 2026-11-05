@@ -1,16 +1,18 @@
 "use client";
 
-import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { CartesianGrid, LabelList, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
 import { defaultIndicatorTarget, hasNumericThreshold, type CoverageIndicator } from "@/lib/indicators";
 
 import { formatIndicatorNumber } from "./number-format";
+import { sectionTitleClass } from "./section-title";
 import styles from "./coverage-trend.module.css";
 
 type CoverageSeries = NonNullable<CoverageIndicator["series"]>;
@@ -74,6 +76,13 @@ function targetOf(data: CoverageIndicator) {
   return { value: target.value, label: `Meta de cobertura ${comparator}${formatIndicatorNumber(target.value, { maximumFractionDigits: 1 })} %` };
 }
 
+/** Piso del eje: deja un margen de 10 puntos bajo el menor valor o la meta, en múltiplos de 10. Sin valores, el eje arranca en 0. */
+export function axisFloor(points: Pick<TrendPoint, "pct">[], target?: number) {
+  const values = [...points.flatMap((point) => (point.pct === null ? [] : [point.pct])), ...(target === undefined ? [] : [target])];
+  if (values.length === 0) return 0;
+  return Math.max(0, Math.floor((Math.min(...values) - 10) / 10) * 10);
+}
+
 type TrendPlotProps = {
   points: TrendPoint[];
   target?: number;
@@ -84,11 +93,13 @@ type TrendPlotProps = {
 
 // Memoizado: enfocar o pasar el mouse no puede remontar los botones, o se perdería el foco.
 const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onFocusPoint }: TrendPlotProps) {
+  const floor = axisFloor(points, target);
+  const ticks = floor === 0 ? [0, 25, 50, 75, 100] : Array.from({ length: (100 - floor) / 10 + 1 }, (_, index) => floor + index * 10);
   return <ChartContainer config={chartConfig} className={styles.plot} style={{ aspectRatio: "auto" }} initialDimension={{ width: 720, height: 260 }}>
     <LineChart data={points} margin={{ top: 12, right: 32, bottom: 4, left: 0 }}>
       <CartesianGrid vertical={false} stroke="var(--color-border)" />
       <XAxis dataKey="tick" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={12} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
-      <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value: number) => `${value} %`} tickLine={false} axisLine={false} width={44} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
+      <YAxis domain={[floor, 100]} ticks={ticks} tickFormatter={(value: number) => `${value} %`} tickLine={false} axisLine={false} width={44} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
       {target === undefined ? null : <ReferenceLine y={target} stroke="var(--color-trend-target)" strokeWidth={2} strokeDasharray="6 4" ifOverflow="extendDomain" />}
       <Line dataKey="pct" type="linear" stroke="var(--color-trend-line)" strokeWidth={2} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: "var(--color-trend-line)", stroke: "var(--color-surface)", strokeWidth: 2 }} activeDot={false}><LabelList dataKey="valueLabel" position="top" fill="var(--color-text-secondary)" /></Line>
       <Line dataKey="anchorY" stroke="none" legendType="none" isAnimationActive={false} activeDot={false} dot={({ cx = 0, cy = 0, index = 0 }: DotProps) => {
@@ -115,7 +126,7 @@ const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onF
   </ChartContainer>;
 });
 
-export function CoverageTrend({ data, viewMode, overview = false }: { data: CoverageIndicator; viewMode: "bars" | "table"; overview?: boolean }) {
+export function CoverageTrend({ data, viewMode, overview = false, toggle }: { data: CoverageIndicator; viewMode: "bars" | "table"; overview?: boolean; toggle?: ReactNode }) {
   const bucket = data.seriesBucket ?? "week";
   const points = useMemo(() => (data.series?.length ? toTrendPoints(data.series, bucket) : []), [bucket, data.series]);
   const target = targetOf(data);
@@ -148,8 +159,8 @@ export function CoverageTrend({ data, viewMode, overview = false }: { data: Cove
   if (!overview && !data.seriesError && points.length === 0) return null;
 
   const title = overview ? `Cobertura por ${bucket === "month" ? "mes" : "semana"}` : "Tendencia";
-  return <section className={styles.trend} role="region" aria-label={title}>
-    <div className={styles.header}><h2>{title}</h2></div>
+  const section = <section className={overview ? `${styles.trend} ${styles.inCard}` : styles.trend} role="region" aria-label={title}>
+    <div className={styles.header}><h2 className={sectionTitleClass}>{title}</h2>{toggle}</div>
     {data.seriesError ? <Alert variant="danger" role="alert"><AlertDescription>{data.seriesError}</AlertDescription></Alert>
       : points.length === 0 ? <p>Sin datos en el período.</p>
       : viewMode === "table" ? <TrendTable points={points} />
@@ -168,6 +179,7 @@ export function CoverageTrend({ data, viewMode, overview = false }: { data: Cove
           </Alert>
         </>}
   </section>;
+  return overview ? <Card className="h-full min-w-0"><CardContent>{section}</CardContent></Card> : section;
 }
 
 function TrendTable({ points }: { points: TrendPoint[] }) {

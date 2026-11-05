@@ -295,7 +295,7 @@ describe("IndicatorsDashboard", () => {
     const summary = await screen.findByRole("region", { name: "Resumen de Incidencias" });
     expect(await within(summary).findByText(/Resolución media en días corridos:/)).toHaveTextContent("Sin reportes cerrados");
     expect(within(summary).getByText("1,8 días hábiles")).toBeVisible();
-    expect(screen.getByText(/Resolución media de reportes:/).closest("p")).toHaveTextContent("1,8 días hábiles");
+    expect(within(summary).getByText("Resolución media de reportes")).toBeVisible();
   });
 
   it("marks Incidencias and Residuos as empty when their families have no records", async () => {

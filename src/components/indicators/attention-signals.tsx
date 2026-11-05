@@ -17,6 +17,7 @@ import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
 import { cn } from "@/lib/utils";
 
 import { formatIndicatorNumber } from "./number-format";
+import { sectionTitleClass } from "./section-title";
 
 type FamilyKey = IndicatorData["family"];
 type LoadStatus = "loading" | "ready" | "empty" | "error";
@@ -105,8 +106,8 @@ function Trend({ change }: { change: number | null }) {
   const text = changeText(change);
   return (
     <span className="inline-flex items-center gap-1 text-xs" aria-hidden="true">
-      <Icon className="size-4" />
-      <span className={cn(change > 0 ? "font-medium text-destructive" : "text-muted-foreground")}>{text}</span>
+      <Icon className={cn("size-4", change > 0 ? "text-[var(--color-danger)]" : change < 0 ? "text-[var(--color-success)]" : "text-muted-foreground")} />
+      <span className={cn(change > 0 ? "font-semibold text-destructive" : change < 0 ? "font-medium text-[var(--color-success)]" : "text-muted-foreground")}>{text}</span>
     </span>
   );
 }
@@ -142,9 +143,9 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
   const comparison = change === null ? "Sin período anterior para comparar."
     : `${changeText(change).replace("que antes", "que el período anterior")}${change === 0 ? "" : worse ? ", empeora" : ", mejora"}.`;
   return (
-    <Card size="sm" className="h-full gap-2" role="group" aria-labelledby={titleId} aria-describedby={descriptionId}>
+    <Card size="sm" data-trend={worse ? "worse" : undefined} className={cn("h-full gap-2", worse && "bg-[var(--color-danger-fill)] ring-[var(--color-danger-line)]")} role="group" aria-labelledby={titleId} aria-describedby={descriptionId}>
       <CardHeader>
-        <CardTitle id={titleId}>{signal.label}</CardTitle>
+        <CardTitle id={titleId} className="text-sm font-semibold">{signal.label}</CardTitle>
         <CardAction className="flex gap-1">
           <Tooltip>
             <TooltipTrigger render={<Button render={<Link href={signal.href} aria-label={signal.linkLabel} />} nativeButton={false} role="link" variant="outline" size="icon" />}>
@@ -164,14 +165,14 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
         {status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo actualizar. Los datos pueden estar desactualizados.</AlertTitle><Button type="button" variant="outline" size="sm" onClick={onRetry}>Reintentar {signal.label}</Button></Alert> : null}
         <div className="flex items-end justify-between gap-3">
           <div className="flex min-w-0 flex-col">
-            <p className="text-3xl leading-none font-semibold tabular-nums tracking-tight" aria-hidden="true">{plainNumber(signal.value)}</p>
+            <p className="text-4xl leading-none font-bold tabular-nums tracking-tight" aria-hidden="true">{plainNumber(signal.value)}</p>
             <Trend change={change} />
           </div>
-          {hasSeries ? <div aria-hidden="true" className="w-28 shrink-0"><ChartContainer config={{ value: { label: signal.label, color: worse ? "var(--destructive)" : "var(--primary)" } }} className="h-10 w-full" style={{ aspectRatio: "auto" }}>
+          {hasSeries ? <div aria-hidden="true" className="w-28 shrink-0"><ChartContainer config={{ value: { label: signal.label, color: worse ? "var(--color-danger)" : "var(--color-action)" } }} className="h-10 w-full" style={{ aspectRatio: "auto" }}>
             <LineChart data={series} margin={{ top: 4, right: 6, bottom: 4, left: 4 }}><YAxis hide domain={["dataMin - 1", "dataMax + 1"]} /><Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={endDot(series)} activeDot={false} isAnimationActive={false} connectNulls /></LineChart>
           </ChartContainer></div> : <p className="text-xs text-muted-foreground">Sin datos en el período.</p>}
         </div>
-        <CardDescription aria-hidden="true" className="text-xs">{signal.context}</CardDescription>
+        <CardDescription aria-hidden="true" className={cn("text-xs", worse && "text-[var(--color-text-secondary)]")}>{signal.context}</CardDescription>
         {hasSeries ? <div className="sr-only">
           <p>Evolución por {bucket === "month" ? "mes" : "semana"}</p>
           <Table><TableCaption>Valores de {signal.label} por {bucket === "month" ? "mes" : "semana"}</TableCaption><TableHeader><TableRow><TableHead>Desde</TableHead><TableHead>Cantidad</TableHead></TableRow></TableHeader><TableBody>{series.map((point) => <TableRow key={point.from}><TableCell>{formatArgentinaCalendarDate(point.from)}</TableCell><TableCell>{point.value === null ? "Sin datos" : plainNumber(point.value)}</TableCell></TableRow>)}</TableBody></Table>
@@ -195,7 +196,7 @@ export function AttentionSignals({ states, period, onRetry, onDetail }: { states
   const loading = signals.some((signal) => states[signal.family].status === "loading");
   return (
     <LoadingRegion label="Requiere atención" isLoading={loading}>
-      <h2 className="mb-3 text-lg font-semibold">Requiere atención</h2>
+      <h2 className={cn("mb-3", sectionTitleClass)}>Requiere atención</h2>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {signals.map((signal) => (
           <li key={signal.id}><SignalCard signal={signal} status={states[signal.family].status} series={seriesFor(signal.family)} bucket={bucket} onRetry={() => onRetry(signal.family)} onDetail={(trigger) => onDetail(signal.family, trigger)} /></li>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Activity, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { Activity, ArrowLeft, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alert, AlertTitle } from "@/components/ui/alert";
@@ -32,6 +32,8 @@ import { CoverageTrend } from "./coverage-trend";
 import { ZonePanel } from "./zone-panel";
 import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
 import { formatIndicatorNumber } from "./number-format";
+import { sectionTitleClass } from "./section-title";
+import { cn } from "@/lib/utils";
 
 import styles from "./indicators-dashboard.module.css";
 
@@ -290,13 +292,19 @@ function FamilyDetailSummary({ family, state }: { family: FamilyKey; state: Fami
   const data = state.data;
   const summary = indicatorSummaryDetails(family, data?.primary.value, state.status === "ready", data);
   const variation = data ? indicatorVariationDetails(data) : null;
-  return <Card size="sm" role="region" aria-label={`Resumen de ${familyMeta[family].label}`}><CardContent className="flex flex-wrap items-center gap-3">
-    {data ? <><strong>{familySummary(data)}</strong><span>{data.primary.label}</span></> : state.status === "loading" ? <Skeleton aria-label="Cargando resumen" className="h-6 w-24" /> : <span>{state.status === "error" ? "Sin datos disponibles." : "Sin resultados en el período."}</span>}
-    {variation ? <IndicatorVariation {...variation} /> : null}
-    <span>{summary.targetLabel}</span>
-    {summary.directionLabel ? <span>{summary.directionLabel}</span> : null}
-    {summary.status ? <Badge variant={summary.status.variant}>{summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}<span>{summary.status.label}</span></Badge> : null}
-    {data?.family === "incidents" ? <span>Resolución media en días corridos: {data.reports.avgResolutionDays === null ? "Sin reportes cerrados" : `${formatNumber(data.reports.avgResolutionDays, "días")} días`}</span> : null}
+  const FamilyIcon = familyMeta[family].icon;
+  return <Card size="sm" role="region" aria-label={`Resumen de ${familyMeta[family].label}`} className={cn(summary.status?.variant === "danger" && "bg-[var(--color-danger-fill)] ring-[var(--color-danger-line)]")}><CardContent className={styles.summaryHero}>
+    <div className={styles.summaryValue}>
+      <FamilyIcon aria-hidden className="size-6 text-[var(--color-action)]" />
+      {data ? <><strong className="text-3xl leading-none font-bold tabular-nums">{familySummary(data)}</strong><span className="text-base font-medium">{data.primary.label}</span></> : state.status === "loading" ? <Skeleton aria-label="Cargando resumen" className="h-8 w-28" /> : <span>{state.status === "error" ? "Sin datos disponibles." : "Sin resultados en el período."}</span>}
+      {summary.status ? <Badge variant={summary.status.variant}>{summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}<span>{summary.status.label}</span></Badge> : null}
+    </div>
+    <div className={styles.summaryMeta}>
+      {variation ? <IndicatorVariation {...variation} /> : null}
+      <span className="font-semibold text-foreground">{summary.targetLabel}</span>
+      {summary.directionLabel ? <span className="text-muted-foreground">{summary.directionLabel}</span> : null}
+      {data?.family === "incidents" ? <span className="text-muted-foreground">Resolución media en días corridos: {data.reports.avgResolutionDays === null ? "Sin reportes cerrados" : `${formatNumber(data.reports.avgResolutionDays, "días")} días`}</span> : null}
+    </div>
   </CardContent></Card>;
 }
 
@@ -530,13 +538,14 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       {!detailOpen ? <>
       <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family, trigger) => openDetail(family, trigger)} />
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><div className="min-w-0">
-        <ChartViewToggle value={overviewView} onChange={setOverviewView} label="Vista de cobertura" />
-        {familyStates.coverage.data?.family === "coverage" ? <CoverageTrend data={familyStates.coverage.data} viewMode={overviewView} overview /> : familyStates.coverage.status === "loading" ? <p>Cargando cobertura…</p> : familyStates.coverage.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo cargar la cobertura.</AlertTitle><Button type="button" variant="outline" onClick={() => retryFamily("coverage")}>Reintentar</Button></Alert> : <p>Sin datos en el período.</p>}
+        {familyStates.coverage.data?.family === "coverage" ? <CoverageTrend data={familyStates.coverage.data} viewMode={overviewView} overview toggle={<ChartViewToggle value={overviewView} onChange={setOverviewView} label="Vista de cobertura" />} /> : familyStates.coverage.status === "loading" ? <Card className="h-full"><CardContent><LoadingRegion label="Cobertura por período"><Skeleton aria-hidden className="h-64 w-full" /></LoadingRegion></CardContent></Card> : familyStates.coverage.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo cargar la cobertura.</AlertTitle><Button type="button" variant="outline" onClick={() => retryFamily("coverage")}>Reintentar</Button></Alert> : <p>Sin datos en el período.</p>}
       </div><ZonePanel states={familyStates} onRetry={retryFamily} ignoredFilters={Boolean(appliedQuery.zoneId || appliedQuery.serviceTypeId)} /></div>
       <DropdownMenu><DropdownMenuTrigger render={<Button data-detail-trigger="family-menu" type="button" variant="outline" className="self-start" />}>Detalle por familia <ChevronDown data-icon="inline-end" aria-hidden /></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuGroup>{familyOrder.map((family) => { const Icon = familyMeta[family].icon; return <DropdownMenuItem key={family} className="min-h-12" onClick={() => { const trigger = document.querySelector<HTMLElement>('[data-detail-trigger="family-menu"]'); if (trigger) openDetail(family, trigger); }}><Icon aria-hidden />{familyMeta[family].label}</DropdownMenuItem>; })}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
       </> : <>
-      <Button type="button" variant="outline" className="self-start" onClick={closeDetail}>Volver a Tableros</Button>
-      <h2 ref={detailHeadingRef} tabIndex={-1}>Detalle de {familyMeta[selectedFamily].label}</h2>
+      <div className={styles.detailTop}>
+        <Button type="button" variant="outline" onClick={closeDetail}><ArrowLeft data-icon="inline-start" aria-hidden />Volver a Tableros</Button>
+        <h2 ref={detailHeadingRef} tabIndex={-1} className={cn(styles.detailTitle, sectionTitleClass)}>Detalle de {familyMeta[selectedFamily].label}</h2>
+      </div>
       {selectedFamilyState.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo actualizar {familyMeta[selectedFamily].label}. Los datos pueden estar desactualizados.</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => retryFamily(selectedFamily)}>Reintentar</Button></Alert> : null}
       <FamilyDetailSummary family={selectedFamily} state={selectedFamilyState} />
 
@@ -626,7 +635,7 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
   const hasSummaryMetrics = data.family === "coverage" || data.family === "compliance";
   return <section className={styles.detail} aria-labelledby="indicator-detail-title">
     <div className={styles.detailHeader}>
-      <div><p id="indicator-detail-title">{meta.label}</p><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
+      <div><p id="indicator-detail-title" className={styles.detailName}>{meta.label}</p><p>{formatDate(data.period.from)} – {formatDate(data.period.to)}</p></div>
       <div className={styles.viewActions}>
         <ChartViewToggle value={requestedViewMode} onChange={onViewModeChange} label="Vista del detalle" />
       </div>

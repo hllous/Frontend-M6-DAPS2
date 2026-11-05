@@ -1,6 +1,7 @@
 /* Línea en el color de acción y meta en gris de texto, discontinua: el rojo y el naranja quedan para lo que empeora. Ambos son tokens del tema. */
 .trend { --color-trend-line: var(--color-action); --color-trend-target: var(--color-text-secondary); display: flex; min-width: 0; flex-direction: column; gap: var(--space-12); }
-.header h2 { margin: 0; font-size: 19px; line-height: 1.3; }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-12); }
+.header h2 { margin: 0; }
 .header p { margin: var(--space-4) 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.45; }
 .legend { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-16); margin: 0; padding: 0; list-style: none; color: var(--color-text-secondary); font-size: 12px; }
 .legend li { display: inline-flex; align-items: center; gap: var(--space-6); }
@@ -23,3 +24,4 @@
   .plot { height: 220px; }
   .detail { align-items: flex-start; flex-direction: column; gap: var(--space-4); }
 }
+.trend.inCard { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
