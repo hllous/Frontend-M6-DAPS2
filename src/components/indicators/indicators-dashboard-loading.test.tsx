@@ -40,7 +40,7 @@ function expectBusy(region: HTMLElement) {
 describe("IndicatorsDashboard loading skeletons (#591)", () => {
   it("shows the family cards as a busy region with a skeleton until the families arrive", async () => {
     server.use(http.get("*/api/indicators/:family", async () => {
-      await delay(150);
+      await delay(1000);
       return HttpResponse.json(coverageIndicatorFixture);
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
@@ -99,7 +99,7 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
   it("shows the narrow summary as a busy region with a skeleton until the family arrives", async () => {
     vi.stubGlobal("matchMedia", vi.fn().mockImplementation(() => ({ matches: true, media: "(max-width: 760px)", onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() })));
     server.use(http.get("*/api/indicators/:family", async () => {
-      await delay(150);
+      await delay(1000);
       return HttpResponse.json(coverageIndicatorFixture);
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
