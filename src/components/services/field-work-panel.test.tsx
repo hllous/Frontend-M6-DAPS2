@@ -234,7 +234,8 @@ describe("FieldWorkPanel component", () => {
     await user.click(detailButtons[0]);
 
     expect(await screen.findByRole("heading", { name: "Derivaciones" })).toBeVisible();
-    expect(screen.getByText("RR-1001")).toBeVisible();
+    expect(screen.getByText("Derivación a Obras Públicas")).toBeVisible();
+    expect(screen.queryByText("RR-1001")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
   });
 
