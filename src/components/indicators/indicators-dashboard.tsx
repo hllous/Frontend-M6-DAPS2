@@ -450,6 +450,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const [filterError, setFilterError] = useState<string | null>(null);
   const [familyStates, setFamilyStates] = useState<Record<FamilyKey, FamilyState>>(emptyFamilyState);
   const [selectedFamily, setSelectedFamily] = useState<FamilyKey>(initialUrlState.family);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(initialUrlState.view);
   const [selectedSignal, setSelectedSignal] = useState<SelectedSignal | null>(null);
   const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
@@ -658,10 +659,14 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         </CollapsibleContent>
       </Collapsible>
 
-      <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} />
+      {!detailOpen ? <>
+      <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family) => { selectFamily(family); setDetailOpen(true); }} />
+      <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} type="button" variant="outline" size="sm" onClick={() => { selectFamily(family); setDetailOpen(true); }}>{familyMeta[family].label}</Button>)}</nav>
+      </> : <>
+      <Button type="button" variant="outline" onClick={() => setDetailOpen(false)}>Volver a Tableros</Button>
 
-      <div className={styles.summaryHeading}><h2>Resumen del período</h2><span>{appliedQuery.from && appliedQuery.to ? `${formatDate(appliedQuery.from)} – ${formatDate(appliedQuery.to)}` : "Últimos 30 días"}</span></div>
-      <FamilySelectorBand states={familyStates} selectedFamily={selectedFamily} onSelect={selectFamily} onRetry={retryFamily} />
+
+      <div hidden><FamilySelectorBand states={familyStates} selectedFamily={selectedFamily} onSelect={selectFamily} onRetry={retryFamily} /></div>
       {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Vista">
         <ToggleGroupItem value="bars" size="lg">Barras</ToggleGroupItem>
         <ToggleGroupItem value="table" size="lg">Tabla</ToggleGroupItem>
@@ -698,6 +703,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         {selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}
         {recordsView}
       </div>}
+      </>}
     </section>
   );
 }

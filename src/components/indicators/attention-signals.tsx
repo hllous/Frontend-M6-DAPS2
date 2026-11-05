@@ -106,7 +106,7 @@ function Trend({ change }: { change: number | null }) {
   );
 }
 
-function SignalCard({ signal, status, onRetry }: { signal: AttentionSignal; status: LoadStatus; onRetry: () => void }) {
+function SignalCard({ signal, status, onRetry, onDetail }: { signal: AttentionSignal; status: LoadStatus; onRetry: () => void; onDetail: () => void }) {
   const titleId = `signal-${signal.id}-title`;
   const descriptionId = `signal-${signal.id}-description`;
   if (signal.value === undefined) {
@@ -138,12 +138,13 @@ function SignalCard({ signal, status, onRetry }: { signal: AttentionSignal; stat
         <Button render={<Link href={signal.href} aria-label={signal.linkLabel} />} nativeButton={false} role="link" variant="outline" size="sm" className="mt-2 min-h-11 self-start sm:min-h-0">
           Ver lista<ArrowRight data-icon="inline-end" aria-hidden="true" />
         </Button>
+        <Button type="button" variant="ghost" size="sm" className="self-start" onClick={onDetail}>Ver detalle</Button>
       </CardContent>
     </Card>
   );
 }
 
-export function AttentionSignals({ states, period, onRetry }: { states: Record<FamilyKey, SignalFamilyState>; period: Period; onRetry: (family: FamilyKey) => void }) {
+export function AttentionSignals({ states, period, onRetry, onDetail }: { states: Record<FamilyKey, SignalFamilyState>; period: Period; onRetry: (family: FamilyKey) => void; onDetail: (family: FamilyKey) => void }) {
   const signals = buildAttentionSignals(states, period);
   const loading = signals.some((signal) => states[signal.family].status === "loading");
   return (
@@ -151,7 +152,7 @@ export function AttentionSignals({ states, period, onRetry }: { states: Record<F
       <h2 className="mb-3 text-lg font-semibold">Requiere atención</h2>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {signals.map((signal) => (
-          <li key={signal.id}><SignalCard signal={signal} status={states[signal.family].status} onRetry={() => onRetry(signal.family)} /></li>
+          <li key={signal.id}><SignalCard signal={signal} status={states[signal.family].status} onRetry={() => onRetry(signal.family)} onDetail={() => onDetail(signal.family)} /></li>
         ))}
       </ul>
     </LoadingRegion>
