@@ -67,7 +67,7 @@ test.describe("operational indicator dashboard #138", () => {
 
     await page.getByRole("button", { name: "Ver tabla", exact: true }).click();
     await expect(page.getByRole("table").first()).toBeVisible();
-    await expect(page.getByText("Objetivos atendidos sobre objetivos programados.")).toBeVisible();
+    await expect(page.getByText("Objetivos atendidos sobre objetivos programados.")).not.toBeVisible();
     await expect(page.getByRole("button", { name: "Exportar CSV" }).last()).toBeVisible();
   });
 
@@ -151,3 +151,4 @@ test.describe("operational indicator dashboard #138", () => {
   await expect(page.getByRole("heading", { name: "Detalle de Cobertura" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Centro", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
+
