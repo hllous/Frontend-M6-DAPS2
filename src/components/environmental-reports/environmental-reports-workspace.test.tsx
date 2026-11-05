@@ -784,10 +784,10 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1005") }));
     const detail = await screen.findByRole("region", { name: reportRowName("ER-1005") });
 
-    const item = (await within(detail).findByText(/^Inspección 1 · /)).closest<HTMLElement>('[role="listitem"]')!;
+    const item = (await within(detail).findByText(/^Inspección del /)).closest<HTMLElement>('[role="listitem"]')!;
     expect(within(item).getByText("Resultado: Infracción constatada")).toBeVisible();
     // #321: fecha legible, sin el ISO del backend ni una versión de checklist que no existe.
-    expect(await within(item).findByText(/^Inspección 1 · 05\/09\/2026 · 13:00–16:00$/)).toBeVisible();
+    expect(await within(item).findByText(/^Inspección del 05\/09\/2026 · 13:00–16:00$/)).toBeVisible();
     expect(item).not.toHaveTextContent("ambiental-v");
     expect(within(item).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
     expect(item).not.toHaveTextContent("crew-c");
@@ -945,7 +945,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1012") }));
     const detail = await screen.findByRole("region", { name: reportRowName("ER-1012") });
-    await within(detail).findByText(/^Inspección 1 · /);
+    await within(detail).findByText(/^Inspección del /);
 
     const button = within(detail).queryByRole("button", { name: "Crear derivación de reparación" });
     if (expected) expect(button).toBeVisible();
@@ -967,7 +967,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     updateEnvironmentalInspectionFixture("INS-1008", { allowedActions });
     const user = userEvent.setup();
     const detail = await openReport(user, scenarios.officeDutyQueue, "ER-1008", "Cola de expedientes ambientales");
-    await within(detail).findByText(/^Inspección 1 · /);
+    await within(detail).findByText(/^Inspección del /);
 
     const button = within(detail).queryByRole("button", { name: "Emitir acta" });
     if (expected) expect(button).toBeVisible();
@@ -1016,7 +1016,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     updateEnvironmentalInspectionFixture("INS-1008", { allowedActions: { repair: true, notice: true, suggestedViolationType: "ILLEGAL_DUMPING" } });
     const user = userEvent.setup();
     const detail = await openReport(user, scenarios.officeLimited, "ER-1008", "Cola de expedientes ambientales");
-    await within(detail).findByText(/^Inspección 1 · /);
+    await within(detail).findByText(/^Inspección del /);
 
     expect(within(detail).queryByRole("button", { name: "Emitir acta" })).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
@@ -1029,9 +1029,9 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1012") }));
     const detail = await screen.findByRole("region", { name: reportRowName("ER-1012") });
 
-    const title = await within(detail).findByText(/^Inspección 1 · /);
+    const title = await within(detail).findByText(/^Inspección del /);
     expect(title).not.toHaveTextContent("INS-1012");
-    expect(title).toHaveTextContent(/^Inspección 1 · 07\/09\/2026 · 10:00–13:00$/);
+    expect(title).toHaveTextContent(/^Inspección del 07\/09\/2026 · 10:00–13:00$/);
     expect(within(detail).queryByRole("button", { name: "Copiar identificador de la inspección" })).not.toBeInTheDocument();
   });
 

@@ -66,7 +66,7 @@ describe("EnvironmentalReportsWorkspace loading skeletons (#591)", () => {
 
     await waitFor(() => expect(history).toHaveAttribute("aria-busy", "false"), { timeout: 2000 });
     expect(history.querySelector('[data-slot="skeleton"]')).toBeNull();
-    expect(within(history).getAllByText(/Inspección \d/).length).toBeGreaterThan(0);
+    expect(within(history).getAllByText(/Inspección del /).length).toBeGreaterThan(0);
   });
 
   it("shows the violation notice as a busy region with a skeleton until the notice arrives", async () => {

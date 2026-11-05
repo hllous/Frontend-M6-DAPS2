@@ -500,7 +500,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         actions={canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
       />
       {!canRequest ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription>Solo consulta</AlertDescription></Alert> : null}
-      {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}{duplicateService && <Link className={buttonVariants({ variant: "link" })} href={serviceSourceHref(duplicateService.id)}>{duplicateService.title ?? "Servicio sin título disponible"}</Link>}</AlertDescription></Alert> : null}
+      {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}{duplicateService && <Link className={buttonVariants({ variant: "link-wrap" })} href={serviceSourceHref(duplicateService.id)}>{duplicateService.title ?? "Servicio sin título disponible"}</Link>}</AlertDescription></Alert> : null}
       <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="intervention-type-filter">Tipo de intervención</FieldLabel>
@@ -617,7 +617,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de autorización</dt><dd className="mt-1 tabular-nums">{dateTimeLabel(detail.authorizedAt)}</dd></div>
                   </dl>
                 ) : null}
-                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className={buttonVariants({ variant: "link" })} href={serviceSourceHref(detail.serviceId)} aria-label={`Servicio: ${(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "sin título disponible"}`}>{(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "Servicio sin título disponible"}</Link>.</AlertDescription></Alert> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className={buttonVariants({ variant: "link-wrap" })} href={serviceSourceHref(detail.serviceId)} aria-label={`Servicio: ${(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "sin título disponible"}`}>{(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "Servicio sin título disponible"}</Link>.</AlertDescription></Alert> : null}
                 {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && scheduleOpen ? (
                   <form
                     aria-label="Programar servicio para la intervención"
