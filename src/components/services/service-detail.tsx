@@ -568,7 +568,7 @@ export function ServiceDetail({
                 Notas
               </div>
               <p className="mt-2 text-sm text-[var(--color-text)]">
-                {service.notes.replace(/^Intervención de arbolado .+\.$/, "Intervención de arbolado.")}
+                {service.notes.replace(/^Intervención de arbolado (?:intervention-\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.$/i, "Intervención de arbolado.")}
               </p>
             </div>
           )}

@@ -91,7 +91,7 @@ describe("Container Service lookup", () => {
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
-    expect(await within(dialog).findByRole("link", { name: service.title })).toBeVisible();
+    expect(await within(dialog).findByRole("link", { name: `Servicio en curso: ${service.title}` })).toBeVisible();
     expect(within(dialog).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
     expect(requestedPages).toContain(2);
   });

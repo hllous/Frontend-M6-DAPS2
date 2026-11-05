@@ -291,6 +291,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const detailOpenedFromUrl = useRef(false);
   const initialDetailId = useSearchParams()?.get("detail") ?? null;
   const [notice, setNotice] = useState<string | null>(null);
+  const [duplicateService, setDuplicateService] = useState<PendingServiceLink | null>(null);
   const query = useMemo<TreeInterventionQuery>(() => ({ interventionType: interventionType || undefined, status: status || undefined, priority: priority || undefined, page, pageSize: 10 }), [interventionType, page, priority, status]);
 
   useEffect(() => {
@@ -320,7 +321,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     return () => { active = false; };
   }, [detail?.serviceId]);
 
-  const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); };
+  const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); setDuplicateService(null); };
   const verifyExistingService = useCallback(async (intervention: TreeInterventionDetail) => {
     const requestId = ++serviceLookupRequest.current;
     setServiceLookupStatus("loading");
@@ -429,6 +430,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           setUnsyncedService(null);
           setScheduleOpen(false);
           setRequestVersion((version) => version + 1);
+          setDuplicateService(linkedTo === createdService.id ? null : { id: createdService.id, title: createdService.title });
           setNotice(linkNotice(createdService.id, linkedTo));
         } catch (caught) {
           writeUnsynced(detail.id, createdService.id);
@@ -447,6 +449,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       setDetail(updated);
       setScheduleOpen(false);
       setRequestVersion((version) => version + 1);
+      setDuplicateService(null);
       setNotice(action === "submit" ? "Extracción enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
       if (action === "reject") setRejectConfirmOpen(false);
     } catch (caught) {
@@ -480,6 +483,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       writeUnsynced(detail.id, null);
       setUnsyncedService(null);
       setRequestVersion((version) => version + 1);
+      setDuplicateService(linkedTo === unsyncedService.id ? null : unsyncedService);
       setNotice(linkNotice(unsyncedService.id, linkedTo));
     } catch (caught) {
       setActionError(errorMessage(caught, "No se pudo vincular el servicio."));
@@ -496,7 +500,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         actions={canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
       />
       {!canRequest ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription>Solo consulta</AlertDescription></Alert> : null}
-      {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}</AlertDescription></Alert> : null}
+      {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}{duplicateService && <Button variant="link" nativeButton={false} render={<Link href={serviceSourceHref(duplicateService.id)} />}>{duplicateService.title ?? "Servicio sin título disponible"}</Button>}</AlertDescription></Alert> : null}
       <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="intervention-type-filter">Tipo de intervención</FieldLabel>
@@ -577,7 +581,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         <CompactPager label="Paginación de intervenciones" page={state.page.page} totalPages={state.page.totalPages} onPageChange={setPage} />
       </> : null}
 
-      {canRequest ? <TreeInterventionRequestDialog key={`${requestOpen}-${JSON.stringify(requestPrefill)}`} open={requestOpen} onOpenChange={setRequestOpen} trees={trees} {...requestPrefill} onCreated={() => { setNotice("Solicitud de intervención creada. Estado inicial: solicitada."); setPage(1); setRequestVersion((version) => version + 1); }} /> : null}
+      {canRequest ? <TreeInterventionRequestDialog key={`${requestOpen}-${JSON.stringify(requestPrefill)}`} open={requestOpen} onOpenChange={setRequestOpen} trees={trees} {...requestPrefill} onCreated={() => { setDuplicateService(null); setNotice("Solicitud de intervención creada. Estado inicial: solicitada."); setPage(1); setRequestVersion((version) => version + 1); }} /> : null}
       {canRequest && streetClosureIntervention ? (
         <CreateStreetClosureRequestDialog
           key={streetClosureIntervention.id}
@@ -588,7 +592,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
             if (!open) setStreetClosureIntervention(null);
           }}
           onCreated={() => {
-            setNotice("Solicitud de corte enviada a Tránsito.");
+            setDuplicateService(null); setNotice("Solicitud de corte enviada a Tránsito.");
             setStreetClosureIntervention(null);
             setRequestVersion((version) => version + 1);
           }}

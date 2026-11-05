@@ -519,7 +519,7 @@ function ReferralRow({
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-bold text-[var(--color-text)]">{label}</span>
             <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{referralKindLabel[referral.kind]}</span>
-            <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">{destinationLabel[referral.destination]} · {formatDateTime(referral.createdAt)}</span>
+            <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">{formatDateTime(referral.createdAt)}</span>
           </span>
           {sectionSummary && <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">{sectionSummary}</span>}
           <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceLabel}</span>

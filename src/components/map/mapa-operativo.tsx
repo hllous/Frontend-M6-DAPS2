@@ -1081,10 +1081,10 @@ function TodayMapPanel({
               <Item key={service.id} variant="outline" size="xs">
                 <ItemContent>
                   <ItemTitle>{service.title}</ItemTitle>
-                  <ItemDescription>{service.id} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "sin horario"}</ItemDescription>
+                  <ItemDescription>{service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "sin horario"}</ItemDescription>
                   <ItemDescription>{service.zoneIds.map((zoneId) => {
                     const result = zoneResults.find((candidate) => candidate.zoneId === zoneId);
-                    return `${service.zoneNames[service.zoneIds.indexOf(zoneId)] ?? zoneId}: ${result ? ZONE_RESULT_STATUS_LABEL[result.status] : "Pendiente"}`;
+                    return `${service.zoneNames[service.zoneIds.indexOf(zoneId)] ?? "Zona sin nombre disponible"}: ${result ? ZONE_RESULT_STATUS_LABEL[result.status] : "Pendiente"}`;
                   }).join(" · ")}
                   </ItemDescription>
                 </ItemContent>
