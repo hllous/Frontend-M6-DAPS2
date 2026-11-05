@@ -22,7 +22,7 @@ describe("Dónde se concentra", () => {
     const user = userEvent.setup();
     await user.click(within(panel).getByRole("button", { name: "Contenedores desbordados ahora, por zona" }));
     expect(within(panel).getByText("Centro tiene 6 de los 14 contenedores desbordados ahora.")).toBeVisible();
-    await user.click(within(panel).getByRole("button", { name: "Tabla" }));
+    await user.click(within(panel).getByRole("button", { name: "Ver tabla" }));
     const table = within(panel).getByRole("table");
     expect(within(table).getByRole("row", { name: /Centro.*6/ })).toBeVisible();
     expect(within(table).queryByText(/Prioritario/)).toBeNull();

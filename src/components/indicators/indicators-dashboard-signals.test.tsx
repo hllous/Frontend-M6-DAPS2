@@ -32,7 +32,7 @@ describe("Requiere atención", () => {
     expect(within(section).queryByRole("button", { name: /Ver datos de/ })).not.toBeInTheDocument();
     expect(within(section).getByRole("table", { name: "Valores de Servicios sin realizar por semana" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Cobertura por semana" })).toBeVisible();
-    await userEvent.click(screen.getAllByRole("button", { name: "Tabla" })[0]!);
+    await userEvent.click(screen.getAllByRole("button", { name: "Ver tabla" })[0]!);
     expect(screen.getByRole("table", { name: "Cobertura por período" })).toBeVisible();
   });
   it("ofrece «Ver lista» y «Ver detalle» como botones de ícono con nombre accesible", async () => {

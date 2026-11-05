@@ -124,7 +124,7 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     serveCoverage(coverageWeeklyFixture);
     const trend = await renderTrend();
 
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const table = await within(trend).findByRole("table");
     for (const heading of ["Período", "Programados", "Atendidos", "Programado a futuro", "Cobertura"]) {
       expect(within(table).getByRole("columnheader", { name: heading })).toBeInTheDocument();

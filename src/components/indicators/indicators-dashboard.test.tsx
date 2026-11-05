@@ -117,8 +117,8 @@ describe("IndicatorsDashboard", () => {
     expect(within(tabs).getByRole("tab", { name: "Registros" })).toBeVisible();
 
     const viewToggle = screen.getByRole("group", { name: "Vista" });
-    await user.click(within(viewToggle).getByRole("button", { name: "Tabla" }));
-    expect(within(viewToggle).getByRole("button", { name: "Tabla" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(viewToggle).getByRole("button", { name: "Ver tabla" }));
+    expect(within(viewToggle).getByRole("button", { name: "Ver tabla" })).toHaveAttribute("aria-pressed", "true");
 
     await user.click(within(tabs).getByRole("tab", { name: "Territorio" }));
     expect(screen.getByRole("heading", { name: "Detalle de Incidencias" })).toBeVisible();
@@ -180,7 +180,7 @@ describe("IndicatorsDashboard", () => {
     const selectedStatus = screen.getAllByRole("status").find((status) => status.textContent?.includes("Seleccionado:"));
     expect(selectedStatus).toHaveTextContent("Seleccionado: Centro");
 
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
     const zonesTable = within(coverageTable).getByRole("table", { name: /Cobertura por zona/ });
     expect(within(coverageTable).getByRole("table", { name: /Cobertura por tipo de servicio/ })).toBeVisible();
@@ -210,7 +210,7 @@ describe("IndicatorsDashboard", () => {
     expect(screen.queryByText(/reportes consideran el período/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const incidentsTable = screen.getByRole("region", { name: "Tabla de datos de Incidencias" });
     expect(within(incidentsTable).getByRole("columnheader", { name: "Desbordes" })).toBeVisible();
     expect(within(incidentsTable).getByRole("columnheader", { name: "Daños" })).toBeVisible();
@@ -218,7 +218,7 @@ describe("IndicatorsDashboard", () => {
 
     await openFamily("Residuos");
     expect(screen.getAllByText(/Desvío de relleno sanitario/)[0]).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const wasteTable = screen.getByRole("region", { name: "Tabla de datos de Residuos" });
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Kilogramos" })[0]).toBeVisible();
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Metros cúbicos" })[0]).toBeVisible();
@@ -258,7 +258,7 @@ describe("IndicatorsDashboard", () => {
     await openFamily("Cobertura");
     await openFamily("Cumplimiento");
     await screen.findByRole("heading", { name: "Detalle de Cumplimiento" });
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
 
     const tablesRegion = screen.getByRole("region", { name: "Tabla de datos de Cumplimiento" });
     const zonesTable = within(tablesRegion).getByRole("table", { name: "Valores exactos de zonas sin atención" });

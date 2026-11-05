@@ -103,7 +103,7 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
     expect(bar).toHaveAttribute("aria-pressed", "false");
 
     const viewToggle = screen.queryByRole("group", { name: "Vista" }) ?? screen.getByRole("group", { name: "Vista del detalle" });
-    await user.click(within(viewToggle).getByRole("button", { name: "Tabla" }));
+    await user.click(within(viewToggle).getByRole("button", { name: "Ver tabla" }));
     const tableRegion = await screen.findByRole("region", { name: `Tabla de datos de ${family}` });
     expect(within(tableRegion).getAllByRole("table")[0]).toBeVisible();
   });
