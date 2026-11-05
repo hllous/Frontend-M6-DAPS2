@@ -29,6 +29,10 @@ function documentedError(statusCode: number, message: string) {
 }
 
 describe("FoundationDemo", () => {
+  it("muestra en el encabezado la persona del perfil de ingreso", async () => {
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+    expect(await within(screen.getByRole("banner")).findByText("Carlos Rodríguez")).toBeVisible();
+  });
   it("keeps the frame visible while navigation and actor data load", async () => {
     server.use(http.get("*/api/mock/scenarios/office-duty-queue", () =>
       mockResponseAfter(150, () => HttpResponse.json(scenarios.officeDutyQueue))));
