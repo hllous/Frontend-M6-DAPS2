@@ -55,7 +55,7 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
   const coverage = states.coverage.data?.family === "coverage" ? states.coverage.data : undefined;
   const compliance = states.compliance.data?.family === "compliance" ? states.compliance.data : undefined;
   const incidents = states.incidents.data?.family === "incidents" ? states.incidents.data : undefined;
-  const periodo = servicesPeriodParam(period);
+  const periodo = period.from && period.to ? `from=${period.from}&to=${period.to}` : `periodo=${servicesPeriodParam(period)}`;
 
   return [
     coverage
@@ -64,7 +64,7 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
         value: coverage.totals.notServiced,
         previous: coverage.previous?.totals.notServiced ?? null,
         context: withTarget(`Cobertura ${plainNumber(coverage.totals.coveragePct, 1)} %`, coverage.targets?.coveragePct?.value),
-        href: `/app?destination=services&status=PARTIALLY_COMPLETED&status=CANCELLED&status=SUSPENDED&periodo=${periodo}`,
+        href: `/app?destination=services&status=PARTIALLY_COMPLETED&status=CANCELLED&status=SUSPENDED&${periodo}`,
         linkLabel: "Ver lista de servicios sin realizar",
       }
       : { id: "not-serviced", family: "coverage", label: "Servicios sin realizar" },
@@ -74,7 +74,7 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
         value: compliance.finished.late,
         previous: compliance.previous?.totals.finished.late ?? null,
         context: withTarget(`A tiempo ${plainNumber(compliance.finished.onTimePct, 1)} %`, compliance.targets?.compliancePct?.value),
-        href: `/app?destination=services&late=true&periodo=${periodo}`,
+        href: `/app?destination=services&late=true&${periodo}`,
         linkLabel: "Ver lista de servicios fuera de horario",
       }
       : { id: "late", family: "compliance", label: "Servicios fuera de horario" },

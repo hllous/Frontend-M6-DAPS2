@@ -1,6 +1,6 @@
 import type { Service } from "@/lib/services";
 
-export type ServicesListPeriod = "semana" | "mes" | "todo";
+export type ServicesListPeriod = "semana" | "mes" | "todo" | "personalizado";
 
 type Content = { services: Service[]; dropped: number; period: ServicesListPeriod };
 type Entry = Content & { key: string; choice: ServicesListPeriod | null; storedAt: number };

@@ -431,7 +431,7 @@ describe("IndicatorsDashboard", () => {
   it("blocks an inverted date range with a message and does not call the backend", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await openFamily("Cobertura");
+    await screen.findByText("Servicios sin realizar");
 
     let indicatorRequests = 0;
     server.use(http.get("*/api/indicators/:family", () => { indicatorRequests += 1; return HttpResponse.json({}, { status: 500 }); }));
