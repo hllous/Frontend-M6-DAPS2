@@ -1,6 +1,6 @@
 import { getScenario, type ScenarioId } from "./scenarios";
 import { DEMO_IDENTITIES } from "./demo-identities";
-import { m1IdentityAdapter } from "./m1-identity";
+import { personNameOrLegajo } from "./m1-identity";
 import type { Session } from "./session";
 
 export type SessionActor = {
@@ -21,8 +21,7 @@ export async function sessionActor(session: Session): Promise<SessionActor> {
   const scenarioId = session.scenarioId ?? "employee-no-role";
   const scenario = getScenario({ ...session, scenarioId });
   if (session.identity) {
-    const person = await m1IdentityAdapter.getUser(session.identity.userId);
-    const displayName = person.displayName === "Persona sin nombre registrado" ? `Legajo ${session.identity.userId}` : person.displayName;
+    const displayName = await personNameOrLegajo(session.identity.userId);
     return {
       scenarioId,
       userId: session.identity.userId,

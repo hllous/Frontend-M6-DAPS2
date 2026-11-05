@@ -33,7 +33,7 @@ import { authenticatedFetch, ROLES_STALE_EVENT } from "@/lib/authenticated-fetch
 import { hasOfficeFieldRoleMix, M6_ROLES, type M6Role } from "@/lib/m6-roles";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
 import { DEMO_IDENTITIES } from "@/lib/demo-identities";
-import { m1IdentityAdapter } from "@/lib/m1-identity";
+import { personNameOrLegajo } from "@/lib/m1-identity";
 
 type Assignment = { userId: string; roles: M6Role[] };
 type Listing = { data: Assignment[]; meta: { page: number; totalPages: number } };
@@ -93,9 +93,8 @@ export function AccessWorkspace({ ownUserId, mock = false }: { ownUserId: string
       const response = await authenticatedFetch(`/api/role-assignments/${userId}`);
       if (!response.ok) throw new Error();
       const data = await response.json() as Assignment;
-      const person = await m1IdentityAdapter.getUser(data.userId);
       const demo = mock ? Object.values(DEMO_IDENTITIES).find((entry) => entry.sub === data.userId) : undefined;
-      setSelectedName(demo?.name ?? (person.displayName === "Persona sin nombre registrado" ? `Legajo ${data.userId}` : person.displayName));
+      setSelectedName(demo?.name ?? await personNameOrLegajo(data.userId));
       setSelected(data);
       setRoles(data.roles);
       setId(userId);
