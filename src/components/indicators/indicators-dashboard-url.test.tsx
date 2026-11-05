@@ -38,11 +38,12 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
   it("no avisa en coverage y escribe familia y vista en la URL conservando destination", async () => {
     window.history.replaceState(null, "", "/app?destination=dashboards");
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await screen.findByRole("navigation", { name: "Detalle por familia" });
+    await screen.findByRole("button", { name: "Detalle por familia" });
     expect(screen.queryByText(/Filtros sin efecto/)).not.toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Residuos" }));
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Residuos" }));
     await user.click(screen.getByRole("button", { name: "Tabla" }));
 
     const params = new URLSearchParams(window.location.search);

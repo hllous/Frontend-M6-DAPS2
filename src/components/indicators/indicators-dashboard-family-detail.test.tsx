@@ -18,7 +18,7 @@ it("abre el detalle de cada familia y vuelve al tablero", async () => {
   const user = userEvent.setup();
   for (const family of ["Cobertura", "Cumplimiento", "Incidencias", "Residuos"]) {
     await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
-    await user.click(screen.getByRole("menuitem", { name: family }));
+    await user.click(await screen.findByRole("menuitem", { name: family }));
     expect(await screen.findByRole("heading", { name: `Detalle de ${family}` })).toBeVisible();
     expect(screen.queryByText("Registros")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Volver a Tableros" }));
@@ -33,7 +33,7 @@ it("devuelve el foco al control de origen y conserva el período", async () => {
   const before = new URLSearchParams(window.location.search).get("from");
   const trigger = screen.getByRole("button", { name: "Detalle por familia" });
   await user.click(trigger);
-  await user.click(screen.getByRole("menuitem", { name: "Cobertura" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Cobertura" }));
   expect(screen.getByRole("heading", { name: "Detalle de Cobertura" })).toHaveFocus();
   await user.click(screen.getByRole("button", { name: "Volver a Tableros" }));
   await screen.findByRole("button", { name: "Detalle por familia" });

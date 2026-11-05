@@ -58,7 +58,8 @@ describe("Atajos de período", () => {
 
   it("conserva los datos anteriores mientras carga y los reemplaza al recibir la respuesta", async () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
     const card = screen.getByRole("region", { name: "Resumen de Cobertura" });
     await within(card).findByText("82,2 %");
     server.use(http.get("*/api/indicators/coverage", async () => {
@@ -76,7 +77,8 @@ describe("Atajos de período", () => {
 
   it("conserva los datos y ofrece reintentar si falla la actualización", async () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
     const card = screen.getByRole("region", { name: "Resumen de Cobertura" });
     await within(card).findByText("82,2 %");
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({ message: "Error" }, { status: 503 })));

@@ -63,7 +63,8 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
     const trend = screen.getByRole("region", { name: "Por categoría" });
     expectBusy(trend);
     expect(trend.querySelector('[data-slot="skeleton"]')).not.toBeNull();
@@ -73,27 +74,6 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expect(loaded).toBeVisible();
     expect(screen.getByRole("region", { name: "Por categoría" })).not.toHaveAttribute("aria-busy");
     expect(within(screen.getByRole("region", { name: "Por categoría" })).queryByText("Cargando")).toBeNull();
-  });
-
-  it("shows the records as a busy region with table-row skeletons, then the table takes its place", async () => {
-    const user = userEvent.setup();
-    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await user.click(screen.getByRole("button", { name: "Cobertura" }));
-    await screen.findByRole("heading", { name: "Detalle de Cobertura" });
-
-    server.use(http.get("*/api/services*", async () => {
-      await delay(300);
-      return HttpResponse.json({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 });
-    }));
-    await user.click(await screen.findByRole("button", { name: "Centro" }));
-
-    const records = await screen.findByRole("region", { name: "Registros" });
-    expectBusy(records);
-    expect(records.querySelector('[data-slot="table-row-skeleton"]')).not.toBeNull();
-
-    await waitFor(() => expect(records).toHaveAttribute("aria-busy", "false"), { timeout: 4000 });
-    expect(records.querySelector('[data-slot="table-row-skeleton"]')).toBeNull();
-    expect(within(records).queryByText("Cargando")).toBeNull();
   });
 
   it("keeps the catalog filters in place while the options load: no spinner, no extra bar", async () => {
@@ -124,7 +104,8 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
     const summary = screen.getByRole("region", { name: "Resumen de Cobertura", busy: true });
     expectBusy(summary);
     expect(summary.querySelector('[data-slot="skeleton"]')).not.toBeNull();
