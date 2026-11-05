@@ -32,7 +32,7 @@ describe("Requiere atención", () => {
     await userEvent.click(within(section).getByRole("button", { name: "Ver datos de Servicios sin realizar" }));
     expect(within(section).getByRole("table", { name: "Valores de Servicios sin realizar por semana" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Cobertura por semana" })).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: "Tabla" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Tabla" })[0]!);
     expect(screen.getByRole("table", { name: "Cobertura por período" })).toBeVisible();
   });
   it("mantiene la tarjeta y explica la ausencia de serie", async () => {
@@ -103,4 +103,3 @@ describe("Requiere atención", () => {
     expect(await screen.findByText(/^Actualizado/)).toBeVisible();
   });
 });
-

@@ -32,6 +32,7 @@ import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
 import { AttentionSignals } from "./attention-signals";
 import { CoverageTrend } from "./coverage-trend";
+import { ZonePanel } from "./zone-panel";
 import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
 import { formatIndicatorNumber } from "./number-format";
 
@@ -675,7 +676,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><div className="min-w-0">
         <div className="flex gap-2"><Button type="button" variant={overviewView === "bars" ? "default" : "outline"} aria-pressed={overviewView === "bars"} onClick={() => setOverviewView("bars")}>Gráfico</Button><Button type="button" variant={overviewView === "table" ? "default" : "outline"} aria-pressed={overviewView === "table"} onClick={() => setOverviewView("table")}>Tabla</Button></div>
         {familyStates.coverage.data?.family === "coverage" ? <CoverageTrend data={familyStates.coverage.data} viewMode={overviewView} overview /> : familyStates.coverage.status === "loading" ? <p>Cargando cobertura…</p> : familyStates.coverage.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo cargar la cobertura.</AlertTitle><Button type="button" variant="outline" onClick={() => retryFamily("coverage")}>Reintentar</Button></Alert> : <p>Sin datos en el período.</p>}
-      </div></div>
+      </div><ZonePanel states={familyStates} onRetry={retryFamily} /></div>
       <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} data-detail-trigger={`family-${family}`} type="button" variant="outline" size="sm" onClick={(event) => openDetail(family, event.currentTarget)}>{familyMeta[family].label}</Button>)}</nav>
       </> : <>
       <Button type="button" variant="outline" className="self-start" onClick={closeDetail}>Volver a Tableros</Button>
@@ -892,4 +893,3 @@ function tableValueHeading(unit?: string) {
   const labels: Record<string, string> = { "%": "Porcentaje", "kg": "Kilogramos", "h": "Horas", "incidentes": "Incidentes", "árboles": "Árboles", "reportes": "Reportes", "objetivos": "Objetivos", "servicios": "Servicios" };
   return labels[unit ?? ""] ?? "Valor";
 }
-
