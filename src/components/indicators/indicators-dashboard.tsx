@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -585,7 +586,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setDetailOpen(true);
   };
   const closeDetail = () => {
-    returnFocusRef.current ??= `family-${selectedFamily}`;
+    returnFocusRef.current ??= "family-menu";
     const params = new URLSearchParams(window.location.search);
     params.delete("family");
     window.history.pushState(window.history.state, "", `${window.location.pathname}?${params}`);
@@ -688,7 +689,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         <div className="flex gap-2"><Button type="button" variant={overviewView === "bars" ? "default" : "outline"} aria-pressed={overviewView === "bars"} onClick={() => setOverviewView("bars")}>Gráfico</Button><Button type="button" variant={overviewView === "table" ? "default" : "outline"} aria-pressed={overviewView === "table"} onClick={() => setOverviewView("table")}>Tabla</Button></div>
         {familyStates.coverage.data?.family === "coverage" ? <CoverageTrend data={familyStates.coverage.data} viewMode={overviewView} overview /> : familyStates.coverage.status === "loading" ? <p>Cargando cobertura…</p> : familyStates.coverage.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo cargar la cobertura.</AlertTitle><Button type="button" variant="outline" onClick={() => retryFamily("coverage")}>Reintentar</Button></Alert> : <p>Sin datos en el período.</p>}
       </div><ZonePanel states={familyStates} onRetry={retryFamily} ignoredFilters={Boolean(appliedQuery.zoneId || appliedQuery.serviceTypeId)} /></div>
-      <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} data-detail-trigger={`family-${family}`} type="button" variant="outline" size="sm" onClick={(event) => openDetail(family, event.currentTarget)}>{familyMeta[family].label}</Button>)}</nav>
+      <DropdownMenu><DropdownMenuTrigger render={<Button data-detail-trigger="family-menu" type="button" variant="outline" className="self-start" />}>Detalle por familia <ChevronDown data-icon="inline-end" aria-hidden /></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuGroup>{familyOrder.map((family) => { const Icon = familyMeta[family].icon; return <DropdownMenuItem key={family} className="min-h-12" onClick={() => { const trigger = document.querySelector<HTMLElement>('[data-detail-trigger="family-menu"]'); if (trigger) openDetail(family, trigger); }}><Icon aria-hidden />{familyMeta[family].label}</DropdownMenuItem>; })}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
       </> : <>
       <Button type="button" variant="outline" className="self-start" onClick={closeDetail}>Volver a Tableros</Button>
       <h2 ref={detailHeadingRef} tabIndex={-1}>Detalle de {familyMeta[selectedFamily].label}</h2>

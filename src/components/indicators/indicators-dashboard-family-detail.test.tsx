@@ -31,12 +31,13 @@ it("devuelve el foco al control de origen y conserva el período", async () => {
   await user.click(screen.getByRole("button", { name: "Más filtros" }));
   await user.click(screen.getByRole("button", { name: "Semana" }));
   const before = new URLSearchParams(window.location.search).get("from");
-  const trigger = screen.getByRole("button", { name: "Cobertura" });
+  const trigger = screen.getByRole("button", { name: "Detalle por familia" });
   await user.click(trigger);
+  await user.click(screen.getByRole("menuitem", { name: "Cobertura" }));
   expect(screen.getByRole("heading", { name: "Detalle de Cobertura" })).toHaveFocus();
   await user.click(screen.getByRole("button", { name: "Volver a Tableros" }));
-  await screen.findByRole("button", { name: "Cobertura" });
+  await screen.findByRole("button", { name: "Detalle por familia" });
   await new Promise((resolve) => requestAnimationFrame(resolve));
-  expect(screen.getByRole("button", { name: "Cobertura" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Detalle por familia" })).toHaveFocus();
   expect(new URLSearchParams(window.location.search).get("from")).toBe(before);
 });
