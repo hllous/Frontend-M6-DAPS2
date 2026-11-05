@@ -7,7 +7,7 @@ test.describe("Office and Field mock entry and navigation @smoke", () => {
     await loginViaUi(page, "Oficina · cola de decisiones");
 
     await expect(page.getByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
-    await expect(page.getByText("Lucía Fernández")).toBeVisible();
+    await expect(page.getByText("Carlos Rodríguez")).toBeVisible();
 
     await page.getByRole("link", { name: "Catálogo" }).click();
     await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();

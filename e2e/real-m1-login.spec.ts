@@ -43,7 +43,7 @@ test.describe("Ingreso real con M1", () => {
     await enterCredentials(page, "carlos.rodriguez@m6.local");
 
     await expect(page).toHaveURL(/\/app\?destination=work$/, { timeout: 20_000 });
-    await expect(page.getByText(`Empleado M1 · ${DEMO_IDENTITIES["office-duty-queue"].sub}`)).toBeVisible();
+    await expect(page.getByText(`Legajo ${DEMO_IDENTITIES["office-duty-queue"].sub}`)).toBeVisible();
   });
 
   test("muestra un error genérico para una contraseña incorrecta y conserva el correo", async ({ page, context }) => {
@@ -78,7 +78,7 @@ test.describe("Ingreso real con M1", () => {
 
     await expect(page).toHaveURL(/\/no-role$/, { timeout: 20_000 });
     await expect(page.getByRole("heading", { name: "Sin rol asignado" })).toBeVisible();
-    await expect(page.getByText("Empleado M1 · 900")).toBeVisible();
+    await expect(page.getByText("Legajo 900")).toBeVisible();
     const noRoleAxe = await new AxeBuilder({ page }).analyze();
     expect(noRoleAxe.violations).toEqual([]);
 
