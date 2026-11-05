@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse, passthrough } from "msw";
 import { setupServer } from "msw/node";
@@ -178,7 +178,7 @@ describe("IndicatorsDashboard", () => {
     const centro = await screen.findByRole("button", { name: "Centro" });
     centro.focus();
     await user.keyboard("{Enter}");
-    expect(centro).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Centro" })).toHaveAttribute("aria-pressed", "true"));
 
     await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
@@ -394,4 +394,6 @@ describe("internal jargon guard", () => {
     expectNoInternalJargon(container);
   });
 });
+
+
 
