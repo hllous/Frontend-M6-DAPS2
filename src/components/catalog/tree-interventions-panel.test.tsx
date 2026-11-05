@@ -204,7 +204,8 @@ describe("TreeInterventionsPanel", () => {
     await user.click(within(detail).getByRole("button", { name: "Autorizar intervención" }));
 
     expect(await within(detail).findByText("Autorizada")).toBeVisible();
-    expect(within(detail).getByText("user-lucia")).toBeVisible();
+    expect(within(detail).getByText("Nombre no disponible")).toBeVisible();
+    expect(within(detail).queryByText("user-lucia")).not.toBeInTheDocument();
     expect(within(detail).getByText(/Fecha de autorización/)).toBeVisible();
   });
 

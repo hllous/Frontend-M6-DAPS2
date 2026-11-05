@@ -614,7 +614,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
               <div className="flex shrink-0 flex-col gap-3">
                 {detail.status === "AUTHORIZED" ? (
                   <dl aria-label="Registro de autorización" className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm sm:grid-cols-2">
-                    <div><dt className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><UserRound className="size-3.5" aria-hidden />Persona autorizante</dt><dd className="mt-1">{detail.authorizedByUserId ?? "No registrada"}</dd></div>
+                    <div><dt className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><UserRound className="size-3.5" aria-hidden />Persona autorizante</dt><dd className="mt-1">{detail.authorizedByUserId ? "Nombre no disponible" : "No registrada"}</dd></div>
                     <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de autorización</dt><dd className="mt-1 tabular-nums">{dateTimeLabel(detail.authorizedAt)}</dd></div>
                   </dl>
                 ) : null}

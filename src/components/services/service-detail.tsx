@@ -28,7 +28,7 @@ import {
   REPAIR_SEVERITY_LABEL,
   type RepairRequest,
 } from "@/lib/repair-requests";
-import { formatArgentinaNumericDateTime, formatCalendarDay } from "@/lib/argentina-date";
+import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
 import type { StreetClosureDependency, StreetClosureRequest } from "@/lib/street-closure-requests";
 import { StatusBadge } from "./status-badge";
@@ -507,7 +507,7 @@ export function ServiceDetail({
                 Programación
               </div>
               <div className="mt-2 text-sm font-bold text-[var(--color-text)] tabular-nums">
-                {formatCalendarDay(service.scheduledDate)}
+                {formatArgentinaCalendarDate(service.scheduledDate)}
               </div>
               <div className="mt-1 flex items-center gap-1 text-xs text-[var(--color-text-secondary)] tabular-nums">
                 <Clock className="h-3.5 w-3.5" aria-hidden />
