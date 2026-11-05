@@ -8,6 +8,7 @@ import { loadRoles, loadScenario, ScenarioRequestError } from "@/lib/scenario-cl
 import { scenarioForRoles, type OperationalScenario, type ScenarioId } from "@/lib/scenarios";
 import type { PublicSession } from "@/lib/session";
 import { onRemoteLogout } from "@/lib/session-client";
+import { DEMO_IDENTITIES } from "@/lib/demo-identities";
 import { ensureMockWorkerStarted } from "@/mocks/ensure-worker-started";
 
 import { AppShell } from "./app-shell";
@@ -136,6 +137,6 @@ export function FoundationDemo({
   if (state.status === "ready" && state.scenario.roles.length === 0) return null;
   if (state.status === "error") return <main className="p-6"><ShellError onRetry={retry} description={state.description} /></main>;
   return (
-    <AppShell scenario={state.status === "ready" ? state.scenario : undefined} identity={identity} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />
+    <AppShell scenario={state.status === "ready" ? state.scenario : undefined} identity={identity ?? { userId: DEMO_IDENTITIES[scenarioId].sub, label: DEMO_IDENTITIES[scenarioId].name }} logoutAction={logoutAction} routeContent={children} contentReady={contentReady} />
   );
 }

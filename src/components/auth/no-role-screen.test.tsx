@@ -25,7 +25,7 @@ describe("NoRoleScreen", () => {
   it("announces logout failures and keeps the screen available", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ message: "No disponible" }, { status: 503 }));
-    render(<NoRoleScreen identity="Empleado M1 · 900" />);
+    render(<NoRoleScreen identity="Legajo 900" />);
 
     await user.click(screen.getByRole("button", { name: "Cerrar sesión" }));
 
@@ -43,7 +43,7 @@ describe("NoRoleScreen", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json({ session: { roles: [] } }))
       .mockResolvedValueOnce(Response.json({ session: { roles: ["M6_ADMIN"] } }));
-    render(<NoRoleScreen identity="Empleado M1 · 900" />);
+    render(<NoRoleScreen identity="Legajo 900" />);
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(60_001);
@@ -55,7 +55,7 @@ describe("NoRoleScreen", () => {
   it("does not refresh roles when keyboard activity targets the logout button", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ session: { roles: [] } }));
-    render(<NoRoleScreen identity="Empleado M1 · 900" />);
+    render(<NoRoleScreen identity="Legajo 900" />);
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(60_001);

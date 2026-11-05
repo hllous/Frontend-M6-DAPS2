@@ -19,9 +19,17 @@ it("lista, abre por id y guarda una asignación", async () => {
   expectNoInternalJargon(container);
   await user.type(screen.getByLabelText("Identificador numérico de persona"), "999");
   await user.click(screen.getByRole("button", { name: "Abrir persona" }));
+  expect(await screen.findByRole("heading", { name: "Roles de Legajo 999" })).toBeVisible();
   await user.click(await screen.findByRole("checkbox", { name: /Campo, inspección/ }));
   await user.click(screen.getByRole("button", { name: "Guardar roles" }));
   expect(await screen.findByText(/Los roles asignados se guardaron/)).toBeVisible();
+});
+it("muestra el nombre del perfil mock al administrar sus roles", async () => {
+  const user = userEvent.setup();
+  render(<AccessWorkspace ownUserId={demoAdminId} mock />);
+  const row = await screen.findByRole("row", { name: new RegExp(`${demoAdminId} \\(su usuario\\)`) });
+  await user.click(within(row).getByRole("button", { name: "Administrar" }));
+  expect(await screen.findByRole("heading", { name: "Roles de Carlos Rodríguez (su usuario)" })).toBeVisible();
 });
 it("impide mezclar Oficina y Campo", async () => {
   const user = userEvent.setup(); render(<AccessWorkspace ownUserId={demoAdminId} />);
