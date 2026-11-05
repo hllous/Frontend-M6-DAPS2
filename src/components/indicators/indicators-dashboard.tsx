@@ -649,8 +649,8 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
       <Collapsible className={styles.quickFilters}>
         <div className={styles.quickBar}>
-          <ToggleGroup variant="outline" value={activeQuickPeriod ? [activeQuickPeriod.id] : []} onValueChange={(values) => { const item = quickPeriods.find((entry) => entry.id === values[0]); if (item) applyPeriod(item.days); }} aria-label="Período" className={styles.quickPeriods}>
-            {quickPeriods.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="h-10 min-w-20 aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary [@media(max-width:760px)]:h-12">{item.label}</ToggleGroupItem>)}
+          <ToggleGroup variant="period" value={activeQuickPeriod ? [activeQuickPeriod.id] : []} onValueChange={(values) => { const item = quickPeriods.find((entry) => entry.id === values[0]); if (item) applyPeriod(item.days); }} aria-label="Período" className={styles.quickPeriods}>
+            {quickPeriods.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="h-10 min-w-20 [@media(max-width:760px)]:h-12">{item.label}</ToggleGroupItem>)}
           </ToggleGroup>
           <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="group/filters" />}>
             <SlidersHorizontal data-icon="inline-start" aria-hidden />
