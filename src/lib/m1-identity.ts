@@ -22,3 +22,8 @@ export const m1IdentityAdapter = {
   async listUsers() { return users; },
   async listOrganizations() { return organizations; },
 };
+
+export async function personNameOrLegajo(id: string): Promise<string> {
+  const person = await m1IdentityAdapter.getUser(id);
+  return person.displayName === "Persona sin nombre registrado" ? `Legajo ${id}` : person.displayName;
+}
