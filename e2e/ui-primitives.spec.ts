@@ -28,6 +28,7 @@ test.describe("shared control density", () => {
 
       await page.goto("/app?destination=dashboards");
       await expect(page.getByRole("heading", { name: "Tableros" })).toBeVisible();
+      await page.getByRole("button", { name: "Más filtros", exact: true }).click();
       const periods = page.getByRole("group", { name: "Período", exact: true });
       await expect.poll(() => heightOf(periods)).toBe(expected);
       for (const name of ["Semana", "Mes", "Trimestre", "Más filtros", "Gráfico", "Tabla", "Ver datos de Servicios sin realizar", "Ver detalle de Servicios sin realizar", "Cobertura"]) {
