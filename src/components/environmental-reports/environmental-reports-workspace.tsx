@@ -813,7 +813,7 @@ function SanctionOutcomeIntegrationExceptionsPanel({ exceptions }: { exceptions:
         {exceptions.map((exception) => (
           <Item key={`${exception.violationNoticeId}-${exception.externalRef}`} variant="outline" className="items-start bg-background p-3">
             <p className="font-semibold text-[var(--color-text)]">Acta: <span className="break-words tabular-nums">{exception.violationNoticeId}</span></p>
-            <p className="mt-1 break-words text-sm text-[var(--color-text-secondary)]">Referencia: <span className="font-semibold text-[var(--color-text)]">{exception.externalRef}</span></p>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Resolución registrada en Faltas</p>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{exception.message}</p>
           </Item>
         ))}
@@ -837,7 +837,7 @@ function SanctionOutcomePanel({ outcome }: { outcome: NonNullable<EnvironmentalR
         <DataField label="Decisión" value={SANCTION_DECISION_LABELS[outcome.decision]} />
         <DataField label="Fecha de decisión" value={formatDate(outcome.decidedAt)} />
         <DataField label="Acta" value={outcome.violationNoticeId} />
-        <DataField label="Referencia" value={outcome.externalRef} />
+        <DataField label="Registro" value={outcome.decision === "FINE_ISSUED" ? "Multa registrada en Faltas" : "Resolución registrada en Faltas"} />
         {outcome.dismissalReason && <DataField label="Motivo" value={outcome.dismissalReason} wide />}
       </dl>
     </Alert>

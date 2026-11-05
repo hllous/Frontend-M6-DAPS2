@@ -315,7 +315,7 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     const exceptionPanel = await screen.findByRole("region", { name: "Resoluciones sin acta" });
     expect(within(exceptionPanel).getByText("NOTICE-UNKNOWN")).toBeVisible();
-    expect(within(exceptionPanel).getByText("M4-CLOSURE-UNKNOWN")).toBeVisible();
+    expect(within(exceptionPanel).queryByText("M4-CLOSURE-UNKNOWN")).not.toBeInTheDocument();
     expect(within(exceptionPanel).getByText("No coinciden con ningún acta.")).toBeVisible();
   });
 
@@ -328,7 +328,7 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     expect(within(detail).getByRole("region", { name: "Resolución de Faltas" })).toBeVisible();
     expect(within(detail).getByText("Multa emitida")).toBeVisible();
-    expect(within(detail).getByText("M4-FINE-1010")).toBeVisible();
+    expect(within(detail).getByText("Multa registrada en Faltas")).toBeVisible();
     expect(within(detail).queryByText(/solo lectura|M6 no edita/i)).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: /Editar|Eliminar|Modificar/ })).not.toBeInTheDocument();
   });
