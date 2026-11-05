@@ -33,30 +33,28 @@ describe("Atajos de período", () => {
   });
   it("conserva los datos anteriores mientras carga y los reemplaza al recibir la respuesta", async () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    const band = screen.getByRole("region", { name: "Familias" });
-    await waitFor(() => expect(band).toHaveAttribute("aria-busy", "false"));
-    const card = within(band).getByRole("button", { name: /Cobertura: seleccionar familia/ });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    const card = screen.getByRole("region", { name: "Resumen de Cobertura" });
+    await within(card).findByText("82,2 %");
     server.use(http.get("*/api/indicators/coverage", async () => {
       await delay(500);
       return HttpResponse.json({ ...coverageIndicatorFixture, totals: { ...coverageIndicatorFixture.totals, coveragePct: 42 } });
     }));
     await userEvent.setup().click(screen.getByRole("button", { name: "Semana" }));
-    expect(band).toHaveAttribute("aria-busy", "true");
     expect(within(card).getByText("82,2 %")).toBeVisible();
     expect(within(card).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Detalle de Cobertura" })).toHaveAttribute("aria-busy", "true");
     await waitFor(() => expect(card).toHaveTextContent("42"), { timeout: 3000 });
-    expect(band).toHaveAttribute("aria-busy", "false");
   });
 
   it("conserva los datos y ofrece reintentar si falla la actualización", async () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    const band = screen.getByRole("region", { name: "Familias" });
-    await waitFor(() => expect(band).toHaveAttribute("aria-busy", "false"));
-    const card = within(band).getByRole("button", { name: /Cobertura: seleccionar familia/ });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    const card = screen.getByRole("region", { name: "Resumen de Cobertura" });
+    await within(card).findByText("82,2 %");
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({ message: "Error" }, { status: 503 })));
     await userEvent.setup().click(screen.getByRole("button", { name: "Semana" }));
-    expect(await within(band).findByRole("button", { name: "Reintentar Cobertura" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Reintentar" })).toBeVisible();
     expect(within(card).getByText("82,2 %")).toBeVisible();
     expect(within(card).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Detalle de Cobertura" })).toBeVisible();

@@ -19,6 +19,7 @@ test.describe("indicator dashboard stage 2 #790", () => {
     await expect(pendingDamage).toContainText("Historial disponible desde 30/10/2026.");
     await expect(pendingDamage).not.toContainText("0 contenedores");
 
+    await page.getByRole("button", { name: "Volver a Tableros" }).click();
     await page.getByRole("button", { name: /Cumplimiento/ }).click();
     const compliance = page.locator("section[aria-labelledby='indicator-detail-title']");
     await expect(compliance.getByRole("group", { name: "Desvío de programación" })).toContainText("8,8 %");

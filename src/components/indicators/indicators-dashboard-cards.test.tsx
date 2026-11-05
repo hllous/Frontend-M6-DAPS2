@@ -27,8 +27,12 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-function familyCard(label: string) {
-  return screen.getByRole("button", { name: `${label}: seleccionar familia` });
+async function familyCard(label: string) {
+  const user = userEvent.setup();
+  const back = screen.queryByRole("button", { name: "Volver a Tableros" });
+  if (back) await user.click(back);
+  await user.click(screen.getByRole("button", { name: label }));
+  return screen.findByRole("region", { name: `Resumen de ${label}` });
 }
 
 describe("metas de las tarjetas de indicadores", () => {
@@ -48,24 +52,24 @@ describe("metas de las tarjetas de indicadores", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const coverage = familyCard("Cobertura");
+    const coverage = await familyCard("Cobertura");
     expect(await within(coverage).findByText("Cumple la meta")).toBeVisible();
     expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
     expect(within(coverage).getByText("más es mejor")).toBeVisible();
 
-    const compliance = familyCard("Cumplimiento");
+    const compliance = await familyCard("Cumplimiento");
     expect(await within(compliance).findByText("Bajo la meta")).toBeVisible();
     expect(within(compliance).getByText("Meta ≥ 90 %")).toBeVisible();
     expect(within(compliance).getByText("más es mejor")).toBeVisible();
 
-    const incidents = familyCard("Incidencias");
+    const incidents = await familyCard("Incidencias");
     expect(await within(incidents).findByText("Cumple la meta")).toBeVisible();
     expect(within(incidents).getByText("1,8 días hábiles")).toBeVisible();
     expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
     expect(within(incidents).getByText("menos es mejor")).toBeVisible();
     expect(within(incidents).getByText(/Resolución media en días corridos:/)).toHaveTextContent("2,4 días");
 
-    const waste = familyCard("Residuos");
+    const waste = await familyCard("Residuos");
     expect(await within(waste).findByText("Sin meta definida")).toBeVisible();
     expect(within(waste).queryByText("más es mejor")).not.toBeInTheDocument();
     expect(within(waste).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
@@ -79,7 +83,7 @@ describe("metas de las tarjetas de indicadores", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const incidents = familyCard("Incidencias");
+    const incidents = await familyCard("Incidencias");
     expect(await within(incidents).findByText("Sobre la meta")).toBeVisible();
     expect(within(incidents).getByText("8,2 días hábiles")).toBeVisible();
     expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
@@ -98,12 +102,11 @@ describe("metas de las tarjetas de indicadores", () => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     })));
-    const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const incidents = familyCard("Incidencias");
+    const incidents = await familyCard("Incidencias");
     await within(incidents).findByText("Cumple la meta");
-    await user.click(incidents);
+
 
     const summary = screen.getByRole("tabpanel");
     expect(within(summary).getByText("1,8 días hábiles")).toBeVisible();
@@ -112,7 +115,7 @@ describe("metas de las tarjetas de indicadores", () => {
     expect(within(summary).getByText("Cumple la meta")).toBeVisible();
   });
 
-  it("no muestra un estado mientras los datos de una familia cargan", () => {
+  it("no muestra un estado mientras los datos de una familia cargan", async () => {
     server.use(http.get("*/api/indicators/coverage", async () => {
       await delay("infinite");
       return HttpResponse.json(coverageIndicatorFixture);
@@ -120,7 +123,7 @@ describe("metas de las tarjetas de indicadores", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const coverage = familyCard("Cobertura");
+    const coverage = await familyCard("Cobertura");
     expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
     expect(within(coverage).getByText("más es mejor")).toBeVisible();
     expect(within(coverage).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
@@ -135,9 +138,8 @@ describe("metas de las tarjetas de indicadores", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const coverage = familyCard("Cobertura");
-    const familyBand = screen.getByRole("region", { name: "Familias" });
-    expect(await within(familyBand).findByText("Sin datos")).toBeVisible();
+    const coverage = await familyCard("Cobertura");
+
     expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
     expect(within(coverage).getByText("más es mejor")).toBeVisible();
     expect(within(coverage).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
@@ -151,9 +153,10 @@ describe("metas de las tarjetas de indicadores", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const coverage = familyCard("Cobertura");
-    const familyBand = screen.getByRole("region", { name: "Familias" });
-    expect(await within(familyBand).findByText("No se pudo cargar Cobertura")).toBeVisible();
+    const coverage = await familyCard("Cobertura");
+    expect(await screen.findByText(/No se pudo actualizar Cobertura/)).toBeVisible();
+    expect(within(coverage).queryByLabelText("Cargando resumen")).not.toBeInTheDocument();
+    expect(within(coverage).getByText("Sin datos disponibles.")).toBeVisible();
     expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
     expect(within(coverage).getByText("más es mejor")).toBeVisible();
     expect(within(coverage).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();

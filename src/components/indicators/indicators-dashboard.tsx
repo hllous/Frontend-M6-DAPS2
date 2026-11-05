@@ -272,14 +272,6 @@ function indicatorVariationDetails(data: IndicatorData): Omit<IndicatorVariation
   return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
 }
 
-function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
-  return [
-    `${targetLabel}.`,
-    directionLabel ? `${directionLabel}.` : null,
-    status ? `Estado: ${status.label}.` : null,
-  ].filter(Boolean).join(" ");
-}
-
 function indicatorTargetLabel(target: { direction: string; value: number | null } | null | undefined, unit: string) {
   if (target?.direction === "down") return "Meta: tendencia descendente";
   if (!hasNumericThreshold(target)) return "Sin meta definida";
@@ -392,42 +384,18 @@ function useNarrowDashboard() {
   return isNarrow;
 }
 
-function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { states: Record<FamilyKey, FamilyState>; selectedFamily: FamilyKey; onSelect: (family: FamilyKey) => void; onRetry: (family: FamilyKey) => void }) {
-  return <LoadingRegion label="Familias" isLoading={familyOrder.some((family) => states[family].status === "loading")}>
-    <ToggleGroup value={[selectedFamily]} onValueChange={(values) => { const family = values[0]; if (family) onSelect(family as FamilyKey); }} aria-label="Familias" className={styles.summaryBand}>
-      {familyOrder.map((family) => {
-        const state = states[family];
-        const item = state.data;
-        const meta = familyMeta[family];
-        const Icon = meta.icon;
-        const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready", item);
-        const descriptionId = `indicator-${family}-summary-description`;
-        const variation = item ? indicatorVariationDetails(item) : null;
-        const variationId = `indicator-${family}-variation-description`;
-        return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
-          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={variation ? `${descriptionId} ${variationId}` : descriptionId}>
-            <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
-            {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item ? familySummary(item) : "—"}</span>}
-            <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
-            {variation ? <IndicatorVariation id={variationId} {...variation} /> : null}
-            <span className={styles.summaryTargetDetails}>
-              <span className="text-xs font-semibold text-foreground">{summary.targetLabel}</span>
-              <span className="text-xs text-muted-foreground">{summary.directionLabel}</span>
-              {summary.status ? <Badge className="h-auto min-h-6 py-1" variant={summary.status.variant} aria-hidden="true">
-                {summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}
-                {summary.status.label}
-              </Badge> : null}
-            </span>
-            {item?.family === "incidents" ? <span className="text-xs leading-snug text-muted-foreground">Resolución media en días corridos: {item.reports.avgResolutionDays === null ? "Sin reportes cerrados" : `${formatNumber(item.reports.avgResolutionDays, "días")} días`}</span> : null}
-            <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
-          </ToggleGroupItem>
-          <span className="sr-only" id={descriptionId}>{indicatorSummaryDescription(summary.targetLabel, summary.directionLabel, summary.status)}</span>
-          {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
-          {state.status === "error" ? <Alert variant="danger" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
-        </Card>;
-      })}
-    </ToggleGroup>
-  </LoadingRegion>;
+function FamilyDetailSummary({ family, state }: { family: FamilyKey; state: FamilyState }) {
+  const data = state.data;
+  const summary = indicatorSummaryDetails(family, data?.primary.value, state.status === "ready", data);
+  const variation = data ? indicatorVariationDetails(data) : null;
+  return <Card size="sm" role="region" aria-label={`Resumen de ${familyMeta[family].label}`}><CardContent className="flex flex-wrap items-center gap-3">
+    {data ? <><strong>{familySummary(data)}</strong><span>{data.primary.label}</span></> : state.status === "loading" ? <Skeleton aria-label="Cargando resumen" className="h-6 w-24" /> : <span>{state.status === "error" ? "Sin datos disponibles." : "Sin resultados en el período."}</span>}
+    {variation ? <IndicatorVariation {...variation} /> : null}
+    <span>{summary.targetLabel}</span>
+    {summary.directionLabel ? <span>{summary.directionLabel}</span> : null}
+    {summary.status ? <Badge variant={summary.status.variant}>{summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}<span>{summary.status.label}</span></Badge> : null}
+    {data?.family === "incidents" ? <span>Resolución media en días corridos: {data.reports.avgResolutionDays === null ? "Sin reportes cerrados" : `${formatNumber(data.reports.avgResolutionDays, "días")} días`}</span> : null}
+  </CardContent></Card>;
 }
 
 function ModuleState({ label, status, onRetry, children }: { label: string; status: LoadStatus; onRetry: () => void; children?: React.ReactNode }) {
@@ -450,6 +418,9 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const [filterError, setFilterError] = useState<string | null>(null);
   const [familyStates, setFamilyStates] = useState<Record<FamilyKey, FamilyState>>(emptyFamilyState);
   const [selectedFamily, setSelectedFamily] = useState<FamilyKey>(initialUrlState.family);
+  const [detailOpen, setDetailOpen] = useState(() => Boolean(searchParams?.has("family")));
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
+  const returnFocusRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(initialUrlState.view);
   const [selectedSignal, setSelectedSignal] = useState<SelectedSignal | null>(null);
   const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
@@ -542,8 +513,31 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   useEffect(() => {
     if (!canView) return;
     const search = serializeIndicatorUrlState({ query: appliedQuery, family: selectedFamily, view: viewMode, signal: selectedSignal ?? pendingSignal.current ?? undefined }, window.location.search);
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${search}`);
-  }, [appliedQuery, canView, selectedFamily, selectedSignal, viewMode]);
+    const params = new URLSearchParams(search);
+    if (!detailOpen) params.delete("family");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${params}`);
+  }, [appliedQuery, canView, detailOpen, selectedFamily, selectedSignal, viewMode]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const state = parseIndicatorUrlState(params);
+      setDetailOpen(params.has("family"));
+      setSelectedFamily(state.family);
+      pendingSignal.current = state.signal;
+      setSelectedSignal(null);
+      setRecordPlan(null);
+      setRecordsStatus("idle");
+      setViewMode(state.view);
+      setAppliedQuery(state.query);
+      setQuery(state.query);
+      if (!params.has("family")) requestAnimationFrame(() => { if (returnFocusRef.current) document.querySelector<HTMLElement>(`[data-detail-trigger="${returnFocusRef.current}"]`)?.focus(); });
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => { if (detailOpen) detailHeadingRef.current?.focus(); }, [detailOpen, selectedFamily]);
   const trendBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "trend") : [];
   const territoryBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "territory") : [];
   const trendStatus = moduleStatus(selectedFamilyState.data ? { ...selectedFamilyState, status: "ready" } : selectedFamilyState, selectedFamilyState.data, "trend");
@@ -578,7 +572,24 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setRecordsStatus("loading");
     setRecordPlan(signalTracePlan(selectedData, breakdown, point));
     setRecordsOpen(true);
-  }, [selectedData]);
+  }, [selectedData, detailOpen]);
+
+  const openDetail = (family: FamilyKey, trigger: HTMLElement) => {
+    returnFocusRef.current = trigger.dataset.detailTrigger ?? null;
+    const params = new URLSearchParams(window.location.search);
+    params.set("family", family);
+    window.history.pushState(window.history.state, "", `${window.location.pathname}?${params}`);
+    selectFamily(family);
+    setDetailOpen(true);
+  };
+  const closeDetail = () => {
+    returnFocusRef.current ??= `family-${selectedFamily}`;
+    const params = new URLSearchParams(window.location.search);
+    params.delete("family");
+    window.history.pushState(window.history.state, "", `${window.location.pathname}?${params}`);
+    setDetailOpen(false);
+    requestAnimationFrame(() => { if (returnFocusRef.current) document.querySelector<HTMLElement>(`[data-detail-trigger="${returnFocusRef.current}"]`)?.focus(); });
+  };
 
   const retryFamily = (family: FamilyKey) => {
     loadFamily(family, appliedQuery);
@@ -658,10 +669,16 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         </CollapsibleContent>
       </Collapsible>
 
-      <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} />
+      {!detailOpen ? <>
+      <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family, trigger) => openDetail(family, trigger)} />
+      <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} data-detail-trigger={`family-${family}`} type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-8" onClick={(event) => openDetail(family, event.currentTarget)}>{familyMeta[family].label}</Button>)}</nav>
+      </> : <>
+      <Button type="button" variant="outline" className="min-h-11 self-start sm:min-h-10" onClick={closeDetail}>Volver a Tableros</Button>
+      <h2 ref={detailHeadingRef} tabIndex={-1}>Detalle de {familyMeta[selectedFamily].label}</h2>
+      {selectedFamilyState.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo actualizar {familyMeta[selectedFamily].label}. Los datos pueden estar desactualizados.</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => retryFamily(selectedFamily)}>Reintentar</Button></Alert> : null}
+      <FamilyDetailSummary family={selectedFamily} state={selectedFamilyState} />
 
-      <div className={styles.summaryHeading}><h2>Resumen del período</h2><span>{appliedQuery.from && appliedQuery.to ? `${formatDate(appliedQuery.from)} – ${formatDate(appliedQuery.to)}` : "Últimos 30 días"}</span></div>
-      <FamilySelectorBand states={familyStates} selectedFamily={selectedFamily} onSelect={selectFamily} onRetry={retryFamily} />
+
       {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Vista">
         <ToggleGroupItem value="bars" size="lg">Barras</ToggleGroupItem>
         <ToggleGroupItem value="table" size="lg">Tabla</ToggleGroupItem>
@@ -673,7 +690,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="territory">Territorio</TabsTrigger>
           <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
-        <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h2 id="mobile-summary-title">{familyMeta[selectedFamily].label}</h2>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}
+        <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h3 id="mobile-summary-title">Resumen</h3>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}
           {selectedData?.family === "coverage" ? <p><strong>Programado a futuro:</strong> {metricText(selectedData.summaryMetrics.find((metric) => metric.label === "Programado a futuro")!)}</p> : null}
           {(() => {
             const summary = indicatorSummaryDetails(selectedFamily, selectedData?.primary.value, selectedFamilyState.status === "ready", selectedData);
@@ -698,6 +715,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         {selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}
         {recordsView}
       </div>}
+      </>}
     </section>
   );
 }
@@ -753,7 +771,7 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
   const hasSummaryMetrics = data.family === "coverage" || data.family === "compliance";
   return <section className={styles.detail} aria-labelledby="indicator-detail-title">
     <div className={styles.detailHeader}>
-      <div><h2 id="indicator-detail-title">{meta.label}</h2><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
+      <div><p id="indicator-detail-title">{meta.label}</p><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
       <div className={styles.viewActions}>
         <ToggleGroup value={[requestedViewMode]} onValueChange={(values) => { const value = values[0]; if (value) onViewModeChange(value as ViewMode); }} variant="outline" size="sm" className={styles.viewToggle} aria-label="Vista del detalle">
           <ToggleGroupItem value="bars">Barras</ToggleGroupItem>
@@ -869,3 +887,4 @@ function tableValueHeading(unit?: string) {
   const labels: Record<string, string> = { "%": "Porcentaje", "kg": "Kilogramos", "h": "Horas", "incidentes": "Incidentes", "árboles": "Árboles", "reportes": "Reportes", "objetivos": "Objetivos", "servicios": "Servicios" };
   return labels[unit ?? ""] ?? "Valor";
 }
+
