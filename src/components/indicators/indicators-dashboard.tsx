@@ -659,7 +659,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <CollapsibleTrigger render={<Button type="button" variant="outline" size="sm" className="group/filters" aria-label="Más filtros" aria-describedby="indicator-filters-summary" />}>
             <SlidersHorizontal data-icon="inline-start" aria-hidden />
             Más filtros
-            <span id="indicator-filters-summary" className="max-w-72 truncate font-normal text-muted-foreground">{filtersSummary}</span>
+            <span id="indicator-filters-summary" className="max-w-72 truncate font-medium text-foreground">{filtersSummary}</span>
             <ChevronDown data-icon="inline-end" aria-hidden className="transition-transform group-aria-expanded/filters:rotate-180" />
           </CollapsibleTrigger>
         </div>

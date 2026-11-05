@@ -32,7 +32,7 @@ test.describe("shared control density", () => {
       const periods = page.getByRole("group", { name: "Período", exact: true });
       await expect.poll(() => heightOf(periods)).toBe(expected);
       for (const name of ["Semana", "Mes", "Trimestre", "Más filtros", "Gráfico", "Tabla", "Ver datos de Servicios sin realizar", "Ver detalle de Servicios sin realizar", "Cobertura"]) {
-        await expect.poll(() => heightOf(page.getByRole("button", { name, exact: true }))).toBe(expected);
+        await expect.poll(() => heightOf(page.getByRole("button", { name, exact: true }).first())).toBe(expected);
       }
       await expect.poll(() => heightOf(page.getByRole("link", { name: "Ver lista de servicios sin realizar" }))).toBe(expected);
       await page.getByRole("button", { name: "Ver detalle de Servicios sin realizar" }).click();
