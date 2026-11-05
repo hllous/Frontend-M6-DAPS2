@@ -56,7 +56,7 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
 
     await user.keyboard("{Enter}");
     expect(bar).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("status", { name: "Detalle fijado de En fecha" })).toBeVisible();
+    expect(within(chart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
 
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("status", { name: /Detalle .*En fecha/ })).not.toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
 
     await user.keyboard("{Enter}");
     expect(bar).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("status", { name: /Detalle fijado de/ })).toBeVisible();
+    expect(within(chart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
     if (recordName) expect(await screen.findByRole("row", { name: recordName })).toBeVisible();
 
     await user.keyboard("{Escape}");

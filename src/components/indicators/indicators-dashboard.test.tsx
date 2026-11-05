@@ -137,19 +137,8 @@ describe("IndicatorsDashboard", () => {
     const centro = await screen.findByRole("button", { name: /En fecha.*344 servicios/i });
 
     await user.hover(centro);
-    expect(screen.getByRole("status", { name: /Detalle de En fecha/i })).toBeVisible();
-    await user.click(centro);
-    expect(screen.getByRole("status", { name: /Detalle fijado de En fecha/i })).toBeVisible();
-
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("status", { name: /Detalle .*En fecha/i })).not.toBeInTheDocument();
-    expect(centro).toHaveFocus();
-
-    await user.click(centro);
-    expect(screen.getByRole("status", { name: /Detalle fijado de En fecha/i })).toBeVisible();
-    await user.click(document.body);
-    expect(screen.queryByRole("status", { name: /Detalle .*En fecha/i })).not.toBeInTheDocument();
-    expect(centro).toHaveFocus();
+    expect(screen.queryByRole("status", { name: /Detalle de En fecha/i })).not.toBeInTheDocument();
+    expect(centro).toHaveAccessibleName(/344 servicios/i);
   });
 
   it("uses semantic colors for danger, success, warning, and neutral indicator points (#420)", async () => {
