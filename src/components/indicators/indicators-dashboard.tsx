@@ -25,7 +25,7 @@ import { defaultIndicatorTarget, familyAppliesCatalogFilters, hasNumericThreshol
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
-import { BreakdownBarChart } from "./breakdown-bar-chart";
+import { BreakdownBarChart, severityToneColors } from "./breakdown-bar-chart";
 import { AttentionSignals } from "./attention-signals";
 import { ChartViewToggle } from "./chart-view-toggle";
 import { CoverageTrend } from "./coverage-trend";
@@ -79,7 +79,7 @@ function familySummary(data: IndicatorData) {
   return metricText(data.primary);
 }
 
-type IndicatorSummaryStatus = { label: string; variant: "success" | "danger" };
+type IndicatorSummaryStatus = { label: string; variant: "success" | "warning" | "danger" };
 
 function primaryTarget(family: FamilyKey, data?: IndicatorData): IndicatorTarget | undefined {
   if (!data) return defaultIndicatorTarget(family);
@@ -110,9 +110,13 @@ function indicatorSummaryDetails(family: FamilyKey, value: number | null | undef
     const meetsTarget = definition.target.comparator === "≥"
       ? value >= definition.target.value
       : value <= definition.target.value;
+    // El rojo es para lo que empeora: fuera de la meta pero mejorando o sin cambio es advertencia.
+    const variation = data ? indicatorVariationDetails(data) : undefined;
+    const worsening = variation?.delta !== undefined && variation.delta !== null && variation.direction !== undefined
+      && (variation.direction === "min" ? variation.delta < 0 : variation.delta > 0);
     status = meetsTarget
       ? { label: "Cumple la meta", variant: "success" }
-      : { label: definition.direction === "less-is-better" ? "Sobre la meta" : "Bajo la meta", variant: "danger" };
+      : { label: definition.direction === "less-is-better" ? "Sobre la meta" : "Bajo la meta", variant: worsening ? "danger" : "warning" };
   }
 
   return { targetLabel, directionLabel, status };
@@ -650,7 +654,7 @@ function BreakdownView({ family, breakdown, viewMode, period, selectedId: contro
     : family === "coverage" && breakdown.id === "service-types"
       ? <CoverageBreakdownTable points={breakdown.points} target={breakdown.target} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" period={period} limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} />
       : null;
-  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3></div>{coverageTable ?? (viewMode === "bars" ? <BreakdownBarChart points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} formatValue={metricText} formatDetail={pointText} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />)}</div>;
+  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3></div>{coverageTable ?? (viewMode === "bars" ? <BreakdownBarChart points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} formatValue={metricText} formatDetail={pointText} toneColors={severityToneColors} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />)}</div>;
 }
 
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {

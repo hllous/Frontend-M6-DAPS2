@@ -17,6 +17,8 @@ type BreakdownBarChartProps = {
   title: string;
   formatValue: (point: IndicatorPoint) => string;
   formatDetail: (point: IndicatorPoint) => string;
+  /** Colores por tono. Por defecto `danger` es rojo: úsese solo para lo que empeora. */
+  toneColors?: Partial<Record<IndicatorTone, string>>;
 };
 type ChartPoint = IndicatorPoint & { valueLabel: string; detailLabel: string; toneCue?: string };
 type CategoryTickProps = { x?: number | string; y?: number | string; payload?: { value?: unknown; payload?: ChartPoint }; toneCue?: string };
@@ -27,6 +29,12 @@ const MAX_LABEL_CHARACTERS = 20;
 const chartConfig = {
   value: { label: "Valor", color: "var(--color-action)" },
 } satisfies ChartConfig;
+
+/** Estados fijos (un contenedor dañado, un árbol crítico): gravedad sin rojo, que se reserva para lo que empeora. */
+export const severityToneColors: Partial<Record<IndicatorTone, string>> = {
+  danger: "var(--color-warning)",
+  warning: "var(--color-border-strong)",
+};
 
 const indicatorToneColors: Record<IndicatorTone, string> = {
   primary: "var(--color-action)",
@@ -96,9 +104,10 @@ type BreakdownBarPlotProps = {
   maxValue: number;
   registerTrigger: (pointId: string, element: HTMLButtonElement | null) => void;
   onSelect: (pointId: string) => void;
+  toneColors?: Partial<Record<IndicatorTone, string>>;
 };
 
-const BreakdownBarPlot = memo(function BreakdownBarPlot({ points, chartHeight, maxValue, registerTrigger, onSelect }: BreakdownBarPlotProps) {
+const BreakdownBarPlot = memo(function BreakdownBarPlot({ points, chartHeight, maxValue, registerTrigger, onSelect, toneColors }: BreakdownBarPlotProps) {
   const toneCuesByLabel = new Map(points.filter((point) => point.toneCue).map((point) => [point.label, point.toneCue]));
 
   return <ChartContainer
@@ -121,7 +130,7 @@ const BreakdownBarPlot = memo(function BreakdownBarPlot({ points, chartHeight, m
           const point = shapeProps.payload as ChartPoint;
           const tone = point.tone ?? "primary";
           return <g>
-            <path d={roundedEndPath(shapeProps)} className={styles.barShape} fill={indicatorToneColors[tone]} aria-hidden="true" />
+            <path d={roundedEndPath(shapeProps)} className={styles.barShape} fill={toneColors?.[tone] ?? indicatorToneColors[tone]} aria-hidden="true" />
             <foreignObject x={shapeProps.x} y={shapeProps.y} width={Math.max(shapeProps.width, 32)} height={shapeProps.height}>
               <Button
                 ref={(element) => registerTrigger(point.id, element)}
@@ -148,7 +157,7 @@ const BreakdownBarPlot = memo(function BreakdownBarPlot({ points, chartHeight, m
   </ChartContainer>;
 });
 
-export function BreakdownBarChart({ points, selectedId, onSelect, title, formatValue, formatDetail }: BreakdownBarChartProps) {
+export function BreakdownBarChart({ points, selectedId, onSelect, title, formatValue, formatDetail, toneColors }: BreakdownBarChartProps) {
   const [localSelectedId, setLocalSelectedId] = useState(selectedId);
   const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const currentSelectedId = selectedId ?? localSelectedId;
@@ -182,7 +191,7 @@ export function BreakdownBarChart({ points, selectedId, onSelect, title, formatV
   }, []);
 
   return <div className={styles.chartView} role="group" aria-label={`Barras de ${title.toLowerCase()}`}>
-    <BreakdownBarPlot points={chartPoints} chartHeight={chartHeight} maxValue={maxValue} registerTrigger={registerTrigger} onSelect={selectPoint} />
+    <BreakdownBarPlot points={chartPoints} chartHeight={chartHeight} maxValue={maxValue} registerTrigger={registerTrigger} onSelect={selectPoint} toneColors={toneColors} />
 
   </div>;
 }

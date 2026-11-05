@@ -142,7 +142,7 @@ describe("IndicatorsDashboard", () => {
     expect(centro).toHaveAccessibleName(/344 servicios/i);
   });
 
-  it("uses semantic colors for danger, success, warning, and neutral indicator points (#420)", async () => {
+  it("uses semantic colors for success, severity, and neutral indicator points, and keeps red for what gets worse (#420)", async () => {
     const dimensions = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
       x: 0, y: 0, width: 480, height: 280, top: 0, right: 480, bottom: 280, left: 0, toJSON: () => ({}),
     } as DOMRect);
@@ -155,12 +155,14 @@ describe("IndicatorsDashboard", () => {
     await screen.findByRole("heading", { name: "Detalle de Cumplimiento" });
     await screen.findByRole("button", { name: /En fecha.*344 servicios/i });
     expect(container.querySelector('[fill="var(--color-success)"]')).not.toBeNull();
-    expect(container.querySelector('[fill="var(--color-warning)"]')).not.toBeNull();
+    expect(container.querySelector('[fill="var(--color-border-strong)"]')).not.toBeNull();
 
     await openFamily("Incidencias");
     await screen.findByRole("heading", { name: "Detalle de Incidencias" });
     await screen.findByRole("button", { name: /Crítico.*3 árboles/i });
-    expect(container.querySelector('[fill="var(--color-danger)"]')).not.toBeNull();
+    // Estados fijos (crítico, desbordado): gravedad sin rojo; el rojo queda para lo que empeora.
+    expect(container.querySelector('[fill="var(--color-danger)"]')).toBeNull();
+    expect(container.querySelector('[fill="var(--color-warning)"]')).not.toBeNull();
     dimensions.mockRestore();
   });
 
