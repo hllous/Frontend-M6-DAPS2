@@ -37,7 +37,8 @@ function serveCoverage(body: object) {
 
 async function renderTrend() {
   render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
   return screen.findByRole("region", { name: "Tendencia" });
 }
 
@@ -88,7 +89,8 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
   it("no muestra la sección cuando el backend no devuelve serie", async () => {
     serveCoverage(coverageWithoutSeriesFixture);
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
 
     await screen.findByRole("heading", { name: "Cobertura por zona" });
     expect(screen.queryByRole("region", { name: "Tendencia" })).not.toBeInTheDocument();

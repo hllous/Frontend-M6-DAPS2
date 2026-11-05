@@ -58,7 +58,8 @@ function rowFor(table: HTMLElement, label: string) {
 describe("metas de las tablas de cobertura", () => {
   it("marca bajo la meta en las tablas por zona y tipo de servicio", async () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
 
     const zones = await screen.findByRole("table", { name: /Cobertura por zona/ });
     const serviceTypes = await screen.findByRole("table", { name: /Cobertura por tipo de servicio/ });
@@ -92,7 +93,8 @@ describe("metas de las tablas de cobertura", () => {
   it("usa la meta recibida del backend para la tarjeta y las filas", async () => {
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({ ...targetCoverageFixture, targets: { coveragePct: { value: 80, direction: "min" } } })));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
     const card = await screen.findByRole("region", { name: "Resumen de Cobertura" });
     expect(await within(card).findByText("Meta ≥ 80 %")).toBeVisible();
     const zones = await screen.findByRole("table", { name: /Cobertura por zona/ });
@@ -105,7 +107,8 @@ describe("metas de las tablas de cobertura", () => {
     delete response.targets;
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(response)));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
 
     const coverage = await screen.findByRole("region", { name: "Resumen de Cobertura" });
     expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
@@ -124,7 +127,8 @@ describe("metas de las tablas de cobertura", () => {
     delete response.byServiceType[0]!.upcoming;
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(response)));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
 
     await screen.findByRole("region", { name: "Resumen de Cobertura" });
     const summary = screen.getByLabelText("Resumen exacto de Cobertura");
@@ -136,7 +140,8 @@ describe("metas de las tablas de cobertura", () => {
   it("conserva el estado de cobertura y la exportación al cambiar a Tabla", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
 
     await screen.findByRole("table", { name: /Cobertura por zona/ });
     const coverageRegion = screen.getByRole("region", { name: "Detalle de Cobertura" });

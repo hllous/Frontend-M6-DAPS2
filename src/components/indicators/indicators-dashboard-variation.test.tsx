@@ -39,7 +39,9 @@ function incidentsWithDelta(delta: number | null) {
 }
 
 async function variationCard(label: string) {
-  await userEvent.setup().click(screen.getByRole("button", { name: label }));
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+  await user.click(await screen.findByRole("menuitem", { name: label }));
   return screen.findByRole("region", { name: `Resumen de ${label}` });
 }
 
