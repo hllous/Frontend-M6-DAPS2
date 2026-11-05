@@ -32,7 +32,7 @@ import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
 import { AttentionSignals } from "./attention-signals";
 import { CoverageTrend } from "./coverage-trend";
-import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
+import { IndicatorVariation, type IndicatorVariationDirection } from "./indicator-variation";
 import { formatIndicatorNumber } from "./number-format";
 
 import styles from "./indicators-dashboard.module.css";
@@ -177,10 +177,6 @@ function formatDateTime(value: string) {
   return formatArgentinaNumericDateTime(value);
 }
 
-function familySummary(data: IndicatorData) {
-  return metricText(data.primary);
-}
-
 type IndicatorSummaryStatus = { label: string; variant: "success" | "danger" };
 
 function primaryTarget(family: FamilyKey, data?: IndicatorData): IndicatorTarget | undefined {
@@ -242,42 +238,6 @@ function computedPreviousPeriod(period: IndicatorPeriod) {
 
 function comparisonPeriod(data: IndicatorData, delta: number | null | undefined) {
   return data.previous?.period ?? (delta === null || delta === undefined ? undefined : computedPreviousPeriod(data.period));
-}
-
-function indicatorVariationDetails(data: IndicatorData): Omit<IndicatorVariationProps, "id"> {
-  if (data.family === "coverage") {
-    const delta = data.delta?.coveragePct;
-    const direction = knownVariationDirection(primaryTarget(data.family, data));
-    const previousPeriod = comparisonPeriod(data, delta);
-    return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
-  }
-
-  if (data.family === "compliance") {
-    const delta = data.delta?.onTimePct;
-    const direction = knownVariationDirection(primaryTarget(data.family, data));
-    const previousPeriod = comparisonPeriod(data, delta);
-    return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
-  }
-
-  if (data.family === "incidents") {
-    const delta = data.reports.avgResolutionBusinessDays === undefined ? data.delta?.avgResolutionDays : data.delta?.avgResolutionBusinessDays;
-    const direction = knownVariationDirection(primaryTarget(data.family, data));
-    const previousPeriod = comparisonPeriod(data, delta);
-    return { delta, unitKind: "days", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
-  }
-
-  const delta = data.delta?.divertedPct;
-  const direction = knownVariationDirection(primaryTarget(data.family, data));
-  const previousPeriod = comparisonPeriod(data, delta);
-  return { delta, unitKind: "percentage-points", ...(previousPeriod ? { previousPeriod } : {}), ...(direction ? { direction } : {}) };
-}
-
-function indicatorSummaryDescription(targetLabel: string, directionLabel: string, status?: IndicatorSummaryStatus) {
-  return [
-    `${targetLabel}.`,
-    directionLabel ? `${directionLabel}.` : null,
-    status ? `Estado: ${status.label}.` : null,
-  ].filter(Boolean).join(" ");
 }
 
 function indicatorTargetLabel(target: { direction: string; value: number | null } | null | undefined, unit: string) {
@@ -390,44 +350,6 @@ function useNarrowDashboard() {
   }, []);
 
   return isNarrow;
-}
-
-function FamilySelectorBand({ states, selectedFamily, onSelect, onRetry }: { states: Record<FamilyKey, FamilyState>; selectedFamily: FamilyKey; onSelect: (family: FamilyKey) => void; onRetry: (family: FamilyKey) => void }) {
-  return <LoadingRegion label="Familias" isLoading={familyOrder.some((family) => states[family].status === "loading")}>
-    <ToggleGroup value={[selectedFamily]} onValueChange={(values) => { const family = values[0]; if (family) onSelect(family as FamilyKey); }} aria-label="Familias" className={styles.summaryBand}>
-      {familyOrder.map((family) => {
-        const state = states[family];
-        const item = state.data;
-        const meta = familyMeta[family];
-        const Icon = meta.icon;
-        const summary = indicatorSummaryDetails(family, item?.primary.value, state.status === "ready", item);
-        const descriptionId = `indicator-${family}-summary-description`;
-        const variation = item ? indicatorVariationDetails(item) : null;
-        const variationId = `indicator-${family}-variation-description`;
-        return <Card className={styles.summaryCard} data-state={state.status} key={family} size="sm">
-          <ToggleGroupItem variant="card" className={`${styles.summaryCardSelect} ${state.status === "loading" && item ? styles.previousData : ""}`} value={family} aria-label={`${meta.label}: seleccionar familia`} aria-describedby={variation ? `${descriptionId} ${variationId}` : descriptionId}>
-            <span className={styles.summaryCardHeader}><span className="text-sm font-semibold text-muted-foreground">{meta.label}</span><span className={`${styles.summaryIcon} size-8 rounded-lg bg-muted text-primary`}><Icon size={17} aria-hidden /></span></span>
-            {state.status === "loading" && !item ? <Skeleton aria-hidden className="h-[30px] w-24" /> : <span className="text-3xl leading-none font-bold tabular-nums tracking-tight">{item ? familySummary(item) : "—"}</span>}
-            <span className="text-xs leading-snug text-muted-foreground">{item?.primary.label ?? meta.description}</span>
-            {variation ? <IndicatorVariation id={variationId} {...variation} /> : null}
-            <span className={styles.summaryTargetDetails}>
-              <span className="text-xs font-semibold text-foreground">{summary.targetLabel}</span>
-              <span className="text-xs text-muted-foreground">{summary.directionLabel}</span>
-              {summary.status ? <Badge className="h-auto min-h-6 py-1" variant={summary.status.variant} aria-hidden="true">
-                {summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}
-                {summary.status.label}
-              </Badge> : null}
-            </span>
-            {item?.family === "incidents" ? <span className="text-xs leading-snug text-muted-foreground">Resolución media en días corridos: {item.reports.avgResolutionDays === null ? "Sin reportes cerrados" : `${formatNumber(item.reports.avgResolutionDays, "días")} días`}</span> : null}
-            <span className="text-xs font-semibold text-primary">{selectedFamily === family ? "Detalle seleccionado" : "Ver detalle"}</span>
-          </ToggleGroupItem>
-          <span className="sr-only" id={descriptionId}>{indicatorSummaryDescription(summary.targetLabel, summary.directionLabel, summary.status)}</span>
-          {state.status === "empty" ? <Alert role="status" className={styles.summaryState}>Sin datos</Alert> : null}
-          {state.status === "error" ? <Alert variant="danger" className={styles.summaryState}><AlertTitle>No se pudo cargar {meta.label}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => onRetry(family)}>Reintentar {meta.label}</Button></Alert> : null}
-        </Card>;
-      })}
-    </ToggleGroup>
-  </LoadingRegion>;
 }
 
 function ModuleState({ label, status, onRetry, children }: { label: string; status: LoadStatus; onRetry: () => void; children?: React.ReactNode }) {
@@ -666,7 +588,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       <Button type="button" variant="outline" onClick={() => setDetailOpen(false)}>Volver a Tableros</Button>
 
 
-      <div hidden><FamilySelectorBand states={familyStates} selectedFamily={selectedFamily} onSelect={selectFamily} onRetry={retryFamily} /></div>
       {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Vista">
         <ToggleGroupItem value="bars" size="lg">Barras</ToggleGroupItem>
         <ToggleGroupItem value="table" size="lg">Tabla</ToggleGroupItem>
