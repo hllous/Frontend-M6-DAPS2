@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { buildAttentionSignals } from "./attention-signals";
 
 it("conserva el rango exacto en los enlaces de servicios", () => {
