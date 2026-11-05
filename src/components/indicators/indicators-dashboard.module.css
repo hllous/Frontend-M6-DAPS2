@@ -111,7 +111,7 @@
 @media (max-width: 760px) {
   .mobileTabs { display: flex; flex-direction: column; gap: var(--space-12); }
   .tabList { min-height: 48px; }
-  .tabList [data-slot="tabs-trigger"] { min-height: 40px; }
+  .tabList [data-slot="tabs-trigger"] { min-height: 48px; }
   .summaryState { align-items: flex-start; flex-direction: column; }
   .chartPinnedDetail { align-items: flex-start; flex-direction: column; }
   .chartPinnedDetail [data-slot="button"] { margin-inline-start: 0; min-height: 48px; }
