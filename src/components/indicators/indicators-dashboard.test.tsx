@@ -178,8 +178,7 @@ describe("IndicatorsDashboard", () => {
     const centro = await screen.findByRole("button", { name: "Centro" });
     centro.focus();
     await user.keyboard("{Enter}");
-    const selectedStatus = screen.getAllByRole("status").find((status) => status.textContent?.includes("Seleccionado:"));
-    expect(selectedStatus).toHaveTextContent("Seleccionado: Centro");
+    expect(centro).toHaveAttribute("aria-pressed", "true");
 
     await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });

@@ -142,12 +142,12 @@ test.describe("operational indicator dashboard #138", () => {
   await page.getByRole("button", { name: "Detalle por familia" }).click();
     await page.getByRole("menuitem", { name: "Cobertura" }).click();
   await page.getByRole("button", { name: "Centro", exact: true }).click();
-  await expect(page.getByText(/Seleccionado: Centro/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Centro", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Volver a Tableros" }).click();
   await page.getByRole("button", { name: "Detalle por familia" }).click();
     await page.getByRole("menuitem", { name: "Incidencias" }).click();
   await page.goBack();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Detalle de Cobertura" })).toBeVisible();
-  await expect(page.getByText(/Seleccionado: Centro/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Centro", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
