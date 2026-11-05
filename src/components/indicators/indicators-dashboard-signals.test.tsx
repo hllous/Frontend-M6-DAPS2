@@ -29,11 +29,20 @@ describe("Requiere atención", () => {
   it("muestra la evolución semanal y cobertura como tabla", async () => {
     const section = await signals();
     expect(within(section).getAllByText(/Evolución por semana/)).toHaveLength(3);
-    await userEvent.click(within(section).getByRole("button", { name: "Ver datos de Servicios sin realizar" }));
-    expect(within(section).getByRole("table", { name: "Valores de Servicios sin realizar por semana" })).toBeVisible();
+    expect(within(section).queryByRole("button", { name: /Ver datos de/ })).not.toBeInTheDocument();
+    expect(within(section).getByRole("table", { name: "Valores de Servicios sin realizar por semana" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Cobertura por semana" })).toBeVisible();
     await userEvent.click(screen.getAllByRole("button", { name: "Tabla" })[0]!);
     expect(screen.getByRole("table", { name: "Cobertura por período" })).toBeVisible();
+  });
+  it("ofrece «Ver lista» y «Ver detalle» como botones de ícono con nombre accesible", async () => {
+    const section = await signals();
+    const card = within(section).getByRole("group", { name: "Servicios sin realizar" });
+    const list = within(card).getByRole("link", { name: "Ver lista de servicios sin realizar" });
+    expect(list).toHaveAttribute("href", expect.stringContaining("status=PARTIALLY_COMPLETED"));
+    expect(list).not.toHaveTextContent(/\S/);
+    const detail = within(card).getByRole("button", { name: "Ver detalle de Servicios sin realizar" });
+    expect(detail).not.toHaveTextContent(/\S/);
   });
   it("mantiene la tarjeta y explica la ausencia de serie", async () => {
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(coverageWithoutSeriesFixture)));
