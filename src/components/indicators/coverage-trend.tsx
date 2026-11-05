@@ -112,7 +112,7 @@ const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onF
   </ChartContainer>;
 });
 
-export function CoverageTrend({ data, viewMode }: { data: CoverageIndicator; viewMode: "bars" | "table" }) {
+export function CoverageTrend({ data, viewMode, overview = false }: { data: CoverageIndicator; viewMode: "bars" | "table"; overview?: boolean }) {
   const bucket = data.seriesBucket ?? "week";
   const points = useMemo(() => (data.series?.length ? toTrendPoints(data.series, bucket) : []), [bucket, data.series]);
   const target = targetOf(data);
@@ -142,13 +142,15 @@ export function CoverageTrend({ data, viewMode }: { data: CoverageIndicator; vie
   }, [points.length]);
 
   // Sin `series` no hay sección; con un rechazo del backend, la sección explica por qué.
-  if (!data.seriesError && points.length === 0) return null;
+  if (!overview && !data.seriesError && points.length === 0) return null;
 
   const description = `Cobertura de objetivos por ${bucket === "month" ? "mes" : "semana"} en el período aplicado.`;
 
-  return <section className={styles.trend} role="region" aria-label="Tendencia">
-    <div className={styles.header}><h2>Tendencia</h2>{data.seriesError ? null : <p>{description}</p>}</div>
+  const title = overview ? `Cobertura por ${bucket === "month" ? "mes" : "semana"}` : "Tendencia";
+  return <section className={styles.trend} role="region" aria-label={title}>
+    <div className={styles.header}><h2>{title}</h2>{data.seriesError ? null : <p>{description}</p>}</div>
     {data.seriesError ? <Alert variant="danger" role="alert"><AlertDescription>{data.seriesError}</AlertDescription></Alert>
+      : points.length === 0 ? <p>Sin datos en el período.</p>
       : viewMode === "table" ? <TrendTable points={points} />
         : <>
           <ul className={styles.legend} aria-label="Referencias del gráfico">

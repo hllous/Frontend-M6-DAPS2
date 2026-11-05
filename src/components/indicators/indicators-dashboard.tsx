@@ -422,6 +422,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
   const returnFocusRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(initialUrlState.view);
+  const [overviewView, setOverviewView] = useState<"bars" | "table">("bars");
   const [selectedSignal, setSelectedSignal] = useState<SelectedSignal | null>(null);
   const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
   const [records, setRecords] = useState<TraceRecord[]>([]);
@@ -671,6 +672,10 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
       {!detailOpen ? <>
       <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family, trigger) => openDetail(family, trigger)} />
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><div className="min-w-0">
+        <div className="flex gap-2"><Button type="button" variant={overviewView === "bars" ? "default" : "outline"} aria-pressed={overviewView === "bars"} onClick={() => setOverviewView("bars")}>Gráfico</Button><Button type="button" variant={overviewView === "table" ? "default" : "outline"} aria-pressed={overviewView === "table"} onClick={() => setOverviewView("table")}>Tabla</Button></div>
+        {familyStates.coverage.data?.family === "coverage" ? <CoverageTrend data={familyStates.coverage.data} viewMode={overviewView} overview /> : <p>Sin datos en el período.</p>}
+      </div></div>
       <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} data-detail-trigger={`family-${family}`} type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-8" onClick={(event) => openDetail(family, event.currentTarget)}>{familyMeta[family].label}</Button>)}</nav>
       </> : <>
       <Button type="button" variant="outline" className="min-h-11 self-start sm:min-h-10" onClick={closeDetail}>Volver a Tableros</Button>

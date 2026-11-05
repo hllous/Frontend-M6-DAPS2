@@ -273,7 +273,7 @@ function coverageBucket(query: IndicatorQuery): "week" | "month" {
 function queryString(query: IndicatorQuery, family: string, withSeries = true) {
   const resolved = resolveIndicatorQuery(query);
   const params = new URLSearchParams({ from: resolved.from, to: resolved.to, compare: "previous" });
-  if (withSeries && family === "coverage") params.set("bucket", coverageBucket(resolved));
+  if (withSeries && family !== "waste") params.set("bucket", coverageBucket(resolved));
   if (familyAppliesCatalogFilters(family)) {
     if (resolved.zoneId) params.set("zoneId", resolved.zoneId);
     if (resolved.serviceTypeId) params.set("serviceTypeId", resolved.serviceTypeId);

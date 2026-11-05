@@ -42,6 +42,13 @@ async function renderTrend() {
 }
 
 describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
+  it("identifica los gráficos como mensuales en períodos largos", async () => {
+    serveCoverage(coverageMonthlyFixture);
+    window.history.replaceState(null, "", "/?from=2024-01-01&to=2026-10-01");
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByRole("heading", { name: "Cobertura por mes" })).toBeVisible();
+    await waitFor(() => expect(screen.getAllByText("Evolución por mes")).toHaveLength(3));
+  });
   it("dibuja un punto por semana con fechas argentinas y la meta como referencia", async () => {
     serveCoverage(coverageWeeklyFixture);
     const trend = await renderTrend();
