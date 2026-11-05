@@ -31,9 +31,14 @@ test.describe("shared control density", () => {
       await page.getByRole("button", { name: "Más filtros", exact: true }).click();
       const periods = page.getByRole("group", { name: "Período", exact: true });
       await expect.poll(() => heightOf(periods)).toBe(expected);
-      for (const name of ["Semana", "Mes", "Trimestre", "Más filtros", "Gráfico", "Tabla", "Ver detalle de Servicios sin realizar", "Cobertura"]) {
+      for (const name of ["Semana", "Mes", "Trimestre", "Más filtros", "Gráfico", "Tabla", "Ver detalle de Servicios sin realizar", "Detalle por familia"]) {
         await expect.poll(() => heightOf(page.getByRole("button", { name, exact: true }).first())).toBe(expected);
       }
+      await page.getByRole("button", { name: "Detalle por familia" }).click();
+      for (const family of ["Cobertura", "Cumplimiento", "Incidencias", "Residuos"]) {
+        await expect.poll(() => heightOf(page.getByRole("menuitem", { name: family }))).toBe(48);
+      }
+      await page.keyboard.press("Escape");
       await expect.poll(() => heightOf(page.getByRole("link", { name: "Ver lista de servicios sin realizar" }))).toBe(expected);
       await page.getByRole("button", { name: "Ver detalle de Servicios sin realizar" }).click();
       await expect.poll(() => heightOf(page.getByRole("button", { name: "Volver a Tableros" }))).toBe(expected);

@@ -31,7 +31,8 @@ async function familyCard(label: string) {
   const user = userEvent.setup();
   const back = screen.queryByRole("button", { name: "Volver a Tableros" });
   if (back) await user.click(back);
-  await user.click(screen.getByRole("button", { name: label }));
+  await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+  await user.click(await screen.findByRole("menuitem", { name: label }));
   return screen.findByRole("region", { name: `Resumen de ${label}` });
 }
 

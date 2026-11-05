@@ -18,7 +18,8 @@ async function openFamily(name: string) {
   const user = userEvent.setup();
   const back = screen.queryByRole("button", { name: "Volver a Tableros" });
   if (back) await user.click(back);
-  await user.click(screen.getByRole("button", { name }));
+  await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+  await user.click(await screen.findByRole("menuitem", { name }));
   await screen.findByRole("heading", { name: `Detalle de ${name}` });
 }
 
@@ -70,7 +71,7 @@ describe("IndicatorsDashboard", () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     const signals = screen.getByRole("region", { name: "Requiere atención" });
-    expect(screen.getByRole("button", { name: "Cobertura" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Detalle por familia" })).toBeVisible();
     expect(signals).toHaveAttribute("aria-busy", "true");
     expect(within(signals).getByText("Cargando")).toHaveClass("sr-only");
   });
@@ -114,7 +115,7 @@ describe("IndicatorsDashboard", () => {
     expect(within(tabs).getByRole("tab", { name: "Resumen" })).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Por categoría" })).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Territorio" })).toBeVisible();
-    expect(within(tabs).getByRole("tab", { name: "Registros" })).toBeVisible();
+    expect(within(tabs).queryByRole("tab", { name: "Registros" })).not.toBeInTheDocument();
 
     const viewToggle = screen.getByRole("group", { name: "Vista" });
     await user.click(within(viewToggle).getByRole("button", { name: "Tabla" }));
@@ -294,60 +295,6 @@ describe("IndicatorsDashboard", () => {
     expect(within(norte).getByRole("cell", { name: "7 objetivos" })).toBeVisible();
     expect(within(norte).getByRole("cell", { name: "5 objetivos" })).toBeVisible();
     expect(within(norte).getAllByRole("cell").filter((cell) => cell.textContent === "")).toHaveLength(3);
-  });
-
-  it("traces a selected zone to services and restores the unfiltered records view", async () => {
-    const user = userEvent.setup();
-    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-
-    await openFamily("Cobertura");
-    await user.click(await screen.findByRole("button", { name: "Centro" }));
-
-    const recordsRegion = await screen.findByRole("region", { name: "Registros" });
-    const recordsTable = within(recordsRegion).getByRole("table", { name: "Registros accesibles de Servicios" });
-    const recordHeader = within(recordsTable).getByRole("columnheader", { name: "Registro" });
-    expect(recordHeader).not.toHaveAttribute("aria-sort");
-    expect(within(recordHeader).queryByRole("button")).not.toBeInTheDocument();
-    // La fila se nombra con el título del servicio, no con su identificador.
-    const serviceLink = () => within(recordsRegion).getAllByRole("link", { name: "Recolección de residuos — Recorrido 4" }).find((link) => link.getAttribute("href") === "/app?destination=services&detail=SVC-1042");
-    expect(serviceLink()).toBeVisible();
-    expect(within(recordsRegion).queryByText("SVC-1042")).not.toBeInTheDocument();
-    expect(recordsRegion).toHaveTextContent(/Filtro:.*Centro/i);
-    expect(recordsRegion).toHaveTextContent(/Cobertura por zona/i);
-    expect(within(screen.getByRole("region", { name: "Registros" })).getByRole("link", { name: /Ver servicios/i })).toHaveAttribute("href", "/app?destination=services");
-
-    await user.click(screen.getByRole("button", { name: "Quitar filtro" }));
-
-    expect(recordsRegion).toHaveTextContent(/Todos los registros del período/);
-    expect(serviceLink()).toBeVisible();
-  });
-
-  it("traces container incidents to the container catalog without adding record mutations", async () => {
-    const user = userEvent.setup();
-    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-
-    await openFamily("Cobertura");
-    await openFamily("Incidencias");
-    await user.click(await screen.findByRole("button", { name: /Centro.*8 incidentes/i }));
-
-    const recordsRegion = await screen.findByRole("region", { name: "Registros" });
-    expect(within(recordsRegion).getByRole("row", { name: /CONT-001/ })).toBeVisible();
-    // Se muestra el código, pero el enlace usa el UUID que `GET /containers/:id` espera.
-    expect(within(recordsRegion).getByRole("link", { name: "CONT-001" })).toHaveAttribute("href", "/app/catalog/containers?detail=cont-1");
-    expect(within(screen.getByRole("region", { name: "Registros" })).getByRole("link", { name: /Ver contenedores/i })).toHaveAttribute("href", "/app/catalog/containers");
-    expect(screen.queryByRole("button", { name: /Editar|Eliminar|Dar de baja/i })).not.toBeInTheDocument();
-  });
-
-  it("explains when a signal has no contract-backed operational record relationship", async () => {
-    const user = userEvent.setup();
-    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-
-    await openFamily("Cobertura");
-    await openFamily("Incidencias");
-    await user.click(await screen.findByRole("button", { name: /Alto.*9 árboles/i }));
-
-    expect(screen.getByText("No hay registros para «Alto».")).toBeVisible();
-    expect(screen.queryByRole("link", { name: /Ver árboles/i })).not.toBeInTheDocument();
   });
 
   it("shows «Sin reportes cerrados» as secondary text when avgResolutionDays is null (#302)", async () => {
