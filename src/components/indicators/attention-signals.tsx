@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, Equal } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ChartLine, Equal, List } from "lucide-react";
 import { Line, LineChart, YAxis } from "recharts";
 
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer } from "@/components/ui/chart";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -126,34 +125,41 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
       </Card>
     );
   }
+  const hasSeries = series.some((point) => point.value !== null);
   const change = signal.previous === null ? null : signal.value - signal.previous;
   const worse = change !== null && change > 0;
   const comparison = change === null ? "Sin período anterior para comparar."
     : `${changeText(change).replace("que antes", "que el período anterior")}${change === 0 ? "" : worse ? ", empeora" : ", mejora"}.`;
   return (
-    <Card size="sm" className="h-full" role="group" aria-labelledby={titleId} aria-describedby={descriptionId}>
+    <Card size="sm" className="h-full gap-2" role="group" aria-labelledby={titleId} aria-describedby={descriptionId}>
       <CardHeader>
         <CardTitle id={titleId}>{signal.label}</CardTitle>
+        <CardAction className="flex gap-1">
+          <Button render={<Link href={signal.href} aria-label={signal.linkLabel} />} nativeButton={false} role="link" variant="outline" size="icon">
+            <List aria-hidden="true" />
+          </Button>
+          <Button type="button" data-detail-trigger={`signal-${signal.id}`} variant="outline" size="icon" aria-label={`Ver detalle de ${signal.label}`} onClick={(event) => onDetail(event.currentTarget)}>
+            <ChartLine aria-hidden="true" />
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-1">
         {status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo actualizar. Los datos pueden estar desactualizados.</AlertTitle><Button type="button" variant="outline" size="sm" onClick={onRetry}>Reintentar {signal.label}</Button></Alert> : null}
-        <p className="text-4xl font-semibold tabular-nums tracking-tight" aria-hidden="true">{plainNumber(signal.value)}</p>
-        <Trend change={change} />
-        <CardDescription aria-hidden="true">{signal.context}</CardDescription>
-        <p className="text-xs text-muted-foreground">Evolución por {bucket === "month" ? "mes" : "semana"}</p>
-        {series.some((point) => point.value !== null) ? <>
-          <div aria-hidden="true"><ChartContainer config={{ value: { label: signal.label, color: "var(--primary)" } }} className="h-12 w-full" style={{ aspectRatio: "auto" }}>
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex min-w-0 flex-col">
+            <p className="text-3xl leading-none font-semibold tabular-nums tracking-tight" aria-hidden="true">{plainNumber(signal.value)}</p>
+            <Trend change={change} />
+          </div>
+          {hasSeries ? <div aria-hidden="true" className="w-28 shrink-0"><ChartContainer config={{ value: { label: signal.label, color: "var(--primary)" } }} className="h-10 w-full" style={{ aspectRatio: "auto" }}>
             <LineChart data={series}><YAxis hide domain={[0, "auto"]} /><Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={series.filter((point) => point.value !== null).length === 1} isAnimationActive={false} /></LineChart>
-          </ChartContainer></div>
-          <Collapsible><CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" />}>Ver datos de {signal.label}</CollapsibleTrigger>
-            <CollapsibleContent><Table><TableCaption>Valores de {signal.label} por {bucket === "month" ? "mes" : "semana"}</TableCaption><TableHeader><TableRow><TableHead>Desde</TableHead><TableHead>Cantidad</TableHead></TableRow></TableHeader><TableBody>{series.map((point) => <TableRow key={point.from}><TableCell>{formatArgentinaCalendarDate(point.from)}</TableCell><TableCell>{point.value === null ? "Sin datos" : plainNumber(point.value)}</TableCell></TableRow>)}</TableBody></Table></CollapsibleContent>
-          </Collapsible>
-        </> : <p className="text-xs text-muted-foreground">Sin datos en el período.</p>}
+          </ChartContainer></div> : <p className="text-xs text-muted-foreground">Sin datos en el período.</p>}
+        </div>
+        <CardDescription aria-hidden="true" className="text-xs">{signal.context}</CardDescription>
+        {hasSeries ? <div className="sr-only">
+          <p>Evolución por {bucket === "month" ? "mes" : "semana"}</p>
+          <Table><TableCaption>Valores de {signal.label} por {bucket === "month" ? "mes" : "semana"}</TableCaption><TableHeader><TableRow><TableHead>Desde</TableHead><TableHead>Cantidad</TableHead></TableRow></TableHeader><TableBody>{series.map((point) => <TableRow key={point.from}><TableCell>{formatArgentinaCalendarDate(point.from)}</TableCell><TableCell>{point.value === null ? "Sin datos" : plainNumber(point.value)}</TableCell></TableRow>)}</TableBody></Table>
+        </div> : null}
         <span className="sr-only" id={descriptionId}>{`${plainNumber(signal.value)}. ${comparison} ${signal.context}.`}</span>
-        <Button render={<Link href={signal.href} aria-label={signal.linkLabel} />} nativeButton={false} role="link" variant="outline" size="sm" className="mt-2 self-start">
-          Ver lista<ArrowRight data-icon="inline-end" aria-hidden="true" />
-        </Button>
-        <Button type="button" data-detail-trigger={`signal-${signal.id}`} variant="ghost" size="sm" className="self-start" aria-label={`Ver detalle de ${signal.label}`} onClick={(event) => onDetail(event.currentTarget)}>Ver detalle</Button>
       </CardContent>
     </Card>
   );
