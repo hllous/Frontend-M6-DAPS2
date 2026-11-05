@@ -156,3 +156,11 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     expect(urls[0].searchParams.get("zoneId")).toBe("zone-1");
   });
 });
+
+it("no muestra un cuadro emergente al pasar por la tendencia", async () => {
+  const user = userEvent.setup();
+  serveCoverage(coverageWeeklyFixture);
+  const trend = await renderTrend();
+  await user.hover(within(trend).getByRole("button", { name: /03\/08\/2026 – 09\/08\/2026: 90 %/ }));
+  expect(within(trend).queryByRole("status")).not.toHaveTextContent("03/08/2026");
+});
