@@ -24,8 +24,8 @@ test.describe("operational indicator dashboard #138", () => {
     await page.getByRole("menuitem", { name: "Cobertura" }).click();
 
     const viewToggle = page.getByRole("group", { name: "Vista" });
-    await expect(viewToggle.getByRole("button", { name: "Barras" })).toHaveAttribute("aria-pressed", "true");
-    await viewToggle.getByRole("button", { name: "Tabla" }).click();
+    await expect(viewToggle.getByRole("button", { name: "Ver gráfico" })).toHaveAttribute("aria-pressed", "true");
+    await viewToggle.getByRole("button", { name: "Ver tabla" }).click();
     await page.getByRole("tab", { name: "Territorio" }).click();
 
     const territory = page.getByRole("region", { name: "Detalle territorial" });
@@ -65,9 +65,9 @@ test.describe("operational indicator dashboard #138", () => {
     await page.getByRole("menuitem", { name: "Cobertura" }).click();
     await expect(detail.getByText("Costera").first()).toBeVisible();
 
-    await page.getByRole("button", { name: "Tabla", exact: true }).click();
+    await page.getByRole("button", { name: "Ver tabla", exact: true }).click();
     await expect(page.getByRole("table").first()).toBeVisible();
-    await expect(page.getByText("Objetivos atendidos sobre objetivos programados.")).toBeVisible();
+    await expect(page.getByText("Objetivos atendidos sobre objetivos programados.")).not.toBeVisible();
     await expect(page.getByRole("button", { name: "Exportar CSV" }).last()).toBeVisible();
   });
 
@@ -92,7 +92,7 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(centroRow).toContainText("140");
     await expect(centroRow).toContainText("89,7 %");
 
-    await page.getByRole("button", { name: "Tabla" }).click();
+    await page.getByRole("button", { name: "Ver tabla" }).click();
     const coverageTable = page.getByRole("region", { name: "Tabla de datos de Cobertura" });
     await expect(coverageTable).toBeVisible();
     await expect(coverageTable.getByRole("columnheader", { name: "Atendidos" }).first()).toBeVisible();
@@ -119,7 +119,7 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(page.getByText(/Estados de contenedores y riesgo de arbolado: situación actual/)).toBeVisible();
     await expect(page.getByText(/reportes consideran el período/i)).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Tabla", exact: true }).click();
+    await page.getByRole("button", { name: "Ver tabla", exact: true }).click();
     const incidentsTable = page.getByRole("region", { name: "Tabla de datos de Incidencias" });
     await expect(incidentsTable.getByRole("columnheader", { name: "Desbordes" })).toBeVisible();
     await expect(incidentsTable.getByRole("columnheader", { name: "Daños" })).toBeVisible();
@@ -128,7 +128,7 @@ test.describe("operational indicator dashboard #138", () => {
     await page.getByRole("button", { name: "Volver a Tableros" }).click();
     await page.getByRole("button", { name: "Detalle por familia" }).click();
     await page.getByRole("menuitem", { name: "Residuos" }).click();
-    await page.getByRole("button", { name: "Tabla", exact: true }).click();
+    await page.getByRole("button", { name: "Ver tabla", exact: true }).click();
     const wasteTable = page.getByRole("region", { name: "Tabla de datos de Residuos" });
     await expect(wasteTable.getByRole("columnheader", { name: "Kilogramos" }).first()).toBeVisible();
     await expect(wasteTable.getByRole("columnheader", { name: "Metros cúbicos" }).first()).toBeVisible();
@@ -142,12 +142,13 @@ test.describe("operational indicator dashboard #138", () => {
   await page.getByRole("button", { name: "Detalle por familia" }).click();
     await page.getByRole("menuitem", { name: "Cobertura" }).click();
   await page.getByRole("button", { name: "Centro", exact: true }).click();
-  await expect(page.getByText(/Seleccionado: Centro/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Centro", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Volver a Tableros" }).click();
   await page.getByRole("button", { name: "Detalle por familia" }).click();
     await page.getByRole("menuitem", { name: "Incidencias" }).click();
   await page.goBack();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Detalle de Cobertura" })).toBeVisible();
-  await expect(page.getByText(/Seleccionado: Centro/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Centro", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
+

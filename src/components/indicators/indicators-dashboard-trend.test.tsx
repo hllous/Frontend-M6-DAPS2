@@ -82,7 +82,7 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     window.history.replaceState(null, "", "/?from=2026-07-15&to=2026-08-31");
     const trend = await renderTrend();
 
-    expect(within(trend).getByText("Cobertura de objetivos por semana en el período aplicado.")).toBeInTheDocument();
+    expect(within(trend).queryByText("Cobertura de objetivos por semana en el período aplicado.")).not.toBeInTheDocument();
     expect(within(trend).getByRole("button", { name: /15\/07\/2026 – 31\/07\/2026: 80 %/ })).toBeInTheDocument();
   });
 
@@ -126,7 +126,7 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     serveCoverage(coverageWeeklyFixture);
     const trend = await renderTrend();
 
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const table = await within(trend).findByRole("table");
     for (const heading of ["Período", "Programados", "Atendidos", "Programado a futuro", "Cobertura"]) {
       expect(within(table).getByRole("columnheader", { name: heading })).toBeInTheDocument();
@@ -157,4 +157,12 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     expect(urls[0].searchParams.get("bucket")).toBe("week");
     expect(urls[0].searchParams.get("zoneId")).toBe("zone-1");
   });
+});
+
+it("no muestra un cuadro emergente al pasar por la tendencia", async () => {
+  const user = userEvent.setup();
+  serveCoverage(coverageWeeklyFixture);
+  const trend = await renderTrend();
+  await user.hover(within(trend).getByRole("button", { name: /03\/08\/2026 – 09\/08\/2026: 90 %/ }));
+  expect(within(trend).queryByRole("status")).not.toHaveTextContent("03/08/2026");
 });

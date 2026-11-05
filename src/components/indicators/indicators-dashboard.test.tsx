@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http, HttpResponse, passthrough } from "msw";
 import { setupServer } from "msw/node";
@@ -118,8 +118,8 @@ describe("IndicatorsDashboard", () => {
     expect(within(tabs).queryByRole("tab", { name: "Registros" })).not.toBeInTheDocument();
 
     const viewToggle = screen.getByRole("group", { name: "Vista" });
-    await user.click(within(viewToggle).getByRole("button", { name: "Tabla" }));
-    expect(within(viewToggle).getByRole("button", { name: "Tabla" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(viewToggle).getByRole("button", { name: "Ver tabla" }));
+    expect(within(viewToggle).getByRole("button", { name: "Ver tabla" })).toHaveAttribute("aria-pressed", "true");
 
     await user.click(within(tabs).getByRole("tab", { name: "Territorio" }));
     expect(screen.getByRole("heading", { name: "Detalle de Incidencias" })).toBeVisible();
@@ -138,19 +138,8 @@ describe("IndicatorsDashboard", () => {
     const centro = await screen.findByRole("button", { name: /En fecha.*344 servicios/i });
 
     await user.hover(centro);
-    expect(screen.getByRole("status", { name: /Detalle de En fecha/i })).toBeVisible();
-    await user.click(centro);
-    expect(screen.getByRole("status", { name: /Detalle fijado de En fecha/i })).toBeVisible();
-
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("status", { name: /Detalle .*En fecha/i })).not.toBeInTheDocument();
-    expect(centro).toHaveFocus();
-
-    await user.click(centro);
-    expect(screen.getByRole("status", { name: /Detalle fijado de En fecha/i })).toBeVisible();
-    await user.click(document.body);
-    expect(screen.queryByRole("status", { name: /Detalle .*En fecha/i })).not.toBeInTheDocument();
-    expect(centro).toHaveFocus();
+    expect(screen.queryByRole("status", { name: /Detalle de En fecha/i })).not.toBeInTheDocument();
+    expect(centro).toHaveAccessibleName(/344 servicios/i);
   });
 
   it("uses semantic colors for danger, success, warning, and neutral indicator points (#420)", async () => {
@@ -189,10 +178,9 @@ describe("IndicatorsDashboard", () => {
     const centro = await screen.findByRole("button", { name: "Centro" });
     centro.focus();
     await user.keyboard("{Enter}");
-    const selectedStatus = screen.getAllByRole("status").find((status) => status.textContent?.includes("Seleccionado:"));
-    expect(selectedStatus).toHaveTextContent("Seleccionado: Centro");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Centro" })).toHaveAttribute("aria-pressed", "true"));
 
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const coverageTable = screen.getByRole("region", { name: "Tabla de datos de Cobertura" });
     const zonesTable = within(coverageTable).getByRole("table", { name: /Cobertura por zona/ });
     expect(within(coverageTable).getByRole("table", { name: /Cobertura por tipo de servicio/ })).toBeVisible();
@@ -222,7 +210,7 @@ describe("IndicatorsDashboard", () => {
     expect(screen.queryByText(/reportes consideran el período/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Reportes por estado" })).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const incidentsTable = screen.getByRole("region", { name: "Tabla de datos de Incidencias" });
     expect(within(incidentsTable).getByRole("columnheader", { name: "Desbordes" })).toBeVisible();
     expect(within(incidentsTable).getByRole("columnheader", { name: "Daños" })).toBeVisible();
@@ -230,7 +218,7 @@ describe("IndicatorsDashboard", () => {
 
     await openFamily("Residuos");
     expect(screen.getAllByText(/Desvío de relleno sanitario/)[0]).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const wasteTable = screen.getByRole("region", { name: "Tabla de datos de Residuos" });
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Kilogramos" })[0]).toBeVisible();
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Metros cúbicos" })[0]).toBeVisible();
@@ -270,7 +258,7 @@ describe("IndicatorsDashboard", () => {
     await openFamily("Cobertura");
     await openFamily("Cumplimiento");
     await screen.findByRole("heading", { name: "Detalle de Cumplimiento" });
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
 
     const tablesRegion = screen.getByRole("region", { name: "Tabla de datos de Cumplimiento" });
     const zonesTable = within(tablesRegion).getByRole("table", { name: "Valores exactos de zonas sin atención" });
@@ -406,4 +394,6 @@ describe("internal jargon guard", () => {
     expectNoInternalJargon(container);
   });
 });
+
+
 

@@ -7,7 +7,7 @@ test("zonas: mouse cambia problema y tabla en escritorio", async ({ page }) => {
   await page.goto("/app?destination=dashboards");
   const panel = page.getByRole("region", { name: "¿Dónde se concentra?" });
   await expect(panel).toContainText("Norte tiene 10 de los 24 objetivos sin atención.");
-  for (const name of ["Contenedores desbordados ahora, por zona", "Tabla"]) {
+  for (const name of ["Contenedores desbordados ahora, por zona", "Ver tabla"]) {
     const button = panel.getByRole("button", { name, exact: true });
     await button.scrollIntoViewIfNeeded();
     const box = await button.boundingBox();
@@ -33,7 +33,7 @@ test.describe("zonas en móvil", () => {
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(48);
     await button.tap();
     await expect(panel).toContainText("Centro tiene 6 de los 14 contenedores desbordados ahora.");
-    await panel.getByRole("button", { name: "Tabla" }).tap();
+    await panel.getByRole("button", { name: "Ver tabla" }).tap();
     await expect(panel.getByRole("table").getByRole("row", { name: /Centro.*6/ })).toBeVisible();
   });
 });

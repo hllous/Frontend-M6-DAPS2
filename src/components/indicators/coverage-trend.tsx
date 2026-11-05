@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
+import { CartesianGrid, LabelList, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ type TrendPoint = {
   pct: number | null;
   /** Posición del marcador enfocable; los huecos van sobre el eje. */
   anchorY: number;
+  valueLabel: string;
 };
 type DotProps = { cx?: number; cy?: number; index?: number };
 
@@ -38,7 +39,8 @@ const asDate = (day: string) => new Date(`${day}T00:00:00Z`);
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 export function toTrendPoints(series: CoverageSeries, bucket: "week" | "month"): TrendPoint[] {
   const monthly = bucket === "month";
-  return series.map((entry) => {
+  const lastValueIndex = series.findLastIndex((entry) => entry.scheduled !== 0);
+  return series.map((entry, index) => {
     const pct = entry.scheduled === 0 ? null : entry.coveragePct;
     return {
       id: entry.from,
@@ -49,6 +51,7 @@ export function toTrendPoints(series: CoverageSeries, bucket: "week" | "month"):
       upcoming: entry.upcoming ?? null,
       pct,
       anchorY: pct ?? 0,
+      valueLabel: index === lastValueIndex && pct !== null ? `${formatIndicatorNumber(pct, { maximumFractionDigits: 1 })} %` : "",
     };
   });
 }
@@ -80,14 +83,14 @@ type TrendPlotProps = {
 };
 
 // Memoizado: enfocar o pasar el mouse no puede remontar los botones, o se perdería el foco.
-const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onFocusPoint, onHoverPoint }: TrendPlotProps) {
+const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onFocusPoint }: TrendPlotProps) {
   return <ChartContainer config={chartConfig} className={styles.plot} style={{ aspectRatio: "auto" }} initialDimension={{ width: 720, height: 260 }}>
-    <LineChart data={points} margin={{ top: 12, right: 16, bottom: 4, left: 0 }}>
+    <LineChart data={points} margin={{ top: 12, right: 32, bottom: 4, left: 0 }}>
       <CartesianGrid vertical={false} stroke="var(--color-border)" />
       <XAxis dataKey="tick" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={12} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
       <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value: number) => `${value} %`} tickLine={false} axisLine={false} width={44} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
       {target === undefined ? null : <ReferenceLine y={target} stroke="var(--color-trend-target)" strokeWidth={2} strokeDasharray="6 4" ifOverflow="extendDomain" />}
-      <Line dataKey="pct" type="linear" stroke="var(--color-trend-line)" strokeWidth={2} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: "var(--color-trend-line)", stroke: "var(--color-surface)", strokeWidth: 2 }} activeDot={false} />
+      <Line dataKey="pct" type="linear" stroke="var(--color-trend-line)" strokeWidth={2} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: "var(--color-trend-line)", stroke: "var(--color-surface)", strokeWidth: 2 }} activeDot={false}><LabelList dataKey="valueLabel" position="top" fill="var(--color-text-secondary)" /></Line>
       <Line dataKey="anchorY" stroke="none" legendType="none" isAnimationActive={false} activeDot={false} dot={({ cx = 0, cy = 0, index = 0 }: DotProps) => {
         const point = points[index];
         if (!point) return <g key={`dot-${index}`} />;
@@ -103,7 +106,7 @@ const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onF
               tabIndex={index === 0 ? 0 : -1}
               aria-label={`${point.label}: ${valueText(point)}, ${extraText(point)}`}
               onFocus={() => onFocusPoint(index)}
-              onMouseEnter={() => onHoverPoint(index)}
+              
             />
           </foreignObject>
         </g>;
@@ -144,11 +147,9 @@ export function CoverageTrend({ data, viewMode, overview = false }: { data: Cove
   // Sin `series` no hay sección; con un rechazo del backend, la sección explica por qué.
   if (!overview && !data.seriesError && points.length === 0) return null;
 
-  const description = `Cobertura de objetivos por ${bucket === "month" ? "mes" : "semana"} en el período aplicado.`;
-
   const title = overview ? `Cobertura por ${bucket === "month" ? "mes" : "semana"}` : "Tendencia";
   return <section className={styles.trend} role="region" aria-label={title}>
-    <div className={styles.header}><h2>{title}</h2>{data.seriesError ? null : <p>{description}</p>}</div>
+    <div className={styles.header}><h2>{title}</h2></div>
     {data.seriesError ? <Alert variant="danger" role="alert"><AlertDescription>{data.seriesError}</AlertDescription></Alert>
       : points.length === 0 ? <p>Sin datos en el período.</p>
       : viewMode === "table" ? <TrendTable points={points} />
@@ -162,7 +163,7 @@ export function CoverageTrend({ data, viewMode, overview = false }: { data: Cove
             <TrendPlot points={points} target={target?.value} registerTrigger={registerTrigger} onFocusPoint={focusPoint} onHoverPoint={setHovered} />
           </div>
           {/* Región de estado siempre montada: anuncia el valor al enfocar y hace de tooltip sin mouse. */}
-          <Alert role="status" variant="info" className={activePoint ? styles.detail : "sr-only"}>
+          <Alert role="status" variant="info" className="sr-only">
             {activePoint ? <AlertDescription><strong>{activePoint.label}</strong><span>{capitalize(valueText(activePoint))} · {extraText(activePoint)}</span></AlertDescription> : null}
           </Alert>
         </>}

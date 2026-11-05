@@ -31,7 +31,7 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
     await userEvent.setup().click(screen.getByRole("button", { name: "Más filtros" }));
     expect(screen.getByRole("button", { name: /^Desde/ })).toHaveTextContent("01/09/2026");
     expect(screen.getByRole("button", { name: /^Hasta/ })).toHaveTextContent("15/09/2026");
-    expect(screen.getByRole("button", { name: "Tabla" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Ver tabla" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/Filtros sin efecto en Incidencias: Zona y Tipo de servicio/)).toBeVisible();
   });
 
@@ -44,7 +44,7 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
     await user.click(await screen.findByRole("menuitem", { name: "Residuos" }));
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
 
     const params = new URLSearchParams(window.location.search);
     expect(params.get("destination")).toBe("dashboards");

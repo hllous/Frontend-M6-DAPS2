@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Activity, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -27,6 +27,7 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
 import { AttentionSignals } from "./attention-signals";
+import { ChartViewToggle } from "./chart-view-toggle";
 import { CoverageTrend } from "./coverage-trend";
 import { ZonePanel } from "./zone-panel";
 import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
@@ -525,7 +526,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       {!detailOpen ? <>
       <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family, trigger) => openDetail(family, trigger)} />
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><div className="min-w-0">
-        <div className="flex gap-2"><Button type="button" variant={overviewView === "bars" ? "default" : "outline"} aria-pressed={overviewView === "bars"} onClick={() => setOverviewView("bars")}>Gráfico</Button><Button type="button" variant={overviewView === "table" ? "default" : "outline"} aria-pressed={overviewView === "table"} onClick={() => setOverviewView("table")}>Tabla</Button></div>
+        <ChartViewToggle value={overviewView} onChange={setOverviewView} label="Vista de cobertura" />
         {familyStates.coverage.data?.family === "coverage" ? <CoverageTrend data={familyStates.coverage.data} viewMode={overviewView} overview /> : familyStates.coverage.status === "loading" ? <p>Cargando cobertura…</p> : familyStates.coverage.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo cargar la cobertura.</AlertTitle><Button type="button" variant="outline" onClick={() => retryFamily("coverage")}>Reintentar</Button></Alert> : <p>Sin datos en el período.</p>}
       </div><ZonePanel states={familyStates} onRetry={retryFamily} ignoredFilters={Boolean(appliedQuery.zoneId || appliedQuery.serviceTypeId)} /></div>
       <DropdownMenu><DropdownMenuTrigger render={<Button data-detail-trigger="family-menu" type="button" variant="outline" className="self-start" />}>Detalle por familia <ChevronDown data-icon="inline-end" aria-hidden /></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuGroup>{familyOrder.map((family) => { const Icon = familyMeta[family].icon; return <DropdownMenuItem key={family} className="min-h-12" onClick={() => { const trigger = document.querySelector<HTMLElement>('[data-detail-trigger="family-menu"]'); if (trigger) openDetail(family, trigger); }}><Icon aria-hidden />{familyMeta[family].label}</DropdownMenuItem>; })}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
@@ -536,10 +537,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       <FamilyDetailSummary family={selectedFamily} state={selectedFamilyState} />
 
 
-      {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Vista">
-        <ToggleGroupItem value="bars" size="lg">Barras</ToggleGroupItem>
-        <ToggleGroupItem value="table" size="lg">Tabla</ToggleGroupItem>
-      </ToggleGroup> : null}
+      {isNarrow ? <ChartViewToggle value={viewMode} onChange={setViewMode} label="Vista" /> : null}
       {isNarrow ? <Tabs defaultValue="summary" className={styles.mobileTabs}>
         <TabsList aria-label="Secciones del tablero" className={styles.tabList}>
           <TabsTrigger value="summary">Resumen</TabsTrigger>
@@ -626,10 +624,7 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
     <div className={styles.detailHeader}>
       <div><p id="indicator-detail-title">{meta.label}</p><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
       <div className={styles.viewActions}>
-        <ToggleGroup value={[requestedViewMode]} onValueChange={(values) => { const value = values[0]; if (value) onViewModeChange(value as ViewMode); }} variant="outline" size="sm" className={styles.viewToggle} aria-label="Vista del detalle">
-          <ToggleGroupItem value="bars">Barras</ToggleGroupItem>
-          <ToggleGroupItem value="table">Tabla</ToggleGroupItem>
-        </ToggleGroup>
+        <ChartViewToggle value={requestedViewMode} onChange={onViewModeChange} label="Vista del detalle" />
       </div>
     </div>
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
@@ -655,7 +650,7 @@ function BreakdownView({ family, breakdown, viewMode, period, selectedId: contro
     : family === "coverage" && breakdown.id === "service-types"
       ? <CoverageBreakdownTable points={breakdown.points} target={breakdown.target} nameHeading="Tipo de servicio" noun="tipos de servicio" title={breakdown.title} initialDirection="desc" period={period} limit={breakdown.points.length} selectedId={selected?.id} onSelect={setSelectedId} />
       : null;
-  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3><p>{breakdown.description}</p>{selected ? <Alert role="status" variant="info" className="mt-2"><AlertDescription><strong>Seleccionado:</strong> {selected.label} · {pointText(selected)}{selected.note ? ` · ${selected.note}` : ""}</AlertDescription></Alert> : null}</div>{coverageTable ?? (viewMode === "bars" ? <BreakdownBarChart points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} formatValue={metricText} formatDetail={pointText} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />)}</div>;
+  return <div className={`${styles.breakdown} ${wide ? styles.breakdownWide : ""}`}><div className={styles.breakdownHeader}><h3>{breakdown.title}</h3></div>{coverageTable ?? (viewMode === "bars" ? <BreakdownBarChart points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} formatValue={metricText} formatDetail={pointText} /> : <TableView points={breakdown.points} selectedId={selected?.id} onSelect={setSelectedId} title={breakdown.title} />)}</div>;
 }
 
 function TableView({ points, selectedId, onSelect, title }: { points: IndicatorPoint[]; selectedId?: string; onSelect: (id: string) => void; title: string }) {
