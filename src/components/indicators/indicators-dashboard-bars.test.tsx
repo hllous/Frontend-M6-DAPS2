@@ -108,3 +108,23 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
     expect(within(tableRegion).getAllByRole("table")[0]).toBeVisible();
   });
 });
+
+it("no muestra detalles emergentes al pasar por las barras de zona y familia", async () => {
+  const user = userEvent.setup();
+  render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+  const zones = await screen.findByRole("region", { name: "¿Dónde se concentra?" });
+  const zoneChart = await within(zones).findByRole("group", { name: /Barras de/ });
+  await user.hover(within(zoneChart).getAllByRole("button")[0]);
+  expect(within(zoneChart).queryByRole("status")).not.toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Cumplimiento" }));
+  const familyChart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
+  await user.hover(within(familyChart).getAllByRole("button")[0]);
+  expect(within(familyChart).queryByRole("status")).not.toBeVisible();
+});
+
+it("ofrece controles de vista con nombres accesibles", async () => {
+  render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+  const zones = await screen.findByRole("region", { name: "¿Dónde se concentra?" });
+  expect(within(zones).getByRole("button", { name: "Ver gráfico" })).toBeVisible();
+  expect(within(zones).getByRole("button", { name: "Ver tabla" })).toBeVisible();
+});
