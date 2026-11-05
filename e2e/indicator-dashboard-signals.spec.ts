@@ -26,9 +26,10 @@ test.describe("Tableros: Requiere atención (#861)", () => {
     expect(Math.abs(list!.y - detail!.y)).toBeLessThan(2);
     expect((await section.getByRole("group", { name: "Servicios sin realizar" }).boundingBox())!.height).toBeLessThan(180);
 
+    await expect(page.getByRole("button", { name: "Semana", exact: true })).toHaveCount(0);
+    await clickWithMouse(page, page.getByRole("button", { name: "Más filtros" }));
     await clickWithMouse(page, page.getByRole("button", { name: "Semana", exact: true }));
     await expect(page.getByRole("button", { name: "Semana", exact: true })).toHaveAttribute("aria-pressed", "true");
-    await clickWithMouse(page, page.getByRole("button", { name: "Más filtros" }));
     await expect(page.getByRole("button", { name: /^Desde/ })).toBeVisible();
 
     await clickWithMouse(page, section.getByRole("link", { name: "Ver lista de contenedores desbordados" }));
@@ -48,6 +49,7 @@ test.describe("Tableros: Requiere atención en móvil (#861)", () => {
     const xs = await cards.evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().x)));
     expect(new Set(xs).size).toBe(1);
 
+    await page.getByRole("button", { name: "Más filtros" }).tap();
     await page.getByRole("button", { name: "Trimestre" }).tap();
     await expect(page.getByRole("button", { name: "Trimestre" })).toHaveAttribute("aria-pressed", "true");
 

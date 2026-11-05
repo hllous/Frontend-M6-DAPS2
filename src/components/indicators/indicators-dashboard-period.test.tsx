@@ -31,6 +31,31 @@ describe("Atajos de período", () => {
     expect(screen.getByRole("button", { name: /^Hasta/ })).toHaveTextContent("04/10/2026");
     await waitFor(() => expect(requests.some((url) => { const params = new URL(url).searchParams; return params.get("from") === from && params.get("to") === "2026-10-04"; })).toBe(true));
   });
+  it("no muestra el período fuera de «Más filtros» y resume lo activo en el disparador", async () => {
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    const user = userEvent.setup();
+    expect(screen.queryByRole("button", { name: "Semana" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Período" })).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Más filtros" });
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "Mes" }));
+    await waitFor(() => expect(trigger).toHaveAccessibleDescription(/^Mes/));
+    await user.click(screen.getByRole("button", { name: "Trimestre" }));
+    await waitFor(() => expect(trigger).toHaveAccessibleDescription("Trimestre"));
+  });
+
+  it("permite elegir el período con el teclado", async () => {
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    const user = userEvent.setup();
+    screen.getByRole("button", { name: "Más filtros" }).focus();
+    await user.keyboard("{Enter}");
+    const week = await screen.findByRole("button", { name: "Semana" });
+    week.focus();
+    await user.keyboard(" ");
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get("from")).toBe("2026-09-28"));
+    expect(week).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("conserva los datos anteriores mientras carga y los reemplaza al recibir la respuesta", async () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
     await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
@@ -40,7 +65,9 @@ describe("Atajos de período", () => {
       await delay(500);
       return HttpResponse.json({ ...coverageIndicatorFixture, totals: { ...coverageIndicatorFixture.totals, coveragePct: 42 } });
     }));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Semana" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Más filtros" }));
+    await user.click(screen.getByRole("button", { name: "Semana" }));
     expect(within(card).getByText("82,2 %")).toBeVisible();
     expect(within(card).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Detalle de Cobertura" })).toHaveAttribute("aria-busy", "true");
@@ -53,7 +80,9 @@ describe("Atajos de período", () => {
     const card = screen.getByRole("region", { name: "Resumen de Cobertura" });
     await within(card).findByText("82,2 %");
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({ message: "Error" }, { status: 503 })));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Semana" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Más filtros" }));
+    await user.click(screen.getByRole("button", { name: "Semana" }));
     expect(await screen.findByRole("button", { name: "Reintentar" })).toBeVisible();
     expect(within(card).getByText("82,2 %")).toBeVisible();
     expect(within(card).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
