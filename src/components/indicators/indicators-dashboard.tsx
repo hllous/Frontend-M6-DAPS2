@@ -292,10 +292,8 @@ function FamilyDetailSummary({ family, state }: { family: FamilyKey; state: Fami
   const data = state.data;
   const summary = indicatorSummaryDetails(family, data?.primary.value, state.status === "ready", data);
   const variation = data ? indicatorVariationDetails(data) : null;
-  const FamilyIcon = familyMeta[family].icon;
   return <Card size="sm" role="region" aria-label={`Resumen de ${familyMeta[family].label}`} className={cn(summary.status?.variant === "danger" && "bg-[var(--color-danger-fill)] ring-[var(--color-danger-line)]")}><CardContent className={styles.summaryHero}>
     <div className={styles.summaryValue}>
-      <FamilyIcon aria-hidden className="size-6 text-[var(--color-action)]" />
       {data ? <><strong className="text-3xl leading-none font-bold tabular-nums">{familySummary(data)}</strong><span className="text-base font-medium">{data.primary.label}</span></> : state.status === "loading" ? <Skeleton aria-label="Cargando resumen" className="h-8 w-28" /> : <span>{state.status === "error" ? "Sin datos disponibles." : "Sin resultados en el período."}</span>}
       {summary.status ? <Badge variant={summary.status.variant}>{summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}<span>{summary.status.label}</span></Badge> : null}
     </div>
