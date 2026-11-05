@@ -115,11 +115,11 @@ it("no muestra detalles emergentes al pasar por las barras de zona y familia", a
   const zones = await screen.findByRole("region", { name: "¿Dónde se concentra?" });
   const zoneChart = await within(zones).findByRole("group", { name: /Barras de/ });
   await user.hover(within(zoneChart).getAllByRole("button")[0]);
-  expect(within(zoneChart).queryByRole("status")).not.toBeVisible();
+  expect(within(zoneChart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Cumplimiento" }));
   const familyChart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
   await user.hover(within(familyChart).getAllByRole("button")[0]);
-  expect(within(familyChart).queryByRole("status")).not.toBeVisible();
+  expect(within(familyChart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
 });
 
 it("ofrece controles de vista con nombres accesibles", async () => {
@@ -128,3 +128,4 @@ it("ofrece controles de vista con nombres accesibles", async () => {
   expect(within(zones).getByRole("button", { name: "Ver gráfico" })).toBeVisible();
   expect(within(zones).getByRole("button", { name: "Ver tabla" })).toBeVisible();
 });
+
