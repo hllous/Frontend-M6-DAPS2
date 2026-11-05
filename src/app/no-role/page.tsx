@@ -12,6 +12,6 @@ export default async function NoRolePage() {
   if (!session) redirect(loginUrl({ expired: true }));
   if (session.roles.length > 0) redirect("/app");
 
-  const actor = sessionActor(session);
+  const actor = await sessionActor(session);
   return <NoRoleScreen identity={actor.displayName} />;
 }
