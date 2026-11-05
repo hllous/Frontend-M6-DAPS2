@@ -22,7 +22,7 @@ afterAll(() => server.close());
 
 describe("IntegrationMonitor", () => {
   it("loads a paginated outgoing event list without exposing payload", async () => {
-    render(<IntegrationMonitor canManage initialTab="events" />);
+    const { container } = render(<IntegrationMonitor canManage initialTab="events" />);
 
     const list = await screen.findByRole("table", { name: "Eventos salientes" });
     expect(within(list).getByText("containerDamaged")).toBeVisible();
@@ -30,12 +30,12 @@ describe("IntegrationMonitor", () => {
     expect(await screen.findByLabelText("Eventos fallidos")).toHaveTextContent("2 eventos fallidos");
     const heading = screen.getByRole("heading", { name: "Eventos" });
     expect(heading).toBeVisible();
-    expectNoInternalJargon(heading);
+    expectNoInternalJargon(container, { allowTechnicalIds: true });
   });
 
   it("announces calendar days in Spanish", async () => {
     const user = userEvent.setup();
-    render(<IntegrationMonitor canManage initialTab="events" />);
+    const { container } = render(<IntegrationMonitor canManage initialTab="events" />);
 
     await user.click(await screen.findByRole("button", { name: "Desde" }));
 
@@ -44,7 +44,7 @@ describe("IntegrationMonitor", () => {
 
   it("lets an administrator inspect a payload and confirms a single retry with the same event id warning", async () => {
     const user = userEvent.setup();
-    render(<IntegrationMonitor canManage initialTab="events" />);
+    const { container } = render(<IntegrationMonitor canManage initialTab="events" />);
 
     await user.click((await screen.findAllByRole("button", { name: "Ver detalle de containerDamaged" }))[0]);
     const detail = await screen.findByRole("dialog", { name: "Detalle del evento" });
@@ -71,7 +71,7 @@ describe("IntegrationMonitor", () => {
   it("shows a conflict message when a single retry is no longer available", async () => {
     const user = userEvent.setup();
     server.use(http.post("*/api/events/outbox/:id/retry", () => HttpResponse.json({ statusCode: 409, message: "El evento ya cambió", error: "Conflict", path: "/api/events/outbox/id" }, { status: 409 })));
-    render(<IntegrationMonitor canManage initialTab="events" />);
+    const { container } = render(<IntegrationMonitor canManage initialTab="events" />);
 
     await user.click((await screen.findAllByRole("button", { name: "Ver detalle de containerDamaged" }))[0]);
     const detail = await screen.findByRole("dialog", { name: "Detalle del evento" });
@@ -85,7 +85,7 @@ describe("IntegrationMonitor", () => {
 
   it("confirms a limited bulk retry and announces how many events remain failed", async () => {
     const user = userEvent.setup();
-    render(<IntegrationMonitor canManage initialTab="events" />);
+    const { container } = render(<IntegrationMonitor canManage initialTab="events" />);
 
     await user.click(await screen.findByRole("button", { name: "Reintentar eventos fallidos" }));
     const confirmation = await screen.findByRole("dialog", { name: "Reintentar eventos fallidos" });
