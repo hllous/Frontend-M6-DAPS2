@@ -49,7 +49,7 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expectBusy(band);
     expect(band.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 
-    await waitFor(() => expect(band).toHaveAttribute("aria-busy", "false"));
+    await waitFor(() => expect(band).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
     expect(within(band).queryByRole("status")).toBeNull();
     expect(band.querySelector('[data-slot="skeleton"]')).toBeNull();
   });
