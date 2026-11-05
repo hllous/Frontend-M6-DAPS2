@@ -106,6 +106,7 @@ describe("IndicatorsDashboard CSV export", () => {
   it("downloads every zone and service type in the table sort order with Argentine CSV formatting", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
 
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Exportar CSV" })).toHaveLength(2));
     const categoryRegion = screen.getByRole("region", { name: "Por categoría" });
@@ -157,6 +158,7 @@ describe("IndicatorsDashboard CSV export", () => {
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(injectionFixture)));
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
 
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Exportar CSV" })).toHaveLength(2));
     const territoryRegion = await screen.findByRole("region", { name: "Detalle territorial" });

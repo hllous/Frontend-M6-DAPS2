@@ -45,7 +45,7 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const band = screen.getByRole("region", { name: "Familias" });
+    const band = screen.getByRole("region", { name: "Requiere atención" });
     expectBusy(band);
     expect(band.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 
@@ -61,6 +61,7 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
     const trend = screen.getByRole("region", { name: "Por categoría" });
     expectBusy(trend);
     expect(trend.querySelector('[data-slot="skeleton"]')).not.toBeNull();
@@ -68,13 +69,14 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     const loaded = await screen.findByRole("heading", { name: "Cobertura por tipo de servicio" });
     expect(loaded).toBeVisible();
     expect(screen.getByRole("region", { name: "Por categoría" })).not.toHaveAttribute("aria-busy", "true");
-    expect(screen.queryAllByText("Cargando")).toHaveLength(0);
+    expect(within(screen.getByRole("region", { name: "Por categoría" })).queryByText("Cargando")).toBeNull();
   });
 
   it("shows the records as a busy region with table-row skeletons, then the table takes its place", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await screen.findByRole("heading", { name: "Cobertura" });
+    await user.click(screen.getByRole("button", { name: "Cobertura" }));
+    await screen.findByRole("heading", { name: "Detalle de Cobertura" });
 
     server.use(http.get("*/api/services*", async () => {
       await delay(300);
@@ -119,10 +121,12 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const summary = screen.getByRole("region", { name: "Resumen de Cobertura" });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Cobertura" }));
+    const summary = screen.getByRole("region", { name: "Resumen de Cobertura", busy: true });
     expectBusy(summary);
     expect(summary.querySelector('[data-slot="skeleton"]')).not.toBeNull();
 
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Resumen de Cobertura" })).toBeNull(), { timeout: 4000 });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Resumen de Cobertura", busy: true })).toBeNull(), { timeout: 4000 });
   });
 });
+

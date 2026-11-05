@@ -14,6 +14,14 @@ import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
 
+async function openFamily(name: string) {
+  const user = userEvent.setup();
+  const back = screen.queryByRole("button", { name: "Volver a Tableros" });
+  if (back) await user.click(back);
+  await user.click(screen.getByRole("button", { name }));
+  await screen.findByRole("heading", { name: `Detalle de ${name}` });
+}
+
 async function chooseDate(user: ReturnType<typeof userEvent.setup>, label: string, value: string) {
   const trigger = screen.getByRole("button", { name: new RegExp(`^${label}`) });
   const displayedValue = trigger.textContent?.match(/(\d{2})\/(\d{2})\/(\d{4})/);
@@ -61,11 +69,10 @@ describe("IndicatorsDashboard", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = screen.getByRole("region", { name: "Familias" });
-    expect(familyBand).toBeVisible();
-    expect(within(familyBand).getByRole("button", { name: /Cobertura.*seleccionar/i })).toBeVisible();
-    expect(familyBand).toHaveAttribute("aria-busy", "true");
-    expect(within(familyBand).getByText("Cargando")).toHaveClass("sr-only");
+    const signals = screen.getByRole("region", { name: "Requiere atención" });
+    expect(screen.getByRole("button", { name: "Cobertura" })).toBeVisible();
+    expect(signals).toHaveAttribute("aria-busy", "true");
+    expect(within(signals).getByText("Cargando")).toHaveClass("sr-only");
   });
 
   it("keeps a ready family usable when another family errors and reports module states independently", async () => {
@@ -76,17 +83,14 @@ describe("IndicatorsDashboard", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias" });
-    expect(within(familyBand).getByRole("button", { name: /Reintentar Cumplimiento/i })).toBeVisible();
-
+    expect(await screen.findByRole("button", { name: "Reintentar Servicios fuera de horario" })).toBeVisible();
+    await openFamily("Cobertura");
     const trend = await screen.findByRole("region", { name: "Por categoría" });
     expect(within(trend).getByRole("heading", { name: "Cobertura por tipo de servicio" })).toBeVisible();
     const territory = screen.getByRole("region", { name: "Detalle territorial" });
     expect(within(territory).getByText("Sin resultados territoriales")).toBeVisible();
-
-    await userEvent.setup().click(within(familyBand).getByRole("button", { name: /Cumplimiento.*seleccionar/i }));
-    expect(await screen.findByText("No se pudo cargar Cumplimiento")).toBeVisible();
-    expect(screen.getByRole("region", { name: "Familias" })).toBeVisible();
+    await openFamily("Cumplimiento");
+    expect(await screen.findByText(/No se pudo actualizar Cumplimiento/)).toBeVisible();
   });
 
   it("uses task-focused tabs on narrow screens without changing the selected family", async () => {
@@ -104,8 +108,7 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias" });
-    await user.click(within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i }));
+    await openFamily("Incidencias");
     const tabs = await screen.findByRole("tablist", { name: "Secciones del tablero" });
     expect(tabs).toBeVisible();
     expect(within(tabs).getByRole("tab", { name: "Resumen" })).toBeVisible();
@@ -118,7 +121,7 @@ describe("IndicatorsDashboard", () => {
     expect(within(viewToggle).getByRole("button", { name: "Tabla" })).toHaveAttribute("aria-pressed", "true");
 
     await user.click(within(tabs).getByRole("tab", { name: "Territorio" }));
-    expect(within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "Detalle de Incidencias" })).toBeVisible();
     expect(await screen.findByRole("heading", { name: "Contenedores por zona" })).toBeVisible();
     expect(await within(screen.getByRole("region", { name: "Detalle territorial" })).findByRole("table")).toBeVisible();
 
@@ -129,8 +132,8 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
+    await openFamily("Cobertura");
+    await openFamily("Cumplimiento");
     const centro = await screen.findByRole("button", { name: /En fecha.*344 servicios/i });
 
     await user.hover(centro);
@@ -150,23 +153,22 @@ describe("IndicatorsDashboard", () => {
   });
 
   it("uses semantic colors for danger, success, warning, and neutral indicator points (#420)", async () => {
-    const user = userEvent.setup();
     const dimensions = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
       x: 0, y: 0, width: 480, height: 280, top: 0, right: 480, bottom: 280, left: 0, toJSON: () => ({}),
     } as DOMRect);
     const { container } = render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
+    await openFamily("Cobertura");
     await screen.findByRole("button", { name: "Centro" });
 
-    await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
-    await screen.findByRole("heading", { name: "Cumplimiento" });
+    await openFamily("Cumplimiento");
+    await screen.findByRole("heading", { name: "Detalle de Cumplimiento" });
     await screen.findByRole("button", { name: /En fecha.*344 servicios/i });
     expect(container.querySelector('[fill="var(--color-success)"]')).not.toBeNull();
     expect(container.querySelector('[fill="var(--color-warning)"]')).not.toBeNull();
 
-    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
-    await screen.findByRole("heading", { name: "Incidencias" });
+    await openFamily("Incidencias");
+    await screen.findByRole("heading", { name: "Detalle de Incidencias" });
     await screen.findByRole("button", { name: /Crítico.*3 árboles/i });
     expect(container.querySelector('[fill="var(--color-danger)"]')).not.toBeNull();
     dimensions.mockRestore();
@@ -176,8 +178,8 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    expect(await screen.findByRole("heading", { name: "Cobertura" })).toBeVisible();
-    expect(await screen.findByText(/^\d{2}\/\d{2}\/\d{4} – \d{2}\/\d{2}\/\d{4}$/)).toBeVisible();
+    await openFamily("Cobertura");
+    expect((await screen.findAllByText(/\d{2}\/\d{2}\/\d{4} – \d{2}\/\d{2}\/\d{4}/))[0]).toBeVisible();
     expect(screen.getByText(/Actualizado \d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}/)).toBeVisible();
     expect(screen.queryByText(/Unidad de análisis/)).not.toBeInTheDocument();
     expect(screen.getAllByText("Atendidos")[0]).toBeVisible();
@@ -200,7 +202,7 @@ describe("IndicatorsDashboard", () => {
     expect(centroRow).toHaveTextContent("140");
     expect(centroRow).toHaveTextContent("156");
 
-    await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
+    await openFamily("Cumplimiento");
     expect((await screen.findAllByText("344 servicios"))[0]).toBeVisible();
     expect((await screen.findAllByText("Demorados"))[0]).toBeVisible();
     expect(screen.getAllByText(/Cuadrilla no disponible/)[0]).toBeVisible();
@@ -211,8 +213,8 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    await openFamily("Cobertura");
+    await openFamily("Incidencias");
 
     expect(screen.getAllByText(/Resolución media de reportes/)[0]).toBeVisible();
     expect(screen.getByText(/Estados de contenedores y riesgo de arbolado: situación actual/)).toBeVisible();
@@ -225,7 +227,7 @@ describe("IndicatorsDashboard", () => {
     expect(within(incidentsTable).getByRole("columnheader", { name: "Daños" })).toBeVisible();
     expect(within(incidentsTable).getByText("Cerrado")).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: /Residuos/ }));
+    await openFamily("Residuos");
     expect(screen.getAllByText(/Desvío de relleno sanitario/)[0]).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Tabla" }));
     const wasteTable = screen.getByRole("region", { name: "Tabla de datos de Residuos" });
@@ -235,12 +237,11 @@ describe("IndicatorsDashboard", () => {
   });
 
   it("shows the fractional calendar-day average as secondary text without rounding it away (#421)", async () => {
-    const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
-    const incidentsCard = screen.getByRole("button", { name: "Incidencias: seleccionar familia" });
+    await openFamily("Cobertura");
+    await openFamily("Incidencias");
+    const incidentsCard = screen.getByRole("region", { name: "Resumen de Incidencias" });
     expect(within(incidentsCard).getByText("1,8 días hábiles")).toBeVisible();
     expect(screen.getByText(/Resolución media en días corridos:/)).toHaveTextContent("2,4 días");
   });
@@ -250,12 +251,11 @@ describe("IndicatorsDashboard", () => {
       ...incidentsIndicatorFixture,
       reports: { ...incidentsIndicatorFixture.reports, avgResolutionDays: 2 },
     })));
-    const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
-    const incidentsCard = screen.getByRole("button", { name: "Incidencias: seleccionar familia" });
+    await openFamily("Cobertura");
+    await openFamily("Incidencias");
+    const incidentsCard = screen.getByRole("region", { name: "Resumen de Incidencias" });
     expect(within(incidentsCard).getByText("1,8 días hábiles")).toBeVisible();
     const calendarAverage = screen.getByText(/Resolución media en días corridos:/);
     expect(calendarAverage).toHaveTextContent("Resolución media en días corridos: 2 días");
@@ -266,9 +266,9 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(screen.getByRole("button", { name: /Cumplimiento/ }));
-    await screen.findByRole("heading", { name: "Cumplimiento" });
+    await openFamily("Cobertura");
+    await openFamily("Cumplimiento");
+    await screen.findByRole("heading", { name: "Detalle de Cumplimiento" });
     await user.click(screen.getByRole("button", { name: "Tabla" }));
 
     const tablesRegion = screen.getByRole("region", { name: "Tabla de datos de Cumplimiento" });
@@ -300,7 +300,7 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
+    await openFamily("Cobertura");
     await user.click(await screen.findByRole("button", { name: "Centro" }));
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros" });
@@ -326,8 +326,8 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    await openFamily("Cobertura");
+    await openFamily("Incidencias");
     await user.click(await screen.findByRole("button", { name: /Centro.*8 incidentes/i }));
 
     const recordsRegion = await screen.findByRole("region", { name: "Registros" });
@@ -342,8 +342,8 @@ describe("IndicatorsDashboard", () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await screen.findByRole("heading", { name: "Cobertura" });
-    await user.click(screen.getByRole("button", { name: /Incidencias/ }));
+    await openFamily("Cobertura");
+    await openFamily("Incidencias");
     await user.click(await screen.findByRole("button", { name: /Alto.*9 árboles/i }));
 
     expect(screen.getByText("No hay registros para «Alto».")).toBeVisible();
@@ -352,18 +352,12 @@ describe("IndicatorsDashboard", () => {
 
   it("shows «Sin reportes cerrados» as secondary text when avgResolutionDays is null (#302)", async () => {
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({ ...incidentsIndicatorFixture, reports: { ...incidentsIndicatorFixture.reports, avgResolutionDays: null } })));
-    const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias" });
-    const incidentsButton = within(familyBand).getByRole("button", { name: /Incidencias.*seleccionar/i });
-    const calendarAverage = await within(incidentsButton).findByText(/Resolución media en días corridos:/);
-    expect(calendarAverage).toHaveTextContent("Sin reportes cerrados");
-    expect(within(incidentsButton).getByText("1,8 días hábiles")).toBeVisible();
-    expect(within(familyBand).queryByText("No se pudo cargar Incidencias")).not.toBeInTheDocument();
-
-    await user.click(incidentsButton);
-    expect(await screen.findByRole("heading", { name: "Incidencias" })).toBeVisible();
+    await openFamily("Incidencias");
+    const summary = await screen.findByRole("region", { name: "Resumen de Incidencias" });
+    expect(await within(summary).findByText(/Resolución media en días corridos:/)).toHaveTextContent("Sin reportes cerrados");
+    expect(within(summary).getByText("1,8 días hábiles")).toBeVisible();
     expect(screen.getByText(/Resolución media de reportes:/).closest("p")).toHaveTextContent("1,8 días hábiles");
   });
 
@@ -390,8 +384,10 @@ describe("IndicatorsDashboard", () => {
     );
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const familyBand = await screen.findByRole("region", { name: "Familias" });
-    expect(await within(familyBand).findAllByText("Sin datos")).toHaveLength(2);
+    for (const family of ["Incidencias", "Residuos"]) {
+      await openFamily(family);
+      expect(await screen.findByText("Sin resultados territoriales")).toBeVisible();
+    }
   });
 
   it("lists real zones and service types and sends their UUIDs as filters (#302)", async () => {
@@ -404,7 +400,7 @@ describe("IndicatorsDashboard", () => {
     );
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await screen.findByRole("heading", { name: "Cobertura" });
+    await openFamily("Cobertura");
 
     const requested: string[] = [];
     server.use(http.get("*/api/indicators/:family", ({ request }) => { requested.push(new URL(request.url).search); return passthrough(); }));
@@ -435,7 +431,7 @@ describe("IndicatorsDashboard", () => {
   it("blocks an inverted date range with a message and does not call the backend", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await screen.findByRole("heading", { name: "Cobertura" });
+    await openFamily("Cobertura");
 
     let indicatorRequests = 0;
     server.use(http.get("*/api/indicators/:family", () => { indicatorRequests += 1; return HttpResponse.json({}, { status: 500 }); }));
@@ -457,9 +453,10 @@ describe("IndicatorsDashboard", () => {
 describe("internal jargon guard", () => {
   it("keeps module codes, backend and API field names out of the rendered copy", async () => {
     const { container } = render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await screen.findByRole("heading", { name: "Cobertura" });
+    await openFamily("Cobertura");
     await screen.findAllByText("Atendidos");
 
     expectNoInternalJargon(container);
   });
 });
+

@@ -386,17 +386,15 @@ function useNarrowDashboard() {
 
 function FamilyDetailSummary({ family, state }: { family: FamilyKey; state: FamilyState }) {
   const data = state.data;
-  if (!data) return null;
-  const summary = indicatorSummaryDetails(family, data.primary.value, state.status === "ready", data);
-  const variation = indicatorVariationDetails(data);
+  const summary = indicatorSummaryDetails(family, data?.primary.value, state.status === "ready", data);
+  const variation = data ? indicatorVariationDetails(data) : null;
   return <Card size="sm" role="region" aria-label={`Resumen de ${familyMeta[family].label}`}><CardContent className="flex flex-wrap items-center gap-3">
-    <strong>{familySummary(data)}</strong>
-    <span>{data.primary.label}</span>
-    <IndicatorVariation {...variation} />
+    {data ? <><strong>{familySummary(data)}</strong><span>{data.primary.label}</span></> : <Skeleton aria-label="Cargando resumen" className="h-6 w-24" />}
+    {variation ? <IndicatorVariation {...variation} /> : null}
     <span>{summary.targetLabel}</span>
     {summary.directionLabel ? <span>{summary.directionLabel}</span> : null}
     {summary.status ? <Badge variant={summary.status.variant}>{summary.status.variant === "success" ? <CheckCheck aria-hidden /> : <TriangleAlert aria-hidden />}<span>{summary.status.label}</span></Badge> : null}
-    {data.family === "incidents" ? <span>Resolución media en días corridos: {data.reports.avgResolutionDays === null ? "Sin reportes cerrados" : `${formatNumber(data.reports.avgResolutionDays, "días")} días`}</span> : null}
+    {data?.family === "incidents" ? <span>Resolución media en días corridos: {data.reports.avgResolutionDays === null ? "Sin reportes cerrados" : `${formatNumber(data.reports.avgResolutionDays, "días")} días`}</span> : null}
   </CardContent></Card>;
 }
 
@@ -585,6 +583,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setDetailOpen(true);
   };
   const closeDetail = () => {
+    returnFocusRef.current ??= `family-${selectedFamily}`;
     const params = new URLSearchParams(window.location.search);
     params.delete("family");
     window.history.pushState(window.history.state, "", `${window.location.pathname}?${params}`);
