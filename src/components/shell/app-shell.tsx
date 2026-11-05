@@ -204,7 +204,7 @@ export function AppShell({
           {scenario ? (
             <>
               <p className={styles.contextLabel}>{actorLabel(scenario)}</p>
-              <p className={styles.actorName}>{identity ? `${identity.label} · ${identity.userId}` : scenario.actor.name}</p>
+              <p className={styles.actorName}>{identity ? identity.label : scenario.actor.name}</p>
             </>
           ) : (
             <div className="flex h-10 flex-col justify-center gap-1">
