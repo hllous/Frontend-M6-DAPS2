@@ -7,6 +7,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { IndicatorPoint } from "@/lib/indicators";
 import { buildAttentionSignals, type SignalFamilyState } from "./attention-signals";
+import { ChartViewToggle } from "./chart-view-toggle";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
 import { formatIndicatorNumber } from "./number-format";
 
@@ -15,7 +16,7 @@ type Problem = { id: string; label: string; noun: string; empty: string; points:
 
 export function ZonePanel({ states, onRetry, ignoredFilters }: { states: States; onRetry: (family: "coverage" | "incidents") => void; ignoredFilters: boolean }) {
   const [choice, setChoice] = useState("coverage");
-  const [view, setView] = useState("bars");
+  const [view, setView] = useState<"bars" | "table">("bars");
   const signals = buildAttentionSignals(states, {});
   const coverage = states.coverage.status === "ready" ? states.coverage.data : undefined;
   const incidents = states.incidents.status === "ready" ? states.incidents.data : undefined;
@@ -48,9 +49,7 @@ export function ZonePanel({ states, onRetry, ignoredFilters }: { states: States;
       <ToggleGroup variant="outline" aria-label="Problema" value={[active!.id]} onValueChange={(values) => { if (values[0]) setChoice(values[0]); }} className="w-full flex-wrap">
         {available.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="h-auto min-h-10 max-w-full whitespace-normal text-left [@media(max-width:760px)]:min-h-12">{item.label}</ToggleGroupItem>)}
       </ToggleGroup>
-      <ToggleGroup variant="outline" aria-label="Vista de zonas" value={[view]} onValueChange={(values) => { if (values[0]) setView(values[0]); }}>
-        <ToggleGroupItem value="bars" className="h-10 min-w-20 [@media(max-width:760px)]:h-12">Gráfico</ToggleGroupItem><ToggleGroupItem value="table" className="h-10 min-w-20 [@media(max-width:760px)]:h-12">Tabla</ToggleGroupItem>
-      </ToggleGroup>
+      <ChartViewToggle value={view} onChange={setView} label="Vista de zonas" />
       {active!.id === "incidents" && ignoredFilters ? <p>Los filtros de zona y tipo de servicio no se aplican a los contenedores.</p> : null}
       {total === 0 ? <p>{active!.empty}</p> : <>
         <p>{sorted[0]!.label} tiene {num(sorted[0]!.value)} de los {num(total)} {active!.noun}.</p>

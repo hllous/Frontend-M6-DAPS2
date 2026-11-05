@@ -31,6 +31,7 @@ import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
 import { AttentionSignals } from "./attention-signals";
+import { ChartViewToggle } from "./chart-view-toggle";
 import { CoverageTrend } from "./coverage-trend";
 import { ZonePanel } from "./zone-panel";
 import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
@@ -685,7 +686,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       {!detailOpen ? <>
       <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family, trigger) => openDetail(family, trigger)} />
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2"><div className="min-w-0">
-        <div className="flex gap-2"><Button type="button" variant={overviewView === "bars" ? "default" : "outline"} aria-pressed={overviewView === "bars"} onClick={() => setOverviewView("bars")}>Gráfico</Button><Button type="button" variant={overviewView === "table" ? "default" : "outline"} aria-pressed={overviewView === "table"} onClick={() => setOverviewView("table")}>Tabla</Button></div>
+        <ChartViewToggle value={overviewView} onChange={setOverviewView} label="Vista de cobertura" />
         {familyStates.coverage.data?.family === "coverage" ? <CoverageTrend data={familyStates.coverage.data} viewMode={overviewView} overview /> : familyStates.coverage.status === "loading" ? <p>Cargando cobertura…</p> : familyStates.coverage.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo cargar la cobertura.</AlertTitle><Button type="button" variant="outline" onClick={() => retryFamily("coverage")}>Reintentar</Button></Alert> : <p>Sin datos en el período.</p>}
       </div><ZonePanel states={familyStates} onRetry={retryFamily} ignoredFilters={Boolean(appliedQuery.zoneId || appliedQuery.serviceTypeId)} /></div>
       <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} data-detail-trigger={`family-${family}`} type="button" variant="outline" size="sm" onClick={(event) => openDetail(family, event.currentTarget)}>{familyMeta[family].label}</Button>)}</nav>
@@ -696,10 +697,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       <FamilyDetailSummary family={selectedFamily} state={selectedFamilyState} />
 
 
-      {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Vista">
-        <ToggleGroupItem value="bars" size="lg">Barras</ToggleGroupItem>
-        <ToggleGroupItem value="table" size="lg">Tabla</ToggleGroupItem>
-      </ToggleGroup> : null}
+      {isNarrow ? <ChartViewToggle value={viewMode} onChange={setViewMode} label="Vista" /> : null}
       {isNarrow ? <Tabs defaultValue="summary" className={styles.mobileTabs}>
         <TabsList aria-label="Secciones del tablero" className={styles.tabList}>
           <TabsTrigger value="summary">Resumen</TabsTrigger>
@@ -790,10 +788,7 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
     <div className={styles.detailHeader}>
       <div><p id="indicator-detail-title">{meta.label}</p><p>{formatDate(data.period.from)} – {formatDate(data.period.to)} · {data.primary.label}: <strong>{metricText(data.primary)}</strong></p></div>
       <div className={styles.viewActions}>
-        <ToggleGroup value={[requestedViewMode]} onValueChange={(values) => { const value = values[0]; if (value) onViewModeChange(value as ViewMode); }} variant="outline" size="sm" className={styles.viewToggle} aria-label="Vista del detalle">
-          <ToggleGroupItem value="bars">Barras</ToggleGroupItem>
-          <ToggleGroupItem value="table">Tabla</ToggleGroupItem>
-        </ToggleGroup>
+        <ChartViewToggle value={requestedViewMode} onChange={onViewModeChange} label="Vista del detalle" />
       </div>
     </div>
     {hasSummaryMetrics ? <div className={styles.summaryMetrics} aria-label={`Resumen exacto de ${meta.label}`}>{data.summaryMetrics.map((metric) => <div className={styles.summaryMetric} key={metric.label}><strong>{metricText(metric)}</strong><span>{metric.label}</span></div>)}</div> : null}
