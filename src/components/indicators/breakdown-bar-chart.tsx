@@ -3,7 +3,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, LabelList, XAxis, YAxis, type BarShapeProps } from "recharts";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import type { IndicatorPoint } from "@/lib/indicators";
@@ -101,7 +100,7 @@ type BreakdownBarPlotProps = {
   onSelect: (pointId: string) => void;
 };
 
-const BreakdownBarPlot = memo(function BreakdownBarPlot({ points, chartHeight, maxValue, registerTrigger, onHover, onHoverEnd, onSelect }: BreakdownBarPlotProps) {
+const BreakdownBarPlot = memo(function BreakdownBarPlot({ points, chartHeight, maxValue, registerTrigger, onSelect }: BreakdownBarPlotProps) {
   const toneCuesByLabel = new Map(points.filter((point) => point.toneCue).map((point) => [point.label, point.toneCue]));
 
   return <ChartContainer
@@ -136,9 +135,9 @@ const BreakdownBarPlot = memo(function BreakdownBarPlot({ points, chartHeight, m
                 data-point-id={point.id}
                 aria-label={`${point.label}: ${point.detailLabel}${point.toneCue ? ` · ${point.toneCue}` : ""}`}
                 aria-pressed="false"
-                onFocus={() => onHover(point.id)}
-                onMouseEnter={() => onHover(point.id)}
-                onMouseLeave={onHoverEnd}
+                
+                
+                
                 onClick={() => onSelect(point.id)}
               />
             </foreignObject>
@@ -162,7 +161,6 @@ export function BreakdownBarChart({ points, selectedId, onSelect, title, formatV
   const onSelectRef = useRef(onSelect);
   const pinnedIdRef = useRef(pinnedId);
   const activeId = pinnedId ?? hoveredId;
-  const activePoint = points.find((point) => point.id === activeId);
   const chartPoints = useMemo<ChartPoint[]>(() => points.map((point) => ({
     ...point,
     valueLabel: formatValue(point),
@@ -231,13 +229,6 @@ export function BreakdownBarChart({ points, selectedId, onSelect, title, formatV
 
   return <div className={styles.chartView} ref={rootRef} role="group" aria-label={`Barras de ${title.toLowerCase()}`}>
     <BreakdownBarPlot points={chartPoints} chartHeight={chartHeight} maxValue={maxValue} registerTrigger={registerTrigger} onHover={hoverPoint} onHoverEnd={clearHoveredPoint} onSelect={pinPoint} />
-    {/* La región de estado queda montada para anunciar el detalle al enfocar o fijar una barra. */}
-    <Alert role="status" variant="info" className={activePoint ? styles.pinnedDetail : "sr-only"} aria-label={activePoint ? `${pinnedId ? "Detalle fijado" : "Detalle"} de ${activePoint.label}` : undefined}>
-      {activePoint ? <AlertDescription>
-        <strong>{activePoint.label}</strong>
-        <span>{formatDetail(activePoint)}{activePoint.note ? ` · ${activePoint.note}` : ""}</span>
-        {pinnedId ? <Button type="button" variant="link" size="sm" className={styles.closeDetail} onClick={dismissDetail}>Cerrar detalle</Button> : null}
-      </AlertDescription> : null}
-    </Alert>
+
   </div>;
 }
