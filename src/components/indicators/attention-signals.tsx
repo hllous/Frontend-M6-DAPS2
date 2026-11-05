@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer } from "@/components/ui/chart";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import { coverageBucket, type IndicatorData } from "@/lib/indicators";
@@ -135,12 +136,18 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
       <CardHeader>
         <CardTitle id={titleId}>{signal.label}</CardTitle>
         <CardAction className="flex gap-1">
-          <Button render={<Link href={signal.href} aria-label={signal.linkLabel} />} nativeButton={false} role="link" variant="outline" size="icon">
-            <List aria-hidden="true" />
-          </Button>
-          <Button type="button" data-detail-trigger={`signal-${signal.id}`} variant="outline" size="icon" aria-label={`Ver detalle de ${signal.label}`} onClick={(event) => onDetail(event.currentTarget)}>
-            <ChartLine aria-hidden="true" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger render={<Button render={<Link href={signal.href} aria-label={signal.linkLabel} />} nativeButton={false} role="link" variant="outline" size="icon" />}>
+              <List aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipContent>Ver lista</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger render={<Button type="button" data-detail-trigger={`signal-${signal.id}`} variant="outline" size="icon" aria-label={`Ver detalle de ${signal.label}`} onClick={(event) => onDetail(event.currentTarget)} />}>
+              <ChartLine aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipContent>Ver detalle</TooltipContent>
+          </Tooltip>
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-1">
