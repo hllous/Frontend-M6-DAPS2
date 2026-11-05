@@ -144,11 +144,9 @@ export function CoverageTrend({ data, viewMode, overview = false }: { data: Cove
   // Sin `series` no hay sección; con un rechazo del backend, la sección explica por qué.
   if (!overview && !data.seriesError && points.length === 0) return null;
 
-  const description = `Cobertura de objetivos por ${bucket === "month" ? "mes" : "semana"} en el período aplicado.`;
-
   const title = overview ? `Cobertura por ${bucket === "month" ? "mes" : "semana"}` : "Tendencia";
   return <section className={styles.trend} role="region" aria-label={title}>
-    <div className={styles.header}><h2>{title}</h2>{data.seriesError ? null : <p>{description}</p>}</div>
+    <div className={styles.header}><h2>{title}</h2></div>
     {data.seriesError ? <Alert variant="danger" role="alert"><AlertDescription>{data.seriesError}</AlertDescription></Alert>
       : points.length === 0 ? <p>Sin datos en el período.</p>
       : viewMode === "table" ? <TrendTable points={points} />

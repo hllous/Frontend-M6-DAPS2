@@ -81,7 +81,7 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     window.history.replaceState(null, "", "/?from=2026-07-15&to=2026-08-31");
     const trend = await renderTrend();
 
-    expect(within(trend).getByText("Cobertura de objetivos por semana en el período aplicado.")).toBeInTheDocument();
+    expect(within(trend).queryByText("Cobertura de objetivos por semana en el período aplicado.")).not.toBeInTheDocument();
     expect(within(trend).getByRole("button", { name: /15\/07\/2026 – 31\/07\/2026: 80 %/ })).toBeInTheDocument();
   });
 
