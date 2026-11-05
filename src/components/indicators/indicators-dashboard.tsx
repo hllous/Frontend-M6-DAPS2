@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Activity, CheckCheck, ChevronDown, Database, RefreshCw, Recycle, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,22 +11,18 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { TableCaption, TableCell, TableRow } from "@/components/ui/table";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
-import { TableCaption, TableCell, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime, todayInArgentina } from "@/lib/argentina-date";
-import { CONTAINER_STATUS_LABELS, containersAdapter, type Container } from "@/lib/containers";
 import { defaultIndicatorTarget, familyAppliesCatalogFilters, hasNumericThreshold, indicatorQueryErrorMessage, parseIndicatorUrlState, serializeIndicatorUrlState, indicatorQuerySchema, indicatorsAdapter, type IndicatorBreakdown, type IndicatorData, type IndicatorPeriod, type IndicatorPoint, type IndicatorQuery, type IndicatorTarget } from "@/lib/indicators";
-import { serviceSourceHref } from "@/lib/referrals";
 import { catalogoDeEtiquetas } from "@/lib/service-labels";
-import { STATUS_LABEL, servicesAdapter, type Service } from "@/lib/services";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { CoverageBreakdownTable } from "./coverage-breakdown-table";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
@@ -45,42 +40,6 @@ type LoadStatus = "loading" | "ready" | "empty" | "error";
 type DashboardModule = "trend" | "territory";
 type FamilyState = { status: LoadStatus; data?: IndicatorData };
 type SelectedSignal = { breakdownId: string; pointId: string };
-type TraceResource = "services" | "containers";
-type TracePlan = {
-  resource: TraceResource;
-  period: { from: string; to: string };
-  zoneId?: string;
-  title: string;
-  href: string;
-  linkLabel: string;
-};
-
-type UnsupportedTrace = { resource: null; reason: string };
-type RecordPlan = TracePlan | UnsupportedTrace;
-type TraceRecord = {
-  id: string;
-  /** Pantalla del registro en el shell (`detail=<UUID>`). */
-  href: string;
-  title: string;
-  detail: string;
-  zone: string;
-  status: string;
-};
-
-const traceRecordColumns: DataTableColumn<TraceRecord>[] = [
-  {
-    id: "record",
-    accessorFn: (record) => record.title,
-    header: "Registro",
-    enableSorting: false,
-    cell: ({ row }) => <><Link className={styles.recordsLink} href={row.original.href}>{row.original.title}</Link><span className={styles.note}>{row.original.detail}</span></>,
-  },
-  { accessorKey: "zone", header: "Zona operativa", enableSorting: false },
-  { accessorKey: "status", header: "Estado", enableSorting: false },
-];
-
-const traceRecordRowId = (record: TraceRecord) => record.id;
-
 const familyMeta: Record<FamilyKey, { label: string; icon: typeof Activity; description: string }> = {
   coverage: { label: "Cobertura", icon: Activity, description: "Objetivos atendidos" },
   compliance: { label: "Cumplimiento", icon: CheckCheck, description: "Servicios en fecha" },
@@ -102,70 +61,6 @@ const territorialBreakdownIds = new Set(["zones", "unattended-zones", "container
 type FilterOption = { id: string; label: string };
 // Opciones reales de GET /zones y GET /service-types: el backend exige UUID en los filtros.
 type FilterCatalog = { zones: FilterOption[]; serviceTypes: FilterOption[] };
-
-function defaultTracePlan(family: FamilyKey, period: { from: string; to: string }, zoneId?: string): TracePlan | null {
-  if (family !== "coverage" && family !== "compliance") return null;
-  return {
-    resource: "services",
-    period,
-    zoneId,
-    title: "Servicios",
-    href: "/app?destination=services",
-    linkLabel: "Ver servicios",
-  };
-}
-
-function signalTracePlan(data: IndicatorData, breakdown: IndicatorBreakdown, point: IndicatorPoint): RecordPlan {
-  if ((data.family === "coverage" && breakdown.id === "zones") || (data.family === "compliance" && breakdown.id === "unattended-zones")) {
-    return {
-      resource: "services",
-      period: data.period,
-      zoneId: point.id,
-      title: "Servicios",
-      href: "/app?destination=services",
-      linkLabel: "Ver servicios",
-    };
-  }
-
-  if (data.family === "incidents" && breakdown.id === "containers") {
-    return {
-      resource: "containers",
-      period: data.period,
-      zoneId: point.id,
-      title: "Contenedores",
-      href: "/app/catalog/containers",
-      linkLabel: "Ver contenedores",
-    };
-  }
-
-  return {
-    resource: null,
-    reason: `No hay registros para «${point.label}».`,
-  };
-}
-
-// El servicio no tiene código legible: la fila se nombra con su título y su agenda.
-function serviceToTraceRecord(service: Service): TraceRecord {
-  return {
-    id: service.id,
-    href: serviceSourceHref(service.id),
-    title: service.title,
-    detail: `${formatArgentinaCalendarDate(service.scheduledDate)}${service.windowFrom ? ` · ${service.windowFrom}–${service.windowTo ?? ""}` : ""}`,
-    zone: service.zoneNames.length > 0 ? service.zoneNames.join(" · ") : "Sin zona",
-    status: STATUS_LABEL[service.status],
-  };
-}
-
-function containerToTraceRecord(container: Container, zones: Map<string, string>): TraceRecord {
-  return {
-    id: container.code,
-    href: `/app/catalog/containers?detail=${encodeURIComponent(container.id)}`,
-    title: container.code,
-    detail: container.address ?? "Sin dirección",
-    zone: zones.get(container.zoneId) ?? "Sin zona",
-    status: CONTAINER_STATUS_LABELS[container.status],
-  };
-}
 
 function formatNumber(value: number, unit: string) {
   return formatIndicatorNumber(value, { maximumFractionDigits: unit === "%" || unit === "h" || unit === "m³" || unit.startsWith("días") ? 1 : 0 });
@@ -426,10 +321,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const [viewMode, setViewMode] = useState<ViewMode>(initialUrlState.view);
   const [overviewView, setOverviewView] = useState<"bars" | "table">("bars");
   const [selectedSignal, setSelectedSignal] = useState<SelectedSignal | null>(null);
-  const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
-  const [records, setRecords] = useState<TraceRecord[]>([]);
-  const [recordsStatus, setRecordsStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [recordsOpen, setRecordsOpen] = useState(false);
   const [filterCatalog, setFilterCatalog] = useState<FilterCatalog | null>(null);
   const isNarrow = useNarrowDashboard();
   const familyRequestVersions = useRef<Record<FamilyKey, number>>({ coverage: 0, compliance: 0, incidents: 0, waste: 0 });
@@ -477,42 +368,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   }, [familyStates]);
   const selectedFamilyState = familyStates[selectedFamily];
   const selectedData = selectedFamilyState.status === "empty" ? undefined : selectedFamilyState.data;
-  const selectedPeriodFrom = selectedFamilyState.status === "ready" ? selectedData?.period.from : undefined;
-  const selectedPeriodTo = selectedFamilyState.status === "ready" ? selectedData?.period.to : undefined;
-  const planPeriodFrom = selectedPeriodFrom ?? appliedQuery.from;
-  const planPeriodTo = selectedPeriodTo ?? appliedQuery.to;
-  const defaultRecordsPlan = useMemo(
-    () => planPeriodFrom && planPeriodTo ? defaultTracePlan(selectedFamily, { from: planPeriodFrom, to: planPeriodTo }, appliedQuery.zoneId) : null,
-    [appliedQuery.zoneId, planPeriodFrom, planPeriodTo, selectedFamily],
-  );
-  const activeRecordPlan = recordPlan ?? defaultRecordsPlan;
-
-  useEffect(() => {
-    const plan = activeRecordPlan;
-    if (!plan || plan.resource === null) {
-      return;
-    }
-
-    let current = true;
-    const request = plan.resource === "services"
-      ? servicesAdapter.list({ page: 1, pageSize: 100, zoneId: plan.zoneId, scheduledFrom: plan.period.from, scheduledTo: plan.period.to }).then((page) => page.services.map(serviceToTraceRecord))
-      : Promise.all([containersAdapter.list({ page: 1, pageSize: 100, zoneId: plan.zoneId }), catalogoDeEtiquetas()])
-        .then(([page, catalog]) => page.containers.map((container) => containerToTraceRecord(container, catalog.zones)));
-
-    request.then((nextRecords) => {
-      if (!current) return;
-      setRecords(nextRecords);
-      setRecordsStatus("ready");
-    }).catch(() => {
-      if (current) setRecordsStatus("error");
-    });
-
-    return () => { current = false; };
-  }, [activeRecordPlan]);
-
-  const selectedBreakdown = selectedData?.breakdowns.find((breakdown) => breakdown.id === selectedSignal?.breakdownId);
-  const selectedPoint = selectedBreakdown?.points.find((point) => point.id === selectedSignal?.pointId);
-
   useEffect(() => {
     if (!canView) return;
     const search = serializeIndicatorUrlState({ query: appliedQuery, family: selectedFamily, view: viewMode, signal: selectedSignal ?? pendingSignal.current ?? undefined }, window.location.search);
@@ -529,8 +384,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       setSelectedFamily(state.family);
       pendingSignal.current = state.signal;
       setSelectedSignal(null);
-      setRecordPlan(null);
-      setRecordsStatus("idle");
       setViewMode(state.view);
       setAppliedQuery(state.query);
       setQuery(state.query);
@@ -552,16 +405,12 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     : [appliedQuery.zoneId && "Zona", appliedQuery.serviceTypeId && "Tipo de servicio"].filter(Boolean).join(" y ") || null;
   const clearSignal = () => {
     setSelectedSignal(null);
-    setRecordPlan((current) => current?.resource ? { ...current, zoneId: undefined } : null);
-    setRecordsStatus("idle");
   };
 
   const selectFamily = (family: FamilyKey) => {
     pendingSignal.current = undefined;
     setSelectedFamily(family);
     setSelectedSignal(null);
-    setRecordPlan(null);
-    setRecordsStatus("idle");
   };
 
   useEffect(() => {
@@ -572,9 +421,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     const point = breakdown?.points.find((item) => item.id === signal.pointId);
     if (!breakdown || !point) return;
     setSelectedSignal(signal);
-    setRecordsStatus("loading");
-    setRecordPlan(signalTracePlan(selectedData, breakdown, point));
-    setRecordsOpen(true);
   }, [selectedData, detailOpen]);
 
   const openDetail = (family: FamilyKey, trigger: HTMLElement) => {
@@ -608,9 +454,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       return;
     }
     setSelectedSignal({ breakdownId, pointId });
-    setRecordsStatus("loading");
-    setRecordPlan(signalTracePlan(selectedData, breakdown, point));
-    setRecordsOpen(true);
   };
 
   const applyQuery = (nextQuery: IndicatorQuery) => {
@@ -619,8 +462,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     if (!validation.success) { setFilterError(indicatorQueryErrorMessage(validation.error)); return; }
     setFilterError(null);
     setSelectedSignal(null);
-    setRecordPlan(null);
-    setRecordsStatus("idle");
     setAppliedQuery({ ...nextQuery });
   };
   const applyPeriod = (days: number) => {
@@ -640,8 +481,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     optionLabel(filterCatalog?.serviceTypes, appliedQuery.serviceTypeId),
   ].filter(Boolean).join(" · ");
 
-  const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
-  const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} open={recordsOpen} onOpenChange={setRecordsOpen} onClear={clearSignal} />;
   const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Por categoría" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent family={selectedFamily} breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} period={selectedData?.period ?? { from: appliedQuery.from ?? "", to: appliedQuery.to ?? "" }} /></ModuleState>;
 
   if (!canView) {
@@ -706,7 +545,6 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
           <TabsTrigger value="summary">Resumen</TabsTrigger>
           <TabsTrigger value="trend">Por categoría</TabsTrigger>
           <TabsTrigger value="territory">Territorio</TabsTrigger>
-          <TabsTrigger value="records">Registros</TabsTrigger>
         </TabsList>
         <TabsContent value="summary"><LoadingRegion label={`Datos del resumen de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}><section className={styles.mobileSummary} aria-labelledby="mobile-summary-title"><h3 id="mobile-summary-title">Resumen</h3>{selectedData ? <p><strong>{selectedData.primary.label}:</strong> {metricText(selectedData.primary)}</p> : selectedFamilyState.status === "loading" ? <LoadingRegion label={`Resumen de ${familyMeta[selectedFamily].label}`}><Skeleton aria-hidden className="h-6 w-3/4" /></LoadingRegion> : <p>{selectedFamilyState.status === "error" ? "No se pudo cargar. Intente nuevamente." : "Sin resultados en el período."}</p>}
           {selectedData?.family === "coverage" ? <p><strong>Programado a futuro:</strong> {metricText(selectedData.summaryMetrics.find((metric) => metric.label === "Programado a futuro")!)}</p> : null}
@@ -724,14 +562,11 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
         </section>{selectedData ? <AdditionalIndicators data={selectedData} /> : null}{selectedData ? detailContext(selectedData) : null}{selectedData?.family === "coverage" ? <CoverageTrend data={selectedData} viewMode={viewMode} /> : null}</LoadingRegion></TabsContent>
         <TabsContent value="trend"><LoadingRegion label="Datos por categoría" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("trend", trendBreakdowns, trendStatus)}</LoadingRegion></TabsContent>
         <TabsContent value="territory"><LoadingRegion label="Datos territoriales" isLoading={selectedFamilyState.status === "loading" && Boolean(selectedData)} className={selectedFamilyState.status === "loading" && selectedData ? styles.previousData : undefined}>{selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}</LoadingRegion></TabsContent>
-        <TabsContent value="records">{recordsView}</TabsContent>
       </Tabs> : selectedData ? <>
         <LoadingRegion label={`Detalle de ${familyMeta[selectedFamily].label}`} isLoading={selectedFamilyState.status === "loading"} className={selectedFamilyState.status === "loading" ? styles.previousData : undefined}><IndicatorDetail data={selectedData} viewMode={viewMode} selection={selectedSignal} onViewModeChange={setViewMode} onSelect={selectSignal} trendBreakdowns={trendBreakdowns} territoryBreakdowns={territoryBreakdowns} trendStatus={trendStatus} territoryStatus={territoryStatus} onRetry={() => retryFamily(selectedFamily)} /></LoadingRegion>
-        {recordsView}
       </> : <div className={styles.desktopModules}>
         {selectedModuleContent("trend", trendBreakdowns, trendStatus)}
         {selectedModuleContent("territory", territoryBreakdowns, territoryStatus)}
-        {recordsView}
       </div>}
       </>}
     </section>
@@ -806,42 +641,6 @@ function IndicatorDetail({ data: rawData, viewMode: requestedViewMode, selection
       <ModuleState label="Detalle territorial" status={territoryStatus} onRetry={onRetry}><IndicatorModuleContent family={data.family} breakdowns={territoryBreakdowns} viewMode={requestedViewMode} selection={selection} onSelect={onSelect} period={data.period} /></ModuleState>
     </div>
   </section>;
-}
-
-function AccessibleRecords({ family, plan, selection, breakdown, point, records, status, familyStatus = "ready", open, onOpenChange, onClear }: { family: FamilyKey; plan: RecordPlan | null; selection: SelectedSignal | null; breakdown?: IndicatorBreakdown; point?: IndicatorPoint; records: TraceRecord[]; status: "idle" | "loading" | "ready" | "error"; familyStatus?: LoadStatus; open: boolean; onOpenChange: (open: boolean) => void; onClear: () => void }) {
-  const meta = familyMeta[family];
-  const hasSelection = Boolean(selection && breakdown && point);
-  const loading = (familyStatus === "loading" && !plan) || Boolean(plan?.resource && status === "loading");
-  return <LoadingRegion label="Registros" isLoading={loading} className={styles.records}>
-    <Collapsible open={open} onOpenChange={onOpenChange}>
-      <h2 className={styles.recordsHeading}><CollapsibleTrigger id="indicator-records-title" render={<Button type="button" variant="ghost" size="lg" className={styles.recordsTrigger} />}>Registros<ChevronDown data-icon="inline-end" aria-hidden /></CollapsibleTrigger></h2>
-      <CollapsibleContent className={styles.recordsBody}>
-        {familyStatus === "loading" && !plan ? <RecordsSkeleton /> : null}
-        {familyStatus === "error" && !plan ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros.</Alert> : null}
-        {plan?.resource ? <Link className={styles.recordsLink} href={plan.href}>{plan.linkLabel}</Link> : null}
-        <Alert role="status" variant="info" className={styles.recordsContext}>
-          {plan?.resource === null && hasSelection ? <AlertDescription>{plan.reason}</AlertDescription> : hasSelection ? <AlertDescription><strong>Filtro:</strong> {meta.label} · {breakdown?.title} · {point?.label} · {pointText(point!)}</AlertDescription> : plan?.resource ? <AlertDescription>Todos los registros del período.</AlertDescription> : <AlertDescription>Seleccione un dato del gráfico.</AlertDescription>}
-          {hasSelection ? <Button type="button" variant="outline" size="sm" onClick={onClear}>Quitar filtro</Button> : null}
-        </Alert>
-        {plan?.resource ? status === "loading" ? <RecordsSkeleton /> : status === "error" ? <Alert variant="danger" className={styles.recordsMessage}>No se pudieron cargar los registros.</Alert> : <TraceRecordsTable plan={plan} records={records} /> : <Alert role="status" className={styles.recordsMessage}>Sin registros.</Alert>}
-      </CollapsibleContent>
-    </Collapsible>
-  </LoadingRegion>;
-}
-
-function RecordsSkeleton() {
-  return <TableRowsSkeleton className={styles.recordsTableWrap} tableClassName={styles.recordsTable} rowCount={3} columnWidths={["w-40", "w-24", "w-20"]} columnLabels={["Registro", "Zona operativa", "Estado"]} />;
-}
-
-function TraceRecordsTable({ plan, records }: { plan: TracePlan; records: TraceRecord[] }) {
-  const table = useDataTable({ data: records, columns: traceRecordColumns, getRowId: traceRecordRowId });
-
-  return <div className={styles.recordsTableWrap}><DataTable
-    table={table}
-    container={false}
-    className={styles.recordsTable}
-    renderEmpty={() => <TableRow><TableCell colSpan={3}>Sin registros.</TableCell></TableRow>}
-  ><TableCaption>Registros accesibles de {plan.title}</TableCaption></DataTable></div>;
 }
 
 function BreakdownView({ family, breakdown, viewMode, period, selectedId: controlledSelectedId, onSelect }: { family: IndicatorData["family"]; breakdown: IndicatorBreakdown; viewMode: ViewMode; period: IndicatorPeriod; selectedId?: string; onSelect: (pointId: string) => void }) {
