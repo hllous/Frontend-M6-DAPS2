@@ -98,7 +98,7 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("status", { name: /Detalle .*Centro/ })).not.toBeInTheDocument();
     expect(bar).toHaveFocus();
-    expect(bar).toHaveAttribute("aria-pressed", "false");
+    expect(bar).toHaveAttribute("aria-pressed", "true");
 
     const viewToggle = screen.queryByRole("group", { name: "Vista" }) ?? screen.getByRole("group", { name: "Vista del detalle" });
     await user.click(within(viewToggle).getByRole("button", { name: "Ver tabla" }));

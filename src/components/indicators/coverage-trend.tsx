@@ -39,6 +39,7 @@ const asDate = (day: string) => new Date(`${day}T00:00:00Z`);
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 export function toTrendPoints(series: CoverageSeries, bucket: "week" | "month"): TrendPoint[] {
   const monthly = bucket === "month";
+  const lastValueIndex = series.findLastIndex((entry) => entry.scheduled !== 0);
   return series.map((entry, index) => {
     const pct = entry.scheduled === 0 ? null : entry.coveragePct;
     return {
@@ -50,7 +51,7 @@ export function toTrendPoints(series: CoverageSeries, bucket: "week" | "month"):
       upcoming: entry.upcoming ?? null,
       pct,
       anchorY: pct ?? 0,
-      valueLabel: index === series.length - 1 && pct !== null ? `${formatIndicatorNumber(pct, { maximumFractionDigits: 1 })} %` : "",
+      valueLabel: index === lastValueIndex && pct !== null ? `${formatIndicatorNumber(pct, { maximumFractionDigits: 1 })} %` : "",
     };
   });
 }
@@ -84,7 +85,7 @@ type TrendPlotProps = {
 // Memoizado: enfocar o pasar el mouse no puede remontar los botones, o se perdería el foco.
 const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onFocusPoint }: TrendPlotProps) {
   return <ChartContainer config={chartConfig} className={styles.plot} style={{ aspectRatio: "auto" }} initialDimension={{ width: 720, height: 260 }}>
-    <LineChart data={points} margin={{ top: 12, right: 16, bottom: 4, left: 0 }}>
+    <LineChart data={points} margin={{ top: 12, right: 32, bottom: 4, left: 0 }}>
       <CartesianGrid vertical={false} stroke="var(--color-border)" />
       <XAxis dataKey="tick" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={12} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
       <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value: number) => `${value} %`} tickLine={false} axisLine={false} width={44} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
