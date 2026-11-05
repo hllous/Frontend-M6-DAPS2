@@ -169,7 +169,7 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
             <Trend change={change} />
           </div>
           {hasSeries ? <div aria-hidden="true" className="w-28 shrink-0"><ChartContainer config={{ value: { label: signal.label, color: worse ? "var(--color-danger)" : "var(--color-action)" } }} className="h-10 w-full" style={{ aspectRatio: "auto" }}>
-            <LineChart data={series} margin={{ top: 4, right: 6, bottom: 4, left: 4 }}><YAxis hide domain={["dataMin - 1", "dataMax + 1"]} /><Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={endDot(series)} activeDot={false} isAnimationActive={false} connectNulls /></LineChart>
+            <LineChart accessibilityLayer={false} data={series} margin={{ top: 4, right: 6, bottom: 4, left: 4 }}><YAxis hide domain={["dataMin - 1", "dataMax + 1"]} /><Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={endDot(series)} activeDot={false} isAnimationActive={false} connectNulls /></LineChart>
           </ChartContainer></div> : <p className="text-xs text-muted-foreground">Sin datos en el período.</p>}
         </div>
         <CardDescription aria-hidden="true" className={cn("text-xs", worse && "text-[var(--color-text-secondary)]")}>{signal.context}</CardDescription>
