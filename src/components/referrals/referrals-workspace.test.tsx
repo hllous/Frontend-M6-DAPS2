@@ -69,12 +69,12 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     // #741: the row is named by what it is (kind, damage, address), never by its UUID.
     const row = within(list).getByRole("button", { name: /Reparación · Vereda hundida o rota · Av\. Rivadavia 2200/ });
-    expect(row).toHaveAccessibleName(expect.stringContaining("#15c86465"));
+    expect(row).not.toHaveAccessibleName(expect.stringContaining("#15c86465"));
     expect(row).not.toHaveAccessibleName(expect.stringContaining(id));
     await user.click(row);
     const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Vereda hundida o rota · Av. Rivadavia 2200" });
-    expect(within(detail).getByText(id)).toBeVisible();
-    expect(within(detail).getByRole("button", { name: "Copiar identificador técnico de la derivación" })).toBeVisible();
+    expect(within(detail).queryByText(id)).not.toBeInTheDocument();
+    expect(within(detail).queryByRole("button", { name: "Copiar identificador técnico de la derivación" })).not.toBeInTheDocument();
     expect(within(detail).getByRole("link", { name: /Ver inspección/ })).toHaveAttribute(
       "href", `/app?destination=environment&inspectionId=${inspectionId}`,
     );

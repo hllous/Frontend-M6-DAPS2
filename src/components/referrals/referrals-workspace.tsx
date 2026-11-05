@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/copyable-id";
-import { isUuid, referralLabel, shortId } from "@/lib/display-ids";
+import { referralLabel } from "@/lib/display-ids";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -522,7 +522,7 @@ function ReferralRow({
           variant="ghost"
           className="h-auto min-h-12 min-w-0 w-full items-start justify-start whitespace-normal text-left sm:items-center"
           onClick={onOpen}
-          aria-label={`${label}${sectionSummary ? `, ${sectionSummary}` : ""}, ${shortId(referral.id)}, ${statusLabel(referral)}`}
+          aria-label={`${label}${sectionSummary ? `, ${sectionSummary}` : ""}, ${destinationLabel[referral.destination]}, ${formatDateTime(referral.createdAt)}, ${statusLabel(referral)}`}
         />
       )}
     >
@@ -536,10 +536,10 @@ function ReferralRow({
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-bold text-[var(--color-text)]">{label}</span>
             <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{referralKindLabel[referral.kind]}</span>
-            <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">{shortId(referral.id)}</span>
+            <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">{destinationLabel[referral.destination]} · {formatDateTime(referral.createdAt)}</span>
           </span>
           {sectionSummary && <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">{sectionSummary}</span>}
-          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {isUuid(referral.sourceId) ? "" : `${referral.sourceId} · `}{referral.sourceLabel}</span>
+          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceLabel}</span>
         </span>
         <ItemActions className="w-full basis-full justify-end sm:ml-auto sm:w-auto sm:basis-auto">
           <Badge variant="status" className="min-h-7 shrink-0 gap-1.5 px-2.5 py-1 text-xs font-semibold" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
@@ -580,7 +580,7 @@ function ReferralDetail({
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Volver a derivaciones
           </Button>
-          <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{shortId(referral.id)}</span>
+          
         </div>
       </header>
       <div className="mx-auto w-full max-w-6xl flex-1 space-y-5 p-4 sm:p-6 lg:p-8">
@@ -589,7 +589,7 @@ function ReferralDetail({
             <p className="text-sm font-semibold text-[var(--color-action)]">{referralKindLabel[referral.kind]}</p>
             <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-text)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] sm:text-[28px]">Detalle de {referralLabel(referral, repairDamageLabel)}</h1>
             <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-              <div className="flex items-center gap-1.5"><dt className="text-[var(--color-text-secondary)]">Identificador técnico</dt><dd><CopyableId value={referral.id} label="identificador técnico de la derivación" /></dd></div>
+              
               <div className="flex gap-1.5"><dt className="text-[var(--color-text-secondary)]">Creada</dt><dd className="text-[var(--color-text)]">{formatDateTime(referral.createdAt)}</dd></div>
               <div className="flex gap-1.5"><dt className="text-[var(--color-text-secondary)]">Actualizada</dt><dd className="text-[var(--color-text)]">{formatDateTime(referral.updatedAt)}</dd></div>
             </dl>
@@ -610,7 +610,7 @@ function ReferralDetail({
             </span>
             <div className="min-w-0">
               <h2 id="referral-source-title" className="text-sm font-bold text-[var(--color-text)]">{sourceKindLabel(referral)}</h2>
-              <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceId} · {referral.sourceLabel}</p>
+              <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceLabel}</p>
               <a className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-action)] underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" href={referral.sourceHref}>
                 {sourceLinkLabel(referral)}
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
