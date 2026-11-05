@@ -34,6 +34,17 @@ describe("Services workspace period", () => {
     await choosePeriod("Todo el período");
     await waitFor(() => expect(list).toHaveBeenLastCalledWith({ pageSize: 100 }));
   });
+  it("no reutiliza el listado de otro rango personalizado", async () => {
+    const list = vi.spyOn(servicesAdapter, "list");
+    window.history.replaceState(null, "", "/app?from=2026-01-03&to=2026-01-20");
+    const first = render(<ServicesWorkspace />);
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    first.unmount();
+    window.history.replaceState(null, "", "/app?from=2026-02-01&to=2026-02-10");
+    render(<ServicesWorkspace />);
+    await waitFor(() => expect(list).toHaveBeenCalledWith(expect.objectContaining({ scheduledFrom: "2026-02-01", scheduledTo: "2026-02-10" })));
+    expect(periodSelect()).toHaveTextContent("Del 01/02 al 10/02");
+  });
   it("warns with the dropped count summed across pages, and stays silent when the total only exceeds the rows because of paging (#651)", async () => {
     const mockPages = (dropped: (page: number) => number) => vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({
       services: query?.pageSize === 1 ? [] : [{ ...serviceFixtures[0], id: `p${query?.page ?? 1}` }],
