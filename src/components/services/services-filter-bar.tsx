@@ -200,7 +200,7 @@ function PeriodField({ period, periodItems, onPeriodChange, periodStatus, id }: 
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            {(Object.keys(periodItems) as ServicesPeriod[]).map((key) => (
+            {(Object.keys(periodItems) as ServicesPeriod[]).filter((key) => key !== "personalizado" || period === "personalizado").map((key) => (
               <SelectItem key={key} value={key}>{periodItems[key]}</SelectItem>
             ))}
           </SelectGroup>

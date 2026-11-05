@@ -106,6 +106,7 @@ async function mapWithLimit<T>(count: number, limit: number, task: (index: numbe
 }
 
 const periodItems: Record<Period, string> = {
+  personalizado: "Período personalizado",
   semana: "Esta semana",
   mes: "Este mes",
   todo: "Todo el período",
@@ -171,11 +172,18 @@ export function ServicesWorkspace({
   // Quién pide la lista: la oficina entera o una cuadrilla. Con la misma clave se reusa la lista ya cargada en esta sesión.
   const listScope = scenario?.actor.kind === "FIELD" ? `field:${scenario.actor.crewId ?? ""}` : "office";
   const listUserId = scenario?.actor.userId ?? "user-lucia";
+  const [customRange] = useState(() => {
+    const from = getParam("from");
+    const to = getParam("to");
+    return from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to ? { from, to } : null;
+  });
   const [initialPeriodChoice] = useState<Period | null>(() => {
+    if (customRange) return "personalizado";
     const value = getParam("periodo");
     return value === "semana" || value === "mes" || value === "todo" ? value : null;
   });
-  const listKey = servicesListCacheKey(listUserId, listScope);
+  const [periodChoice, setPeriodChoice] = useState<Period | null>(initialPeriodChoice);
+  const listKey = servicesListCacheKey(listUserId, listScope) + (periodChoice === "personalizado" && customRange ? `|${customRange.from}|${customRange.to}` : "");
   const [initialCached] = useState(() => readServicesListCache(listKey, initialPeriodChoice));
   // Lista y período con los que se cargó lo que se muestra; la copia de la sesión se actualiza con cada cambio.
   const loadedRef = useRef<{ key: string; choice: Period | null; period: Period } | null>(
@@ -190,7 +198,6 @@ export function ServicesWorkspace({
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const loadedScopeRef = useRef<string | null>(initialCached ? listScope : null);
   const [reloadVersion, setReloadVersion] = useState(0);
-  const [periodChoice, setPeriodChoice] = useState<Period | null>(initialPeriodChoice);
   const [activePeriod, setActivePeriod] = useState<Period>(periodChoice ?? initialCached?.period ?? "todo");
   const handlePeriodChoiceChange = useCallback((period: Period) => {
     setActivePeriod(period);
@@ -354,7 +361,10 @@ export function ServicesWorkspace({
         }
         setActivePeriod(period);
         const query: ServiceQuery = { ...base, pageSize: 100 };
-        if (period !== "todo") {
+        if (period === "personalizado" && customRange) {
+          query.scheduledFrom = customRange.from;
+          query.scheduledTo = customRange.to;
+        } else if (period !== "todo") {
           const today = todayInArgentina();
           const from = new Date(`${today}T00:00:00Z`);
           const to = new Date(from);
@@ -409,7 +419,7 @@ export function ServicesWorkspace({
     return () => {
       isCurrent = false;
     };
-  }, [reloadVersion, scenario, periodChoice, listScope, listKey]);
+  }, [reloadVersion, scenario, periodChoice, listScope, listKey, customRange]);
 
   // Crear, asignar o editar un servicio cambia `loadState`: la copia de la sesión acompaña esos cambios.
   useEffect(() => {
@@ -464,7 +474,10 @@ export function ServicesWorkspace({
     if (search.trim()) newParams.set("q", search.trim());
     if (selectedId) newParams.set("selected", selectedId);
     if (detailId) newParams.set("detail", detailId);
-    if (periodChoice) newParams.set("periodo", periodChoice);
+    if (periodChoice === "personalizado" && customRange) {
+      newParams.set("from", customRange.from);
+      newParams.set("to", customRange.to);
+    } else if (periodChoice) newParams.set("periodo", periodChoice);
     if (sortKey && sortKey !== "scheduled") newParams.set("sort", sortKey);
     if (sortKey && sortDir !== "asc") newParams.set("dir", sortDir);
     columnFilters.zones.forEach((z) => newParams.append("zone", z));
@@ -493,6 +506,7 @@ export function ServicesWorkspace({
     selectedId,
     detailId,
     periodChoice,
+    customRange,
     sortKey,
     sortDir,
     columnFilters,
@@ -971,7 +985,7 @@ export function ServicesWorkspace({
       search={search}
       onSearchChange={setSearch}
       period={activePeriod}
-      periodItems={periodItems}
+      periodItems={customRange ? { ...periodItems, personalizado: `Del ${customRange.from.slice(8, 10)}/${customRange.from.slice(5, 7)} al ${customRange.to.slice(8, 10)}/${customRange.to.slice(5, 7)}` } : periodItems}
       onPeriodChange={handlePeriodChoiceChange}
       periodStatus={periodStatus}
       filters={columnFilters}

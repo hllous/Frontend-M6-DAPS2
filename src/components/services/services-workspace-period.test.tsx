@@ -24,6 +24,16 @@ afterEach(() => {
 });
 
 describe("Services workspace period", () => {
+  it("abre el rango exacto de Tableros y permite volver a un período habitual", async () => {
+    window.history.replaceState(null, "", "/app?destination=services&from=2026-01-03&to=2026-01-20");
+    const list = vi.spyOn(servicesAdapter, "list");
+    render(<ServicesWorkspace />);
+    expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ scheduledFrom: "2026-01-03", scheduledTo: "2026-01-20" }));
+    expect(periodSelect()).toHaveTextContent("Del 03/01 al 20/01");
+    await choosePeriod("Todo el período");
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ pageSize: 100 }));
+  });
   it("warns with the dropped count summed across pages, and stays silent when the total only exceeds the rows because of paging (#651)", async () => {
     const mockPages = (dropped: (page: number) => number) => vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({
       services: query?.pageSize === 1 ? [] : [{ ...serviceFixtures[0], id: `p${query?.page ?? 1}` }],
