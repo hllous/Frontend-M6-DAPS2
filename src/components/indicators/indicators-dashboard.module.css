@@ -5,6 +5,7 @@
 .freshness { display: inline-flex; align-items: center; gap: var(--space-8); flex: 0 0 auto; min-height: 40px; padding: 0 var(--space-12); border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); color: var(--color-text-secondary); font-size: 12px; white-space: nowrap; }
 .freshness svg { color: var(--color-success); }
 .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: var(--space-12); align-items: end; padding: var(--space-14); border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
+.periodRow { grid-column: 1 / -1; align-items: flex-start; }
 .field { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
 .fieldError { grid-column: 1 / -1; margin: 0; }
 .filterAction { height: 40px; }
@@ -126,5 +127,5 @@
 @media (max-width: 760px) { .periodShortcuts > button { min-height: 48px; flex: 1 1 auto; } }
 
 .quickFilters { display: flex; flex-direction: column; gap: var(--space-12); }
-.quickBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-12); }
+.quickBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: var(--space-12); }
 @media (max-width: 760px) { .quickPeriods { flex: 1 1 100%; } .quickPeriods > * { flex: 1 1 0; } }

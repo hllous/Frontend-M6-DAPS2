@@ -632,6 +632,13 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     return appliedQuery.from === range.from && appliedQuery.to === range.to;
   });
 
+  const optionLabel = (options: FilterOption[] | undefined, id?: string) => id ? (options?.find((option) => option.id === id)?.label ?? null) : null;
+  const filtersSummary = [
+    activeQuickPeriod?.label ?? (appliedQuery.from && appliedQuery.to ? `${formatDate(appliedQuery.from)} – ${formatDate(appliedQuery.to)}` : null),
+    optionLabel(filterCatalog?.zones, appliedQuery.zoneId),
+    optionLabel(filterCatalog?.serviceTypes, appliedQuery.serviceTypeId),
+  ].filter(Boolean).join(" · ");
+
   const visibleRecordsStatus = activeRecordPlan?.resource && recordsStatus === "idle" ? "loading" : recordsStatus;
   const recordsView = <AccessibleRecords family={selectedFamily} plan={activeRecordPlan} selection={selectedSignal} breakdown={selectedBreakdown} point={selectedPoint} records={records} status={visibleRecordsStatus} familyStatus={selectedFamilyState.status} open={recordsOpen} onOpenChange={setRecordsOpen} onClear={clearSignal} />;
   const selectedModuleContent = (module: DashboardModule, breakdowns: IndicatorBreakdown[], state: LoadStatus) => <ModuleState label={module === "trend" ? "Por categoría" : "Detalle territorial"} status={state} onRetry={() => retryFamily(selectedFamily)}><IndicatorModuleContent family={selectedFamily} breakdowns={breakdowns} viewMode={viewMode} selection={selectedSignal} onSelect={selectSignal} period={selectedData?.period ?? { from: appliedQuery.from ?? "", to: appliedQuery.to ?? "" }} /></ModuleState>;
@@ -649,17 +656,21 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
       <Collapsible className={styles.quickFilters}>
         <div className={styles.quickBar}>
-          <ToggleGroup variant="period" value={activeQuickPeriod ? [activeQuickPeriod.id] : []} onValueChange={(values) => { const item = quickPeriods.find((entry) => entry.id === values[0]); if (item) applyPeriod(item.days); }} aria-label="Período" className={styles.quickPeriods}>
-            {quickPeriods.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="h-10 min-w-20 [@media(max-width:760px)]:h-12">{item.label}</ToggleGroupItem>)}
-          </ToggleGroup>
-          <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" className="group/filters" />}>
+          <CollapsibleTrigger render={<Button type="button" variant="outline" size="sm" className="group/filters" aria-label="Más filtros" aria-describedby="indicator-filters-summary" />}>
             <SlidersHorizontal data-icon="inline-start" aria-hidden />
             Más filtros
+            <span id="indicator-filters-summary" className="max-w-72 truncate font-medium text-foreground">{filtersSummary}</span>
             <ChevronDown data-icon="inline-end" aria-hidden className="transition-transform group-aria-expanded/filters:rotate-180" />
           </CollapsibleTrigger>
         </div>
         <CollapsibleContent>
       <form className={styles.filters} onSubmit={(event) => { event.preventDefault(); applyQuery(query); }}>
+        <Field className={`${styles.field} ${styles.periodRow}`}>
+          <FieldLabel id="indicator-period-label">Período</FieldLabel>
+          <ToggleGroup variant="period" value={activeQuickPeriod ? [activeQuickPeriod.id] : []} onValueChange={(values) => { const item = quickPeriods.find((entry) => entry.id === values[0]); if (item) applyPeriod(item.days); }} aria-labelledby="indicator-period-label" className={styles.quickPeriods}>
+            {quickPeriods.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="h-10 min-w-20 [@media(max-width:760px)]:h-12">{item.label}</ToggleGroupItem>)}
+          </ToggleGroup>
+        </Field>
         <Field className={styles.field}><FieldLabel htmlFor="indicator-from">Desde</FieldLabel><DatePicker id="indicator-from" value={query.from ?? ""} onChange={(from) => { setFilterError(null); setQuery((current) => ({ ...current, from: from || undefined })); }} /></Field>
         <Field className={styles.field}><FieldLabel htmlFor="indicator-to">Hasta</FieldLabel><DatePicker id="indicator-to" value={query.to ?? ""} invalid={Boolean(filterError)} aria-describedby={filterError ? "indicator-to-error" : undefined} onChange={(to) => { setFilterError(null); setQuery((current) => ({ ...current, to: to || undefined })); }} /></Field>
         <CatalogFilter id="indicator-zone" label="Zona operativa" allLabel="Todas las zonas" noun="zonas" options={filterCatalog?.zones} value={query.zoneId} onChange={(zoneId) => setQuery((current) => ({ ...current, zoneId }))} />
