@@ -173,7 +173,7 @@ describe("InspectionExecutionPanel", () => {
 
     expect(await screen.findByText("Inicie el servicio para registrar la inspección.")).toBeVisible();
     expect(screen.queryByText(/solo consulta/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/SVC-INS-1 · 7 dic 2026 · 09:00–11:00/)).toBeVisible();
+    expect(screen.getByText(/Inspección ambiental — Establecimiento de prueba · 7 dic 2026 · 09:00–11:00/)).toBeVisible();
     expect(screen.queryByText(/Checklist ambiental-v1|Checklist —/)).not.toBeInTheDocument();
   });
 
@@ -252,7 +252,7 @@ describe("InspectionExecutionPanel", () => {
     expect(await screen.findByText(/Resultado registrado/)).toBeVisible();
     // #295: la agenda sale del servicio (la inspección del backend no la trae) y el
     // resultado muestra los cuatro campos de cierre.
-    expect(screen.getByText(/SVC-INS-1 · 7 sept 2026 · 09:00–11:00/)).toBeVisible();
+    expect(screen.getByText(/Inspección ambiental — Establecimiento de prueba · 7 sept 2026 · 09:00–11:00/)).toBeVisible();
     expect(screen.getByText("Humo negro continuo.")).toBeVisible();
     expect(screen.getByText("Emisión al aire")).toBeVisible();
     expect(screen.getByText("Alta")).toBeVisible();

@@ -38,7 +38,7 @@ describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
     expect(within(reports).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       expect.stringContaining("TK-2026-095"),
       expect.stringContaining("TK-2026-091"),
-      expect.stringContaining("ER-1001"),
+      expect.stringContaining("Microbasural · Av. Warnes 1840"),
     ]);
     expect(hrefs(reports)).toEqual([
       "/app?destination=environment&detail=ER-1013",

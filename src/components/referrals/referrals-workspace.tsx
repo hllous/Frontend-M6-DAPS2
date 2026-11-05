@@ -19,7 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { referralLabel } from "@/lib/display-ids";
+import { isUuid, referralLabel } from "@/lib/display-ids";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -899,7 +899,7 @@ function RepairDetail({ referral }: { referral: Extract<Referral, { kind: "REPAI
         <DataField label="Severidad" value={severityLabel[request.severity] ?? request.severity} />
         <DataField label="Riesgo" value={request.publicSafetyRisk ? "Sí" : "No"} />
         <DataField label="Ubicación" value={request.address ?? "Sin dirección registrada"} />
-        {request.workOrderId && <DataField label="Nº de orden de trabajo" value={request.workOrderId} />}
+        {request.workOrderId && <DataField label="Nº de orden de trabajo" value={isUuid(request.workOrderId) || /^M[1-9]-/i.test(request.workOrderId) ? "Número no disponible" : request.workOrderId} />}
       </dl>
     </section>
   );
@@ -924,7 +924,7 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
         {referral.status === "REJECTED" && (
           <DataField label="Motivo del rechazo" value={request.rejectionReason || "Sin informar"} />
         )}
-        {request.closureId && <DataField label="Nº de corte" value={request.closureId} />}
+        {request.closureId && <DataField label="Nº de corte" value={isUuid(request.closureId) || /^M[1-9]-/i.test(request.closureId) ? "Número no disponible" : request.closureId} />}
       </dl>
       <div className="mt-5 border-t border-[var(--color-border)] pt-4">
         <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Tramos afectados</h3>
