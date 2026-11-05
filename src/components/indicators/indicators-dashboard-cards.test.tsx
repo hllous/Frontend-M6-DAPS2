@@ -76,6 +76,29 @@ describe("metas de las tarjetas de indicadores", () => {
     expect(within(waste).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
   });
 
+  it("reserva el rojo para lo que empeora: bajo la meta pero mejorando es advertencia", async () => {
+    const compliance = (delta: number) => http.get("*/api/indicators/compliance", () => HttpResponse.json({
+      ...complianceIndicatorFixture,
+      finished: { ...complianceIndicatorFixture.finished, onTimePct: 82 },
+      delta: { ...complianceIndicatorFixture.delta, onTimePct: delta },
+    }));
+    server.use(compliance(3));
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    const improving = await familyCard("Cumplimiento");
+    expect((await within(improving).findByText("Bajo la meta")).closest("[data-slot=badge]")).toHaveAttribute("data-variant", "warning");
+  });
+
+  it("marca en rojo el estado bajo la meta cuando además empeora", async () => {
+    server.use(http.get("*/api/indicators/compliance", () => HttpResponse.json({
+      ...complianceIndicatorFixture,
+      finished: { ...complianceIndicatorFixture.finished, onTimePct: 82 },
+      delta: { ...complianceIndicatorFixture.delta, onTimePct: -3 },
+    })));
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    const worsening = await familyCard("Cumplimiento");
+    expect((await within(worsening).findByText("Bajo la meta")).closest("[data-slot=badge]")).toHaveAttribute("data-variant", "danger");
+  });
+
   it("marca sobre la meta cuando las incidencias superan el máximo", async () => {
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({
       ...incidentsIndicatorFixture,

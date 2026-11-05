@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardHeader } from "@/components/ui/card";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { IndicatorPoint } from "@/lib/indicators";
@@ -10,6 +13,7 @@ import { buildAttentionSignals, type SignalFamilyState } from "./attention-signa
 import { ChartViewToggle } from "./chart-view-toggle";
 import { BreakdownBarChart } from "./breakdown-bar-chart";
 import { formatIndicatorNumber } from "./number-format";
+import { sectionTitleClass } from "./section-title";
 
 type States = Record<"coverage" | "compliance" | "incidents" | "waste", SignalFamilyState>;
 type Problem = { id: string; label: string; noun: string; empty: string; points: IndicatorPoint[] };
@@ -42,19 +46,20 @@ export function ZonePanel({ states, onRetry, ignoredFilters }: { states: States;
   const total = sorted.reduce((sum, point) => sum + point.value, 0);
   const loading = states.coverage.status === "loading" || states.incidents.status === "loading";
   const num = (value: number) => formatIndicatorNumber(value);
-  return <section role="region" aria-label="¿Dónde se concentra?" className="flex min-w-0 flex-col gap-3">
-    <h2 className="text-lg font-semibold">¿Dónde se concentra?</h2>
+  return <Card role="region" aria-label="¿Dónde se concentra?" className="min-w-0">
+    <CardHeader><h2 className={sectionTitleClass}>¿Dónde se concentra?</h2><CardAction><ChartViewToggle value={view} onChange={setView} label="Vista de zonas" /></CardAction></CardHeader>
+    <CardContent className="flex min-w-0 flex-col gap-3">
     {(["coverage", "incidents"] as const).map((family) => states[family].status === "error" ? <Alert variant="danger" key={family}><AlertTitle>No se pudo cargar {family === "coverage" ? "los objetivos" : "los contenedores"} por zona.</AlertTitle><Button variant="outline" onClick={() => onRetry(family)}>Reintentar</Button></Alert> : null)}
     {available.length ? <>
-      <ToggleGroup variant="outline" aria-label="Problema" value={[active!.id]} onValueChange={(values) => { if (values[0]) setChoice(values[0]); }} className="w-full flex-wrap">
+      <ToggleGroup variant="period" aria-label="Problema" value={[active!.id]} onValueChange={(values) => { if (values[0]) setChoice(values[0]); }} className="w-full flex-wrap">
         {available.map((item) => <ToggleGroupItem key={item.id} value={item.id} className="h-auto min-h-10 max-w-full whitespace-normal text-left [@media(max-width:760px)]:min-h-12">{item.label}</ToggleGroupItem>)}
       </ToggleGroup>
-      <ChartViewToggle value={view} onChange={setView} label="Vista de zonas" />
       {active!.id === "incidents" && ignoredFilters ? <p>Los filtros de zona y tipo de servicio no se aplican a los contenedores.</p> : null}
       {total === 0 ? <p>{active!.empty}</p> : <>
         <p>{sorted[0]!.label} tiene {num(sorted[0]!.value)} de los {num(total)} {active!.noun}.</p>
         {view === "table" ? <Table><TableCaption>{active!.label}</TableCaption><TableHeader><TableRow><TableHead>Zona</TableHead><TableHead className="text-right">Cantidad</TableHead></TableRow></TableHeader><TableBody>{sorted.map((point) => <TableRow key={point.id}><TableHead scope="row">{point.label}{point.tone === "danger" ? " · Prioritario" : ""}</TableHead><TableCell className="text-right">{num(point.value)}</TableCell></TableRow>)}</TableBody></Table> : <BreakdownBarChart key={active!.id} points={sorted} title={active!.label} onSelect={() => {}} formatValue={(point) => num(point.value)} formatDetail={(point) => `${num(point.value)} ${active!.noun}`} />}
       </>}
-    </> : <p>{loading ? "Cargando datos por zona…" : "No hay datos por zona para el período."}</p>}
-  </section>;
+    </> : loading ? <LoadingRegion label="Datos por zona"><Skeleton aria-hidden className="h-48 w-full" /></LoadingRegion> : <p className="text-muted-foreground">No hay datos por zona para el período.</p>}
+    </CardContent>
+  </Card>;
 }

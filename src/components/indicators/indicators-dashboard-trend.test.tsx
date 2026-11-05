@@ -9,6 +9,7 @@ import { scenarios } from "@/lib/scenarios";
 import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
 
+import { axisFloor } from "./coverage-trend";
 import { IndicatorsDashboard } from "./indicators-dashboard";
 
 const server = setupServer(...handlers);
@@ -165,4 +166,16 @@ it("no muestra un cuadro emergente al pasar por la tendencia", async () => {
   const trend = await renderTrend();
   await user.hover(within(trend).getByRole("button", { name: /03\/08\/2026 – 09\/08\/2026: 90 %/ }));
   expect(within(trend).queryByRole("status")).not.toHaveTextContent("03/08/2026");
+});
+
+describe("eje de la tendencia de cobertura", () => {
+  it("arranca 10 puntos bajo el menor valor o la meta, en múltiplos de 10", () => {
+    expect(axisFloor([{ pct: 81.9 }, { pct: 84 }], 95)).toBe(70);
+    expect(axisFloor([{ pct: 62 }, { pct: null }], 95)).toBe(50);
+  });
+
+  it("arranca en cero si hay valores bajos o ninguno", () => {
+    expect(axisFloor([{ pct: 5 }], 95)).toBe(0);
+    expect(axisFloor([{ pct: null }])).toBe(0);
+  });
 });
