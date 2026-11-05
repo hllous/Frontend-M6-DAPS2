@@ -155,6 +155,8 @@ describe("metas de las tarjetas de indicadores", () => {
 
     const coverage = await familyCard("Cobertura");
     expect(await screen.findByText(/No se pudo actualizar Cobertura/)).toBeVisible();
+    expect(within(coverage).queryByLabelText("Cargando resumen")).not.toBeInTheDocument();
+    expect(within(coverage).getByText("Sin datos disponibles.")).toBeVisible();
     expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
     expect(within(coverage).getByText("más es mejor")).toBeVisible();
     expect(within(coverage).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();

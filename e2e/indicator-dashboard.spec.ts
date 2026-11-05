@@ -125,3 +125,17 @@ test.describe("operational indicator dashboard #138", () => {
     await expect(wasteTable.getByText("62,8 m³").first()).toBeVisible();
   });
 });
+
+ test("restaura el dato seleccionado al volver con el navegador", async ({ page }) => {
+  await loginViaApi(page, "office-duty-queue");
+  await page.goto("/app?destination=dashboards");
+  await page.getByRole("navigation", { name: "Detalle por familia" }).getByRole("button", { name: "Cobertura" }).click();
+  await page.getByRole("button", { name: "Centro", exact: true }).click();
+  await expect(page.getByText(/Seleccionado: Centro/)).toBeVisible();
+  await page.getByRole("button", { name: "Volver a Tableros" }).click();
+  await page.getByRole("navigation", { name: "Detalle por familia" }).getByRole("button", { name: "Incidencias" }).click();
+  await page.goBack();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Detalle de Cobertura" })).toBeVisible();
+  await expect(page.getByText(/Seleccionado: Centro/)).toBeVisible();
+});

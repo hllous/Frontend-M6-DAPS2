@@ -389,7 +389,7 @@ function FamilyDetailSummary({ family, state }: { family: FamilyKey; state: Fami
   const summary = indicatorSummaryDetails(family, data?.primary.value, state.status === "ready", data);
   const variation = data ? indicatorVariationDetails(data) : null;
   return <Card size="sm" role="region" aria-label={`Resumen de ${familyMeta[family].label}`}><CardContent className="flex flex-wrap items-center gap-3">
-    {data ? <><strong>{familySummary(data)}</strong><span>{data.primary.label}</span></> : <Skeleton aria-label="Cargando resumen" className="h-6 w-24" />}
+    {data ? <><strong>{familySummary(data)}</strong><span>{data.primary.label}</span></> : state.status === "loading" ? <Skeleton aria-label="Cargando resumen" className="h-6 w-24" /> : <span>{state.status === "error" ? "Sin datos disponibles." : "Sin resultados en el período."}</span>}
     {variation ? <IndicatorVariation {...variation} /> : null}
     <span>{summary.targetLabel}</span>
     {summary.directionLabel ? <span>{summary.directionLabel}</span> : null}
