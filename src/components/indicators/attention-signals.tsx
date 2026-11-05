@@ -114,10 +114,11 @@ function Trend({ change }: { change: number | null }) {
 /** Marca solo el último valor del minigráfico: es el número que muestra la tarjeta. */
 function endDot(series: { value: number | null }[]) {
   const last = series.reduce((found, point, index) => (point.value === null ? found : index), -1);
-  return ({ cx, cy, index }: { cx?: number; cy?: number; index?: number }) =>
-    index === last && cx !== undefined && cy !== undefined
+  return function EndDot({ cx, cy, index }: { cx?: number; cy?: number; index?: number }) {
+    return index === last && cx !== undefined && cy !== undefined
       ? <circle key={index} cx={cx} cy={cy} r={3} fill="var(--color-value)" />
       : <g key={index} />;
+  };
 }
 
 function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { signal: AttentionSignal; status: LoadStatus; onRetry: () => void; onDetail: (trigger: HTMLElement) => void; series: { from: string; value: number | null }[]; bucket: "week" | "month" }) {
