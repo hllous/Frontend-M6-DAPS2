@@ -26,6 +26,7 @@ type TrendPoint = {
   pct: number | null;
   /** Posición del marcador enfocable; los huecos van sobre el eje. */
   anchorY: number;
+  valueLabel: string;
 };
 type DotProps = { cx?: number; cy?: number; index?: number };
 
@@ -38,7 +39,7 @@ const asDate = (day: string) => new Date(`${day}T00:00:00Z`);
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 export function toTrendPoints(series: CoverageSeries, bucket: "week" | "month"): TrendPoint[] {
   const monthly = bucket === "month";
-  return series.map((entry) => {
+  return series.map((entry, index) => {
     const pct = entry.scheduled === 0 ? null : entry.coveragePct;
     return {
       id: entry.from,
@@ -49,6 +50,7 @@ export function toTrendPoints(series: CoverageSeries, bucket: "week" | "month"):
       upcoming: entry.upcoming ?? null,
       pct,
       anchorY: pct ?? 0,
+      valueLabel: index === series.length - 1 && pct !== null ? `${formatIndicatorNumber(pct, { maximumFractionDigits: 1 })} %` : "",
     };
   });
 }
@@ -87,7 +89,7 @@ const TrendPlot = memo(function TrendPlot({ points, target, registerTrigger, onF
       <XAxis dataKey="tick" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={12} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
       <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value: number) => `${value} %`} tickLine={false} axisLine={false} width={44} tick={{ fill: "var(--color-text-secondary)", fontSize: 12 }} />
       {target === undefined ? null : <ReferenceLine y={target} stroke="var(--color-trend-target)" strokeWidth={2} strokeDasharray="6 4" ifOverflow="extendDomain" />}
-      <Line dataKey="pct" type="linear" stroke="var(--color-trend-line)" strokeWidth={2} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: "var(--color-trend-line)", stroke: "var(--color-surface)", strokeWidth: 2 }} activeDot={false}><LabelList dataKey="pct" position="top" formatter={(value: unknown) => typeof value === "number" ? `${formatIndicatorNumber(value, { maximumFractionDigits: 1 })} %` : ""} /></Line>
+      <Line dataKey="pct" type="linear" stroke="var(--color-trend-line)" strokeWidth={2} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: "var(--color-trend-line)", stroke: "var(--color-surface)", strokeWidth: 2 }} activeDot={false}><LabelList dataKey="valueLabel" position="top" fill="var(--color-text-secondary)" /></Line>
       <Line dataKey="anchorY" stroke="none" legendType="none" isAnimationActive={false} activeDot={false} dot={({ cx = 0, cy = 0, index = 0 }: DotProps) => {
         const point = points[index];
         if (!point) return <g key={`dot-${index}`} />;
