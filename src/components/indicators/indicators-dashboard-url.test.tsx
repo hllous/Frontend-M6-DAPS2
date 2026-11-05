@@ -51,3 +51,10 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
     expect(params.get("view")).toBe("table");
   });
 });
+
+it("restaura un enlace anterior de detalle de familia", async () => {
+  currentSearch = "family=waste&from=2026-09-01&to=2026-09-15&view=table";
+  render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+  expect(await screen.findByRole("heading", { name: "Detalle de Residuos" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Volver a Tableros" })).toBeVisible();
+});

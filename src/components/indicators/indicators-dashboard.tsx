@@ -372,7 +372,9 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   const [filterError, setFilterError] = useState<string | null>(null);
   const [familyStates, setFamilyStates] = useState<Record<FamilyKey, FamilyState>>(emptyFamilyState);
   const [selectedFamily, setSelectedFamily] = useState<FamilyKey>(initialUrlState.family);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(() => Boolean(searchParams?.has("family")));
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
+  const returnFocusRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(initialUrlState.view);
   const [selectedSignal, setSelectedSignal] = useState<SelectedSignal | null>(null);
   const [recordPlan, setRecordPlan] = useState<RecordPlan | null>(null);
@@ -465,8 +467,27 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
   useEffect(() => {
     if (!canView) return;
     const search = serializeIndicatorUrlState({ query: appliedQuery, family: selectedFamily, view: viewMode, signal: selectedSignal ?? pendingSignal.current ?? undefined }, window.location.search);
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${search}`);
-  }, [appliedQuery, canView, selectedFamily, selectedSignal, viewMode]);
+    const params = new URLSearchParams(search);
+    if (!detailOpen) params.delete("family");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${params}`);
+  }, [appliedQuery, canView, detailOpen, selectedFamily, selectedSignal, viewMode]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const state = parseIndicatorUrlState(params);
+      setDetailOpen(params.has("family"));
+      setSelectedFamily(state.family);
+      setViewMode(state.view);
+      setAppliedQuery(state.query);
+      setQuery(state.query);
+      if (!params.has("family")) requestAnimationFrame(() => { if (returnFocusRef.current) document.querySelector<HTMLElement>(`[data-detail-trigger="${returnFocusRef.current}"]`)?.focus(); });
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => { if (detailOpen) detailHeadingRef.current?.focus(); }, [detailOpen, selectedFamily]);
   const trendBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "trend") : [];
   const territoryBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "territory") : [];
   const trendStatus = moduleStatus(selectedFamilyState.data ? { ...selectedFamilyState, status: "ready" } : selectedFamilyState, selectedFamilyState.data, "trend");
@@ -502,6 +523,22 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     setRecordPlan(signalTracePlan(selectedData, breakdown, point));
     setRecordsOpen(true);
   }, [selectedData]);
+
+  const openDetail = (family: FamilyKey, trigger: HTMLElement) => {
+    returnFocusRef.current = trigger.dataset.detailTrigger ?? null;
+    const params = new URLSearchParams(window.location.search);
+    params.set("family", family);
+    window.history.pushState(window.history.state, "", `${window.location.pathname}?${params}`);
+    selectFamily(family);
+    setDetailOpen(true);
+  };
+  const closeDetail = () => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("family");
+    window.history.pushState(window.history.state, "", `${window.location.pathname}?${params}`);
+    setDetailOpen(false);
+    requestAnimationFrame(() => { if (returnFocusRef.current) document.querySelector<HTMLElement>(`[data-detail-trigger="${returnFocusRef.current}"]`)?.focus(); });
+  };
 
   const retryFamily = (family: FamilyKey) => {
     loadFamily(family, appliedQuery);
@@ -582,10 +619,11 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       </Collapsible>
 
       {!detailOpen ? <>
-      <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family) => { selectFamily(family); setDetailOpen(true); }} />
-      <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} type="button" variant="outline" size="sm" onClick={() => { selectFamily(family); setDetailOpen(true); }}>{familyMeta[family].label}</Button>)}</nav>
+      <AttentionSignals states={familyStates} period={appliedQuery} onRetry={retryFamily} onDetail={(family, trigger) => openDetail(family, trigger)} />
+      <nav aria-label="Detalle por familia" className="flex flex-wrap items-center gap-2"><span>Detalle por familia</span>{familyOrder.map((family) => <Button key={family} data-detail-trigger={`family-${family}`} type="button" variant="outline" size="sm" onClick={(event) => openDetail(family, event.currentTarget)}>{familyMeta[family].label}</Button>)}</nav>
       </> : <>
-      <Button type="button" variant="outline" onClick={() => setDetailOpen(false)}>Volver a Tableros</Button>
+      <Button type="button" variant="outline" onClick={closeDetail}>Volver a Tableros</Button>
+      <h2 ref={detailHeadingRef} tabIndex={-1}>Detalle de {familyMeta[selectedFamily].label}</h2>
 
 
       {isNarrow ? <ToggleGroup value={[viewMode]} onValueChange={(values) => { const value = values[0]; if (value) setViewMode(value as ViewMode); }} variant="outline" className={styles.mobileViewToggle} aria-label="Vista">
@@ -796,3 +834,4 @@ function tableValueHeading(unit?: string) {
   const labels: Record<string, string> = { "%": "Porcentaje", "kg": "Kilogramos", "h": "Horas", "incidentes": "Incidentes", "árboles": "Árboles", "reportes": "Reportes", "objetivos": "Objetivos", "servicios": "Servicios" };
   return labels[unit ?? ""] ?? "Valor";
 }
+
