@@ -17,8 +17,10 @@ it("abre el detalle de cada familia y vuelve al tablero", async () => {
   expect(screen.queryByText("Resumen del período")).not.toBeInTheDocument();
   const user = userEvent.setup();
   for (const family of ["Cobertura", "Cumplimiento", "Incidencias", "Residuos"]) {
-    await user.click(within(screen.getByRole("navigation", { name: "Detalle por familia" })).getByRole("button", { name: family }));
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(screen.getByRole("menuitem", { name: family }));
     expect(await screen.findByRole("heading", { name: `Detalle de ${family}` })).toBeVisible();
+    expect(screen.queryByText("Registros")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Volver a Tableros" }));
   }
 });
