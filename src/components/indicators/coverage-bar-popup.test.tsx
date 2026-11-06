@@ -26,7 +26,6 @@ afterEach(() => vi.useRealTimers());
 
 describe("Barras de cobertura: cuadro con el detalle por tramo", () => {
   it("se abre al enfocar la barra y muestra el porcentaje de cada tramo", async () => {
-    const user = userEvent.setup();
     render(<CoverageBreakdownTable {...props} />);
     const trigger = screen.getAllByRole("button").find((button) => /Porcentajes de Norte/.test(button.getAttribute("aria-label") ?? ""))!;
     act(() => trigger.focus());
