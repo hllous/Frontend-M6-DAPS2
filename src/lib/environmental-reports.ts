@@ -107,6 +107,8 @@ export const environmentalReportSchema = z.object({
   description: z.string().nullable().optional(),
   details: z.string().optional(),
   publicId: z.string().nullable().optional(),
+  // EXP-AAAA-NNNNNN (Backend #509): número de expediente de M6, lo tienen todos. Solo para mostrar.
+  caseNumber: z.string().optional(),
   ticketId: z.string().nullable().optional(),
   reporterSnapshot: z.unknown().optional(),
   status: environmentalReportStatusSchema,

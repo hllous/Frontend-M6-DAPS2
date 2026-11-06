@@ -38,6 +38,9 @@ const reports: EnvironmentalReport[] = [
 reports.push({ id: "ER-1012", reportType: "AIR_EMISSION", address: "Av. Brasil 2450", lat: -34.636, lng: -58.405, description: "Emisión visible informada en un establecimiento industrial.", status: "INSPECTION_SCHEDULED", priority: "HIGH", ticketId: null, deadlineAt: "2026-09-14T12:00:00.000Z", escalated: false, assignedCrewId: "crew-b", createdAt: "2026-09-06T08:00:00.000Z", updatedAt: "2026-09-06T08:00:00.000Z" });
 reports.push({ id: "ER-1013", reportType: "NOISE", address: "Av. Rivadavia 5100", lat: null, lng: null, description: null, status: "UNDER_REVIEW", priority: "LOW", publicId: "TK-2026-095", ticketId: "550e8400-e29b-41d4-a716-446655440095", deadlineAt: null, escalated: false, assignedCrewId: null, createdAt: "2026-09-03T09:00:00.000Z", updatedAt: "2026-09-03T09:30:00.000Z" });
 
+// Backend #509: todo expediente trae `caseNumber` (EXP-AAAA-NNNNNN), también los que abre M2.
+for (const report of reports) report.caseNumber ??= `EXP-${report.createdAt.slice(0, 4)}-${report.id.replace(/\D/g, "").padStart(6, "0")}`;
+
 const initialSanctionOutcome: SanctionOutcome = {
   violationNoticeId: "NOTICE-1010",
   decision: "FINE_ISSUED",
@@ -333,6 +336,7 @@ export function createEnvironmentalReportFixture(input: CreateEnvironmentalRepor
   const now = new Date().toISOString();
   return {
     id: `ER-${Date.now()}`,
+    caseNumber: `EXP-${now.slice(0, 4)}-${String(environmentalReportFixtures.length + 1).padStart(6, "0")}`,
     ...input,
     status: "RECEIVED",
     priority: "MEDIUM",
@@ -357,7 +361,7 @@ export function filterEnvironmentalReportFixtures(query: EnvironmentalReportQuer
     if (query.priority && report.priority !== query.priority) return false;
     if (query.publicId && report.publicId !== query.publicId) return false;
     if (query.ticketId && report.ticketId !== query.ticketId) return false;
-    if (search && ![report.id, report.address ?? "", report.description ?? "", report.publicId ?? "", report.ticketId ?? ""].some((value) => value.toLowerCase().includes(search))) return false;
+    if (search && ![report.id, report.address ?? "", report.description ?? "", report.publicId ?? "", report.caseNumber ?? "", report.ticketId ?? ""].some((value) => value.toLowerCase().includes(search))) return false;
     return true;
   });
 }
