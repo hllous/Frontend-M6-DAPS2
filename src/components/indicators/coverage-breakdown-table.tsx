@@ -78,14 +78,18 @@ function StackedBar({ row, target, dimension, period }: { row: Row; target: Indi
           // Si el cuadro acaba de cerrarse (Escape), el foco vuelve a la barra sin reabrirlo.
           if (keyboard && Date.now() - closedAt.current > 400) setOpen(true);
         }}
-        onBlur={(event) => { if (!popupRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false); }}
+        onBlur={(event) => {
+          // El foco pasa por guardas invisibles al entrar al cuadro: eso no es salir de la barra.
+          const next = event.relatedTarget as HTMLElement | null;
+          if (!popupRef.current?.contains(next) && !next?.hasAttribute("data-base-ui-focus-guard")) setOpen(false);
+        }}
       >
         <span aria-hidden="true" className={styles.bar}>
           {segments.map(({ key, className, count }) => count > 0 ? <span key={key} className={styles[className]} style={{ flexGrow: count }} /> : null)}
           {hasNumericThreshold(target) ? <span className={styles.targetLine} style={{ left: `${target.value}%` }} /> : null}
         </span>
       </PopoverTrigger>
-      <PopoverContent ref={popupRef} onKeyDown={closeWithEscape} initialFocus={false} align="start" className={styles.popup} aria-label={`Cobertura de ${row.name}`}>
+      <PopoverContent ref={popupRef} onKeyDown={closeWithEscape} initialFocus={false} finalFocus={false} align="start" className={styles.popup} aria-label={`Cobertura de ${row.name}`}>
         <PopoverTitle className={styles.popupTitle}>{row.name}</PopoverTitle>
         <div aria-hidden="true" className={styles.bigBar}>
           {segments.map((state) => state.count > 0 ? <Link key={state.key} tabIndex={-1} href={segmentHref(state, dimension, row.id, period)} className={styles[state.className]} style={{ flexGrow: state.count }} /> : null)}

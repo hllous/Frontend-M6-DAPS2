@@ -50,8 +50,8 @@ test.describe("Tableros: Requiere atención en móvil (#861)", () => {
     expect(new Set(xs).size).toBe(1);
 
     await page.getByRole("button", { name: "Más filtros" }).tap();
-    await page.getByRole("button", { name: "Trimestre" }).tap();
-    await expect(page.getByRole("button", { name: "Trimestre" })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Trimestre", exact: true }).tap();
+    await expect(page.getByRole("button", { name: "Trimestre", exact: true })).toHaveAttribute("aria-pressed", "true");
 
     await page.getByRole("link", { name: "Ver lista de servicios sin realizar" }).tap();
     await expect(page).toHaveURL(/destination=services.*status=PARTIALLY_COMPLETED/);
