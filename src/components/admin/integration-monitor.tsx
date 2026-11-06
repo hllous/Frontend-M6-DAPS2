@@ -41,7 +41,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import {
   AUDIT_ENTITY_TYPES,
   auditPageSchema,
@@ -51,6 +50,7 @@ import {
   outboxPageSchema,
   OUTBOX_STATUSES,
   retryFailedResponseSchema,
+  systemActorLabel,
   type AuditEntry,
   type AuditPage,
   type OutboxDetail,
@@ -60,9 +60,11 @@ import {
 import type { M6Role } from "@/lib/m6-roles";
 
 import { auditActionLabel, auditStatusLabel } from "./audit-labels";
+import { ApiRequestError, dateTime, readApiJson } from "./integration-monitor-client";
+import { InboxEventsPanel } from "./inbox-events-panel";
 import styles from "./integration-monitor.module.css";
 
-type MonitorTab = "events" | "activity";
+type MonitorTab = "events" | "activity" | "received";
 type OutboxStatus = (typeof OUTBOX_STATUSES)[number];
 type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 type EventFilters = { status?: OutboxStatus; eventType?: string; from?: string; to?: string };
@@ -75,39 +77,6 @@ type IntegrationMonitorProps = {
   initialEntityType?: AuditEntityType;
   initialEntityId?: string;
 };
-
-class ApiRequestError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-    this.name = "ApiRequestError";
-  }
-}
-
-async function readApiJson<T>(url: string, schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false } }, init?: RequestInit): Promise<T> {
-  const response = await authenticatedFetch(url, init);
-  const body = await response.json().catch(() => undefined) as { message?: unknown } | undefined;
-  if (!response.ok) {
-    const message = Array.isArray(body?.message)
-      ? body.message.filter((part): part is string => typeof part === "string").join(" ")
-      : typeof body?.message === "string" ? body.message : "No se pudo completar la solicitud.";
-    throw new ApiRequestError(response.status, message);
-  }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) throw new ApiRequestError(502, "La respuesta recibida no tiene el formato esperado.");
-  return parsed.data;
-}
-
-function dateTime(value: string): string {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "America/Argentina/Buenos_Aires",
-  }).format(new Date(value));
-}
 
 const statusPresentation: Record<OutboxStatus, { label: string; variant: "info" | "success" | "danger"; Icon: typeof Clock3 }> = {
   PENDING: { label: "Pendiente", variant: "info", Icon: Clock3 },
@@ -138,6 +107,7 @@ const entityLabels: Record<AuditEntityType, string> = {
   ZONE: "Zona",
   VEHICLE: "Vehículo",
   ROUTE: "Recorrido",
+  SANCTION_OUTCOME: "Resolución de Faltas",
 };
 
 const roleLabels: Record<M6Role, string> = {
@@ -327,14 +297,14 @@ export function IntegrationMonitor({
 
   function updateActivityUrl(tab: MonitorTab, filters: AuditFilters) {
     const params = new URLSearchParams();
-    if (tab === "activity") params.set("tab", "activity");
-    if (filters.entityType) params.set("entityType", filters.entityType);
-    if (filters.entityId) params.set("entityId", filters.entityId);
+    if (tab !== "events") params.set("tab", tab);
+    if (tab === "activity" && filters.entityType) params.set("entityType", filters.entityType);
+    if (tab === "activity" && filters.entityId) params.set("entityId", filters.entityId);
     router.replace(`${pathname}${params.size ? `?${params.toString()}` : ""}`, { scroll: false });
   }
 
   function changeTab(value: string | null) {
-    const tab: MonitorTab = value === "activity" ? "activity" : "events";
+    const tab: MonitorTab = value === "activity" || value === "received" ? value : "events";
     setActiveTab(tab);
     updateActivityUrl(tab, auditFilters);
   }
@@ -497,9 +467,14 @@ export function IntegrationMonitor({
 
       <Tabs value={activeTab} onValueChange={changeTab} className="min-w-0">
         <TabsList className="w-full min-[761px]:w-fit">
-          <TabsTrigger value="events" className="text-foreground">Eventos salientes</TabsTrigger>
-          <TabsTrigger value="activity" className="text-foreground">Registro de actividad</TabsTrigger>
+          <TabsTrigger value="events" className="min-w-0 text-foreground [@media(max-width:760px)]:whitespace-normal">Eventos salientes</TabsTrigger>
+          <TabsTrigger value="received" className="min-w-0 text-foreground [@media(max-width:760px)]:whitespace-normal">Eventos recibidos</TabsTrigger>
+          <TabsTrigger value="activity" className="min-w-0 text-foreground [@media(max-width:760px)]:whitespace-normal">Registro de actividad</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="received" className="flex min-w-0 flex-col gap-4 pt-3">
+          <InboxEventsPanel active={activeTab === "received"} />
+        </TabsContent>
 
         <TabsContent value="events" className="flex min-w-0 flex-col gap-4 pt-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -734,7 +709,7 @@ export function IntegrationMonitor({
                       <TableHead scope="col">Entidad</TableHead>
                       <TableHead scope="col">Estado anterior</TableHead>
                       <TableHead scope="col">Estado nuevo</TableHead>
-                      <TableHead scope="col">Persona y roles</TableHead>
+                      <TableHead scope="col">Quién actuó</TableHead>
                       <TableHead scope="col">Nota</TableHead>
                       <TableHead scope="col">Fecha</TableHead>
                     </TableRow>
@@ -750,8 +725,8 @@ export function IntegrationMonitor({
                         <TableCell><AuditLabel value={auditStatusLabel(entry.entityType, entry.fromStatus)} showRawCode={canManage} /></TableCell>
                         <TableCell><AuditLabel value={auditStatusLabel(entry.entityType, entry.toStatus)} showRawCode={canManage} /></TableCell>
                         <TableCell>
-                          <span className="block">{entry.actorUserId}</span>
-                          <span className="block text-xs text-muted-foreground">{entry.actorRoles.map((role) => roleLabels[role as M6Role] ?? "Otro perfil").join(", ")}</span>
+                          <span className="block">{systemActorLabel(entry.actorUserId) ?? entry.actorUserId}</span>
+                          {entry.actorRoles.length > 0 ? <span className="block text-xs text-muted-foreground">{entry.actorRoles.map((role) => roleLabels[role as M6Role] ?? "Otro perfil").join(", ")}</span> : null}
                         </TableCell>
                         <TableCell><span className="block max-w-48 whitespace-normal">{entry.note ?? "—"}</span></TableCell>
                         <TableCell className="tabular-nums">{dateTime(entry.occurredAt)}</TableCell>
@@ -772,7 +747,7 @@ export function IntegrationMonitor({
                       <span>{entry.entityId}</span>
                     </p>
                     <p className="text-sm"><AuditLabel value={auditStatusLabel(entry.entityType, entry.fromStatus)} showRawCode={canManage} /> → <AuditLabel value={auditStatusLabel(entry.entityType, entry.toStatus)} showRawCode={canManage} /></p>
-                    <p className="text-sm">Persona {entry.actorUserId} · {entry.actorRoles.map((role) => roleLabels[role as M6Role] ?? "Otro perfil").join(", ")}</p>
+                    <p className="text-sm">{systemActorLabel(entry.actorUserId) ?? `Persona ${entry.actorUserId} · ${entry.actorRoles.map((role) => roleLabels[role as M6Role] ?? "Otro perfil").join(", ")}`}</p>
                     {entry.note ? <p className="break-words text-sm text-muted-foreground">{entry.note}</p> : null}
                   </li>
                 ))}

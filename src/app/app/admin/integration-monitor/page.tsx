@@ -27,7 +27,7 @@ export default async function IntegrationMonitorPage({ searchParams }: { searchP
   const rawEntityType = Array.isArray(params.entityType) ? params.entityType[0] : params.entityType;
   const rawEntityId = Array.isArray(params.entityId) ? params.entityId[0] : params.entityId;
   const parsedFilters = auditQuerySchema.safeParse({ entityType: rawEntityType, entityId: rawEntityId });
-  const initialTab = params.tab === "activity" ? "activity" : "events";
+  const initialTab = params.tab === "activity" || params.tab === "received" ? params.tab : "events";
   const monitorKey = [
     initialTab,
     parsedFilters.success ? parsedFilters.data.entityType ?? "" : "",

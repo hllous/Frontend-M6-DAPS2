@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { argentineDate, pageSlice, type AuditEntry, type OutboxDetail, type OutboxEvent, type OutboxQuery, type AuditQuery } from "@/lib/integration-monitor";
+import { argentineDate, pageSlice, type AuditEntry, type OutboxDetail, type OutboxEvent, type OutboxQuery, type AuditQuery, type InboxEvent, type InboxQuery } from "@/lib/integration-monitor";
 
 const initialEvents: OutboxDetail[] = [
   {
@@ -134,6 +134,54 @@ const initialAudit: AuditEntry[] = [
     note: null,
     occurredAt: "2026-10-27T10:00:00.000Z",
   },
+  {
+    id: "650e8400-e29b-41d4-a716-446655440050",
+    entityType: "REPAIR_REQUEST",
+    entityId: "550e8400-e29b-41d4-a716-446655440051",
+    action: "CLOSE",
+    fromStatus: "IN_PROGRESS",
+    toStatus: "CLOSED",
+    actorUserId: "system:m3",
+    actorRoles: [],
+    note: null,
+    occurredAt: "2026-11-05T18:20:01.000Z",
+  },
+];
+
+const initialInbox: InboxEvent[] = [
+  {
+    messageId: "750e8400-e29b-41d4-a716-446655440000",
+    eventType: "workOrderCompleted",
+    sourceModule: "obras",
+    status: "processed",
+    receivedAt: "2026-11-05T18:20:00.000Z",
+    processedAt: "2026-11-05T18:20:01.000Z",
+    occurredAt: "2026-11-05T18:19:58.000Z",
+    correlationId: "550e8400-e29b-41d4-a716-446655440102",
+    error: null,
+  },
+  {
+    messageId: "750e8400-e29b-41d4-a716-446655440010",
+    eventType: "streetClosureApproved",
+    sourceModule: "transito",
+    status: "failed",
+    receivedAt: "2026-11-05T16:05:00.000Z",
+    processedAt: null,
+    occurredAt: "2026-11-05T16:04:55.000Z",
+    correlationId: "550e8400-e29b-41d4-a716-446655440112",
+    error: "closureRequestId inexistente",
+  },
+  {
+    messageId: "750e8400-e29b-41d4-a716-446655440020",
+    eventType: "ticketUpdated",
+    sourceModule: "tickets",
+    status: "pending",
+    receivedAt: "2026-11-04T12:00:00.000Z",
+    processedAt: null,
+    occurredAt: null,
+    correlationId: null,
+    error: null,
+  },
 ];
 
 let eventDetails: OutboxDetail[] = structuredClone(initialEvents);
@@ -196,5 +244,16 @@ export function listAuditFixtures(query: AuditQuery) {
     .filter((entry) => !query.entityType || entry.entityType === query.entityType)
     .filter((entry) => !query.entityId || entry.entityId === query.entityId)
     .sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt));
+  return pageSlice(filtered, query.page, query.pageSize);
+}
+
+export function listInboxFixtures(query: InboxQuery) {
+  const filtered = initialInbox
+    .filter((event) => !query.status || event.status === query.status)
+    .filter((event) => !query.eventType || event.eventType === query.eventType)
+    .filter((event) => !query.sourceModule || event.sourceModule === query.sourceModule)
+    .filter((event) => !query.from || argentineDate(event.receivedAt) >= query.from)
+    .filter((event) => !query.to || argentineDate(event.receivedAt) <= query.to)
+    .sort((left, right) => Date.parse(right.receivedAt) - Date.parse(left.receivedAt));
   return pageSlice(filtered, query.page, query.pageSize);
 }
