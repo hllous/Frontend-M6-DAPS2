@@ -192,9 +192,12 @@ export function ContainerCatalogPanel({
   const [requestVersion, setRequestVersion] = useState(0);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<ContainerStatus | "all">(
-    "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<ContainerStatus | "all">(() => {
+    // `?status=OVERFLOWED` (p. ej. desde el tablero) abre la lista ya filtrada.
+    const requested = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("status");
+    const parsed = containerStatusSchema.safeParse(requested);
+    return parsed.success ? parsed.data : "all";
+  });
   const [typeFilter, setTypeFilter] = useState<ContainerType | "all">("all");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [search, setSearch] = useState("");

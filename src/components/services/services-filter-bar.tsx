@@ -86,6 +86,11 @@ function StatusOptions({ filters, onFiltersChange, hideLegend }: Pick<FilterBarP
           onChange={() => onFiltersChange({ ...filters, statuses: toggleInSet(filters.statuses, status) })}
         />
       ))}
+      <Option
+        label="Fuera de horario"
+        checked={filters.late}
+        onChange={() => onFiltersChange({ ...filters, late: !filters.late })}
+      />
     </Checklist>
   );
 }
@@ -195,7 +200,7 @@ function PeriodField({ period, periodItems, onPeriodChange, periodStatus, id }: 
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            {(Object.keys(periodItems) as ServicesPeriod[]).map((key) => (
+            {(Object.keys(periodItems) as ServicesPeriod[]).filter((key) => key !== "personalizado" || period === "personalizado").map((key) => (
               <SelectItem key={key} value={key}>{periodItems[key]}</SelectItem>
             ))}
           </SelectGroup>
@@ -269,7 +274,7 @@ export function ServicesFilterBar(props: FilterBarProps) {
     >
       <SearchField search={search} onSearchChange={onSearchChange} className="w-52 max-w-full" />
       <PeriodField {...props} id="services-period" />
-      <FilterPopover label="Estado" count={filters.statuses.size}>
+      <FilterPopover label="Estado" count={filters.statuses.size + (filters.late ? 1 : 0)}>
         <StatusOptions filters={filters} onFiltersChange={onFiltersChange} hideLegend />
       </FilterPopover>
       <FilterPopover label="Comuna y barrio" count={filters.zones.size} wide>

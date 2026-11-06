@@ -48,10 +48,14 @@ export type { SortDir, SortKey } from "./service-sorting";
 
 export type ColumnFilters = {
   zones: Set<string>;
+  /** Tipos de servicio (ids); llega por ?serviceType= desde Tableros. */
+  serviceTypes: Set<string>;
   statuses: Set<ServiceStatus>;
   crews: Set<string>;
   timeFrom: string;
   timeTo: string;
+  /** Solo servicios terminados después de su fecha programada. */
+  late: boolean;
 };
 
 type ColumnPointerDrag = {

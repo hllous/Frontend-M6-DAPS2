@@ -1,3 +1,4 @@
+import { argentinaDay } from "@/lib/argentina-date";
 import type { Service } from "@/lib/services";
 import { communeNumber, sortZonesByCommune, type Zone } from "@/lib/zones";
 
@@ -11,7 +12,7 @@ export type ZoneGroup = { key: string; label: string; zones: ZoneOption[] };
 const NO_COMMUNE_KEY = "sin-comuna";
 
 export function emptyColumnFilters(): ColumnFilters {
-  return { zones: new Set(), statuses: new Set(), crews: new Set(), timeFrom: "", timeTo: "" };
+  return { zones: new Set(), serviceTypes: new Set(), statuses: new Set(), crews: new Set(), timeFrom: "", timeTo: "", late: false };
 }
 
 /** Agrupa las zonas activas por comuna (numérica), con las zonas sin comuna al final. */
@@ -72,12 +73,25 @@ export function toggleInSet<T>(selected: ReadonlySet<T>, value: T): Set<T> {
   return next;
 }
 
+/**
+ * «Fuera de horario»: servicio terminado (completo o parcial) cuyo último resultado de zona
+ * se registró un día argentino después de la fecha programada. Es la misma regla con la que
+ * el backend arma el indicador de cumplimiento (`recordedAt` contra `scheduledDate`).
+ */
+export function isLateService(service: Pick<Service, "status" | "scheduledDate" | "zoneResults">): boolean {
+  if (service.status !== "COMPLETED" && service.status !== "PARTIALLY_COMPLETED") return false;
+  const days = (service.zoneResults ?? []).map((result) => argentinaDay(result.recordedAt)).filter((day): day is string => day !== null);
+  if (days.length === 0) return false;
+  return days.reduce((latest, day) => (day > latest ? day : latest)) > service.scheduledDate;
+}
+
 /** Cantidad de filtros distintos activos: cada filtro cuenta una vez, sin importar cuántas opciones tenga. */
 export function countActiveFilters(search: string, filters: ColumnFilters): number {
   return [
     search.trim() !== "",
-    filters.statuses.size > 0,
+    filters.statuses.size > 0 || filters.late,
     filters.zones.size > 0,
+    filters.serviceTypes.size > 0,
     filters.crews.size > 0,
     filters.timeFrom !== "" || filters.timeTo !== "",
   ].filter(Boolean).length;

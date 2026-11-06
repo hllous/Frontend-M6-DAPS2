@@ -40,6 +40,19 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+describe("Container list opened from a link", () => {
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  it("applies the status from the URL as the list filter", async () => {
+    window.history.replaceState(null, "", "/app/catalog/containers?status=OVERFLOWED");
+    const requested: string[] = [];
+    server.events.on("request:start", ({ request }) => { if (request.url.includes("/api/containers")) requested.push(request.url); });
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await waitFor(() => expect(requested.some((url) => new URL(url).searchParams.get("status") === "OVERFLOWED")).toBe(true));
+    server.events.removeAllListeners();
+  });
+});
+
 describe("Container Service lookup", () => {
   const containerId = "70423999-647b-4b29-98ce-efcd33b3d7c2";
   beforeEach(() => {

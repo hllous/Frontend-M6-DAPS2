@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { ArrowDown, ArrowUp, TriangleAlert } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { DataTable, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableCaption, TableCell, TableHead, TableRow } from "@/components/ui/table";
+import { todayInArgentina } from "@/lib/argentina-date";
 import { coverageRowsToCsv, defaultIndicatorTarget, hasNumericThreshold, isCoverageBelowTarget, type IndicatorPeriod, type IndicatorPoint, type IndicatorTarget } from "@/lib/indicators";
 
 import { formatIndicatorNumber } from "./number-format";
@@ -16,12 +18,22 @@ import styles from "./coverage-breakdown-table.module.css";
 
 const TOP = 10;
 
+// Estados de Servicios que corresponden a cada tramo. La cobertura cuenta objetivos y la lista cuenta servicios: los totales pueden no coincidir.
 const STATES = [
-  { key: "Atendidos", className: "served" },
-  { key: "Parciales", className: "partial" },
-  { key: "No atendidos", className: "missed" },
-  { key: "Pendientes", className: "pending" },
+  { key: "Atendidos", className: "served", statuses: ["COMPLETED"] },
+  { key: "Parciales", className: "partial", statuses: ["PARTIALLY_COMPLETED"] },
+  { key: "No atendidos", className: "missed", statuses: ["CANCELLED", "SUSPENDED"] },
+  { key: "Pendientes", className: "pending", statuses: ["SCHEDULED", "RESCHEDULED", "IN_PROGRESS"] },
 ] as const;
+
+type LinkDimension = "zone" | "serviceType";
+
+/** Lista de Servicios de un tramo: mismo tipo o zona, fechas exactas del período y los estados del tramo. «Pendientes» llega hasta hoy: lo futuro es «Programado a futuro». */
+function segmentHref(state: Pick<(typeof STATES)[number], "key" | "statuses">, dimension: LinkDimension, id: string, period: IndicatorPeriod) {
+  const to = state.key === "Pendientes" && period.to > todayInArgentina() ? todayInArgentina() : period.to;
+  const params = [...state.statuses.map((status) => `status=${status}`), `${dimension}=${encodeURIComponent(id)}`, `from=${period.from}`, `to=${to}`];
+  return `/app?destination=services&${params.join("&")}`;
+}
 
 type Row = { id: string; name: string; scheduled: number; upcoming?: number; lowSample: boolean; counts: Record<string, number>; pct: number };
 
@@ -33,20 +45,71 @@ function toRow(point: IndicatorPoint): Row {
 
 const numeric = (id: string) => (a: { getValue: (id: string) => unknown }, b: { getValue: (id: string) => unknown }) => Number(a.getValue(id)) - Number(b.getValue(id));
 
-function StackedBar({ row, target }: { row: Row; target: IndicatorTarget }) {
-  // Los conteos ya están en las columnas: la barra es solo apoyo visual y no se lee por separado.
+const percentText = (value: number) => `${formatIndicatorNumber(value, { maximumFractionDigits: 1 })} %`;
+
+function StackedBar({ row, target, dimension, period }: { row: Row; target: IndicatorTarget; dimension: LinkDimension; period: IndicatorPeriod }) {
+  const [open, setOpen] = useState(false);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const closedAt = useRef(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeWithEscape = (event: { key: string }) => {
+    if (event.key !== "Escape") return;
+    closedAt.current = Date.now();
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
   if (row.scheduled === 0) return <span className={styles.noScheduled}>Sin programados</span>;
+  const total = STATES.reduce((sum, { key }) => sum + row.counts[key], 0);
+  const segments = STATES.map((state) => ({ ...state, count: row.counts[state.key], pct: total === 0 ? 0 : (row.counts[state.key] / total) * 100 }));
   return <div className={styles.barCell}>
-    <div aria-hidden="true" className={styles.bar}>
-      {STATES.map(({ key, className }) => row.counts[key] > 0 ? <span key={key} className={styles[className]} style={{ flexGrow: row.counts[key] }} /> : null)}
-      {hasNumericThreshold(target) ? <span className={styles.targetLine} style={{ left: `${target.value}%` }} /> : null}
-    </div>
+    <Popover open={open} onOpenChange={(next) => { if (!next) closedAt.current = Date.now(); setOpen(next); }}>
+      <PopoverTrigger
+        ref={triggerRef}
+        openOnHover
+        onKeyDown={closeWithEscape}
+        delay={120}
+        closeDelay={150}
+        className={styles.barTrigger}
+        aria-label={`Porcentajes de ${row.name}`}
+        onFocus={(event) => {
+          // Con teclado el foco abre el cuadro; con el mouse lo abre el hover o el clic.
+          let keyboard = true;
+          try { keyboard = event.currentTarget.matches(":focus-visible"); } catch { /* sin :focus-visible */ }
+          // Si el cuadro acaba de cerrarse (Escape), el foco vuelve a la barra sin reabrirlo.
+          if (keyboard && Date.now() - closedAt.current > 400) setOpen(true);
+        }}
+        onBlur={(event) => {
+          // El foco pasa por guardas invisibles al entrar al cuadro: eso no es salir de la barra.
+          const next = event.relatedTarget as HTMLElement | null;
+          if (!popupRef.current?.contains(next) && !next?.hasAttribute("data-base-ui-focus-guard")) setOpen(false);
+        }}
+      >
+        <span aria-hidden="true" className={styles.bar}>
+          {segments.map(({ key, className, count }) => count > 0 ? <span key={key} className={styles[className]} style={{ flexGrow: count }} /> : null)}
+          {hasNumericThreshold(target) ? <span className={styles.targetLine} style={{ left: `${target.value}%` }} /> : null}
+        </span>
+      </PopoverTrigger>
+      <PopoverContent ref={popupRef} onKeyDown={closeWithEscape} initialFocus={false} finalFocus={false} align="start" className={styles.popup} aria-label={`Cobertura de ${row.name}`}>
+        <PopoverTitle className={styles.popupTitle}>{row.name}</PopoverTitle>
+        <div aria-hidden="true" className={styles.bigBar}>
+          {segments.map((state) => state.count > 0 ? <Link key={state.key} tabIndex={-1} href={segmentHref(state, dimension, row.id, period)} className={styles[state.className]} style={{ flexGrow: state.count }} /> : null)}
+          {hasNumericThreshold(target) ? <span className={styles.targetLine} style={{ left: `${target.value}%` }} /> : null}
+        </div>
+        <ul className={styles.popupList}>
+          {segments.map((state) => <li key={state.key}>
+            {state.count > 0
+              ? <Link className={styles.popupRow} href={segmentHref(state, dimension, row.id, period)}><span aria-hidden className={`${styles.swatch} ${styles[state.className]}`} />{state.key}<strong>{percentText(state.pct)}</strong><span className={styles.popupAction}>Ver servicios</span></Link>
+              : <span className={styles.popupRow} data-empty><span aria-hidden className={`${styles.swatch} ${styles[state.className]}`} />{state.key}<strong>{percentText(0)}</strong></span>}
+          </li>)}
+        </ul>
+      </PopoverContent>
+    </Popover>
     <span className={styles.pct}>{formatIndicatorNumber(row.pct, { maximumFractionDigits: 1 })} %</span>
   </div>;
 }
 
 /** Cobertura por zona o por tipo: tabla ordenable con barra apilada por fila (alto fijo) y cantidades. */
-export function CoverageBreakdownTable({ points, nameHeading, noun, title, initialDirection, period, target = defaultIndicatorTarget("coverage"), limit = TOP, selectedId, onSelect, mapHref }: { points: IndicatorPoint[]; nameHeading: string; noun: string; title: string; initialDirection: "asc" | "desc"; period: IndicatorPeriod; target?: IndicatorTarget; limit?: number; selectedId?: string; onSelect: (id: string) => void; mapHref?: string }) {
+export function CoverageBreakdownTable({ points, nameHeading, noun, title, initialDirection, period, target = defaultIndicatorTarget("coverage"), limit = TOP, selectedId, onSelect, mapHref, linkDimension }: { points: IndicatorPoint[]; nameHeading: string; noun: string; title: string; initialDirection: "asc" | "desc"; period: IndicatorPeriod; target?: IndicatorTarget; limit?: number; selectedId?: string; onSelect: (id: string) => void; mapHref?: string; linkDimension?: LinkDimension }) {
   const [showAll, setShowAll] = useState(false);
   const tableId = useId();
   const data = useMemo(() => points.map(toRow), [points]);
@@ -63,8 +126,8 @@ export function CoverageBreakdownTable({ points, nameHeading, noun, title, initi
     { id: "scheduled", accessorFn: (row) => row.scheduled, header: "Programados", sortFn: numeric("scheduled"), meta: { label: "Programados", cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }) => formatIndicatorNumber(row.original.scheduled) },
     { id: "upcoming", accessorFn: (row) => row.upcoming, header: "Programado a futuro", sortFn: numeric("upcoming"), sortUndefined: "last", meta: { label: "Programado a futuro", cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }) => row.original.upcoming === undefined ? "Sin dato" : formatIndicatorNumber(row.original.upcoming) },
     ...STATES.map(({ key }) => ({ id: key, accessorFn: (row: Row) => row.counts[key], header: key, sortFn: numeric(key), meta: { label: key, cellClassName: styles.num, headClassName: styles.num }, cell: ({ row }: { row: { original: Row } }) => formatIndicatorNumber(row.original.counts[key]) })),
-    { id: "pct", accessorFn: (row) => row.scheduled === 0 ? undefined : row.pct, header: "Cobertura", sortFn: numeric("pct"), sortUndefined: "last", meta: { label: "Cobertura", cellClassName: styles.barColumn }, cell: ({ row }) => <StackedBar row={row.original} target={target} /> },
-  ], [nameHeading, onSelect, selectedId, target]);
+    { id: "pct", accessorFn: (row) => row.scheduled === 0 ? undefined : row.pct, header: "Cobertura", sortFn: numeric("pct"), sortUndefined: "last", meta: { label: "Cobertura", cellClassName: styles.barColumn }, cell: ({ row }) => <StackedBar row={row.original} target={target} dimension={linkDimension ?? (nameHeading === "Zona" ? "zone" : "serviceType")} period={period} /> },
+  ], [nameHeading, onSelect, selectedId, target, linkDimension, period]);
   const table = useDataTable({ data, columns, getRowId: (row) => row.id, initialState: { sorting: [{ id: "pct", desc: initialDirection === "desc" }] } });
   const sorting = table.state.sorting[0];
   const sortOptions = [
