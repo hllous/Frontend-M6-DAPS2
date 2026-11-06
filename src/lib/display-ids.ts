@@ -9,9 +9,16 @@ export function shortId(id: string): string {
   return UUID.test(id) ? `#${id.slice(0, 8)}` : id;
 }
 
-/** Public report number or an understandable description when no number exists. */
-export function reportLabel(report: { reportType: EnvironmentalReportType; address?: string | null; location?: { address?: string | null } | null; publicId?: string | null }): string {
-  return report.publicId || `${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · ${report.address || report.location?.address || "sin dirección"}`;
+type ReportLabelInput = { reportType: EnvironmentalReportType; address?: string | null; location?: { address?: string | null } | null; publicId?: string | null; caseNumber?: string | null };
+
+/** Business number of a report: the citizen's `publicId` (TK-…) or, for office-opened ones, M6's `caseNumber` (EXP-…). */
+export function reportNumber(report: Pick<ReportLabelInput, "publicId" | "caseNumber">): string | null {
+  return report.publicId || report.caseNumber || null;
+}
+
+/** Report number or an understandable description when no number exists. */
+export function reportLabel(report: ReportLabelInput): string {
+  return reportNumber(report) || `${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · ${report.address || report.location?.address || "sin dirección"}`;
 }
 
 type ReferralLike =
