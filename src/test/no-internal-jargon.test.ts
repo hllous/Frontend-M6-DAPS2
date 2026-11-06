@@ -25,6 +25,8 @@ describe("expectNoInternalJargon", () => {
     ["ticketId", "<p>ticketId</p>", "ticketId"],
     ["serviceId", "<p>serviceId</p>", "serviceId"],
     ["zoneId", "<p>zoneId</p>", "zoneId"],
+    ["short ID", "<p>#9ee7865f</p>", "#9ee7865f"],
+    ["UUID", "<p>550e8400-e29b-41d4-a716-446655440091</p>", "550e8400-e29b-41d4-a716-446655440091"],
   ])("fails on %s in visible text", (_name, html, offender) => {
     expect(() => expectNoInternalJargon(render(html))).toThrow(offender);
   });
@@ -35,6 +37,12 @@ describe("expectNoInternalJargon", () => {
     ["placeholder", '<input placeholder="zoneId" />', "zoneId"],
   ])("fails when the pattern appears only in %s", (_name, html, offender) => {
     expect(() => expectNoInternalJargon(render(html))).toThrow(offender);
+  });
+
+  it("permits technical IDs only when explicitly allowed", () => {
+    const container = render("<p>#9ee7865f 550e8400-e29b-41d4-a716-446655440091</p>");
+    expect(() => expectNoInternalJargon(container, { allowTechnicalIds: true })).not.toThrow();
+    expect(() => expectNoInternalJargon(render("<p>backend</p>"), { allowTechnicalIds: true })).toThrow();
   });
 
   it("lists every offending string", () => {

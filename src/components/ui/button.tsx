@@ -24,6 +24,7 @@ const buttonVariants = cva(
         "destructive-solid":
           "bg-[var(--color-danger)] text-white hover:brightness-90",
         link: "text-primary underline-offset-4 hover:underline",
+        "link-wrap": "h-auto max-w-full min-w-0 whitespace-normal break-words text-left text-primary underline-offset-4 hover:underline",
         /** Ítem de navegación sobre el fondo institucional; `aria-current="page"` lo invierte. */
         sidebar:
           "justify-start text-[var(--color-on-institutional)] hover:bg-[color-mix(in_srgb,var(--color-on-institutional)_14%,transparent)] aria-[current=page]:bg-[var(--color-surface)] aria-[current=page]:text-[var(--color-institutional)]",

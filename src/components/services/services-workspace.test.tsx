@@ -932,7 +932,7 @@ describe("ServicesWorkspace component", () => {
     await waitFor(() => {
       expect(screen.getByText("Programado")).toBeVisible();
     });
-    expect(screen.getByText(/^12 [a-záéíóú]{3,5}\.? \d{4}$/i)).toBeVisible();
+    expect(screen.getByText(/^12\/\d{2}\/\d{4}$/)).toBeVisible();
     // zoneIds preserved verbatim
     expect(screen.getByText("Zona Centro")).toBeVisible();
   });

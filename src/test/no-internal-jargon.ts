@@ -3,6 +3,8 @@ const FORBIDDEN: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: "module code", pattern: /\bM[1-9]\b/g },
   { label: "the word backend", pattern: /backend/gi },
   { label: "API field name", pattern: /\b(?:workOrderId|closureId|ticketId|serviceId|zoneId)\b/g },
+  { label: "short ID", pattern: /#[0-9a-f]{8}\b/gi },
+  { label: "UUID", pattern: /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi },
 ];
 
 const ATTRIBUTES = ["aria-label", "title", "placeholder"];
@@ -22,7 +24,8 @@ function visibleText(container: HTMLElement): string {
  * "backend" or raw API field names. Checks visible text plus aria-label, title and
  * placeholder values.
  */
-export function expectNoInternalJargon(container: HTMLElement): void {
+/** allowTechnicalIds is reserved for Eventos, the technical administrator screen. */
+export function expectNoInternalJargon(container: HTMLElement, options: { allowTechnicalIds?: boolean } = {}): void {
   const sources: Array<{ where: string; value: string }> = [
     { where: "text", value: visibleText(container) },
   ];
@@ -40,6 +43,7 @@ export function expectNoInternalJargon(container: HTMLElement): void {
   const offenders: string[] = [];
   for (const { where, value } of sources) {
     for (const { label, pattern } of FORBIDDEN) {
+      if (options.allowTechnicalIds && (label === "short ID" || label === "UUID")) continue;
       for (const match of value.matchAll(pattern)) {
         offenders.push(`${label} "${match[0]}" in ${where}: "${value.trim().slice(0, 120)}"`);
       }
