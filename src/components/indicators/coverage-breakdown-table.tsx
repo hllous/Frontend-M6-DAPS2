@@ -50,13 +50,23 @@ const percentText = (value: number) => `${formatIndicatorNumber(value, { maximum
 function StackedBar({ row, target, dimension, period }: { row: Row; target: IndicatorTarget; dimension: LinkDimension; period: IndicatorPeriod }) {
   const [open, setOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
+  const closedAt = useRef(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeWithEscape = (event: { key: string }) => {
+    if (event.key !== "Escape") return;
+    closedAt.current = Date.now();
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
   if (row.scheduled === 0) return <span className={styles.noScheduled}>Sin programados</span>;
   const total = STATES.reduce((sum, { key }) => sum + row.counts[key], 0);
   const segments = STATES.map((state) => ({ ...state, count: row.counts[state.key], pct: total === 0 ? 0 : (row.counts[state.key] / total) * 100 }));
   return <div className={styles.barCell}>
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(next) => { if (!next) closedAt.current = Date.now(); setOpen(next); }}>
       <PopoverTrigger
+        ref={triggerRef}
         openOnHover
+        onKeyDown={closeWithEscape}
         delay={120}
         closeDelay={150}
         className={styles.barTrigger}
@@ -65,7 +75,8 @@ function StackedBar({ row, target, dimension, period }: { row: Row; target: Indi
           // Con teclado el foco abre el cuadro; con el mouse lo abre el hover o el clic.
           let keyboard = true;
           try { keyboard = event.currentTarget.matches(":focus-visible"); } catch { /* sin :focus-visible */ }
-          if (keyboard) setOpen(true);
+          // Si el cuadro acaba de cerrarse (Escape), el foco vuelve a la barra sin reabrirlo.
+          if (keyboard && Date.now() - closedAt.current > 400) setOpen(true);
         }}
         onBlur={(event) => { if (!popupRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false); }}
       >
@@ -74,7 +85,7 @@ function StackedBar({ row, target, dimension, period }: { row: Row; target: Indi
           {hasNumericThreshold(target) ? <span className={styles.targetLine} style={{ left: `${target.value}%` }} /> : null}
         </span>
       </PopoverTrigger>
-      <PopoverContent ref={popupRef} align="start" className={styles.popup} aria-label={`Cobertura de ${row.name}`}>
+      <PopoverContent ref={popupRef} onKeyDown={closeWithEscape} initialFocus={false} align="start" className={styles.popup} aria-label={`Cobertura de ${row.name}`}>
         <PopoverTitle className={styles.popupTitle}>{row.name}</PopoverTitle>
         <div aria-hidden="true" className={styles.bigBar}>
           {segments.map((state) => state.count > 0 ? <Link key={state.key} tabIndex={-1} href={segmentHref(state, dimension, row.id, period)} className={styles[state.className]} style={{ flexGrow: state.count }} /> : null)}
