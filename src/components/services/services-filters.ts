@@ -12,7 +12,7 @@ export type ZoneGroup = { key: string; label: string; zones: ZoneOption[] };
 const NO_COMMUNE_KEY = "sin-comuna";
 
 export function emptyColumnFilters(): ColumnFilters {
-  return { zones: new Set(), statuses: new Set(), crews: new Set(), timeFrom: "", timeTo: "", late: false };
+  return { zones: new Set(), serviceTypes: new Set(), statuses: new Set(), crews: new Set(), timeFrom: "", timeTo: "", late: false };
 }
 
 /** Agrupa las zonas activas por comuna (numérica), con las zonas sin comuna al final. */
@@ -91,6 +91,7 @@ export function countActiveFilters(search: string, filters: ColumnFilters): numb
     search.trim() !== "",
     filters.statuses.size > 0 || filters.late,
     filters.zones.size > 0,
+    filters.serviceTypes.size > 0,
     filters.crews.size > 0,
     filters.timeFrom !== "" || filters.timeTo !== "",
   ].filter(Boolean).length;
