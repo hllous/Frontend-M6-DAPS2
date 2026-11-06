@@ -1,5 +1,6 @@
 import { getScenario, type ScenarioId } from "./scenarios";
 import { DEMO_IDENTITIES } from "./demo-identities";
+import { personNameOrLegajo } from "./m1-identity";
 import type { Session } from "./session";
 
 export type SessionActor = {
@@ -16,20 +17,21 @@ export function sessionUserId(session: Session): string | undefined {
 }
 
 /** One presentation actor for both demo sessions and identity confirmed by Backend GET /me. */
-export function sessionActor(session: Session): SessionActor {
+export async function sessionActor(session: Session): Promise<SessionActor> {
   const scenarioId = session.scenarioId ?? "employee-no-role";
   const scenario = getScenario({ ...session, scenarioId });
   if (session.identity) {
+    const displayName = await personNameOrLegajo(session.identity.userId);
     return {
       scenarioId,
       userId: session.identity.userId,
-      displayName: `Empleado M1 · ${session.identity.userId}`,
-      m1Identity: { userId: session.identity.userId, label: "Empleado M1" },
+      displayName,
+      m1Identity: { userId: session.identity.userId, label: displayName },
     };
   }
   return {
     scenarioId,
     userId: sessionUserId(session) ?? scenario.actor.userId,
-    displayName: scenario.actor.name,
+    displayName: DEMO_IDENTITIES[scenarioId].name,
   };
 }

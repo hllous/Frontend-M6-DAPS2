@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { containerFixtures } from "./containers-fixtures";
 import { greenPointFixtures } from "./green-point-fixtures";
 import { greenSpaceFixtures } from "./green-space-fixtures";
 import {
   getOperationalZoneGeometries,
+  loadOperationalZoneGeometries,
   isCoordinateInsideOperationalZone,
   parseOperationalZoneGeoJson,
   routeToStopOverlays,
@@ -31,6 +32,7 @@ const inventoryFixtures: LocatedInventoryItem[] = [
 ];
 
 describe("mock geodata", () => {
+  beforeAll(async () => { await loadOperationalZoneGeometries(); });
   it("ships the boundaries of the eight operational zones of the demo seed", () => {
     expect(new Set(getOperationalZoneGeometries().map((geometry) => geometry.code))).toEqual(
       new Set(["belgrano", "colegiales", "montserrat", "palermo", "puerto-madero", "recoleta", "retiro", "san-nicolas"]),

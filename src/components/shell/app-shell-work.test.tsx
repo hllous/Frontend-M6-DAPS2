@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 import { AppShell } from "./app-shell";
 import { scenarios } from "@/lib/scenarios";
 import { handlers } from "@/mocks/handlers";
@@ -31,13 +32,13 @@ function hrefs(list: HTMLElement) {
 
 describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
   it("shows every group the Admin can act on, built from real records, oldest first", async () => {
-    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+    const { container } = render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
     const reports = await group(/Expedientes por clasificar: 3 pendientes/);
     expect(within(reports).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       expect.stringContaining("TK-2026-095"),
       expect.stringContaining("TK-2026-091"),
-      expect.stringContaining("ER-1001"),
+      expect.stringContaining("Microbasural · Av. Warnes 1840"),
     ]);
     expect(hrefs(reports)).toEqual([
       "/app?destination=environment&detail=ER-1013",
@@ -48,6 +49,8 @@ describe("Mi trabajo de Oficina · cola de decisiones (Admin)", () => {
       "href",
       "/app?destination=environment&status=RECEIVED&status=UNDER_REVIEW",
     );
+
+    expectNoInternalJargon(container);
 
     const noCrew = await group(/Servicios sin cuadrilla: 1 pendiente/);
     expect(within(noCrew).getAllByRole("listitem")).toHaveLength(1);

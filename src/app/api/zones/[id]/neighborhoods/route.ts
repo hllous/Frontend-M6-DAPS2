@@ -51,7 +51,7 @@ export async function POST(
 
     // Como el backend: el id tiene que ser el UUID de un barrio del catálogo de M9 (no el `codigo`).
     if (parsed.data.neighborhoodIds.some((neighborhoodId) => !neighborhoodFixtures.some((candidate) => candidate.id === neighborhoodId))) {
-      return errorResponse(400, "Algún barrio no figura en el catálogo de M9.", path);
+      return errorResponse(400, "Algún barrio no figura en el catálogo de barrios de la ciudad.", path);
     }
 
     if (!getZoneFixture(id)) {

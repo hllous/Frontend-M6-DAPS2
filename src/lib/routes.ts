@@ -153,7 +153,7 @@ async function readJsonBody(response: Response, resource: "routes" = "routes"): 
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
-    throw new RouteContractError("La respuesta de recorridos no es JSON válido.", { cause });
+    throw new RouteContractError("No se pudo obtener información válida de recorridos. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -162,7 +162,7 @@ function handleErrorPayload(payload: unknown, resource: "routes" = "routes"): ne
   if (!parsedError.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
     throw new RouteContractError(
-      "La respuesta de error de recorridos no respeta el contrato documentado.",
+      "No se pudo obtener información válida de recorridos. Reintente en unos segundos.",
       { cause: parsedError.error },
     );
   }
@@ -184,7 +184,7 @@ async function handleSingleRouteResponse(
   const parsed = routeSchema.safeParse(payload);
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource });
-    throw new RouteContractError("La respuesta de recorrido no respeta el contrato esperado.", {
+    throw new RouteContractError("No se pudo obtener información válida de recorrido. Reintente en unos segundos.", {
       cause: parsed.error,
     });
   }
@@ -211,7 +211,7 @@ export const routesAdapter = {
     const parsed = routesEnvelopeSchema.safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "routes" });
-      throw new RouteContractError("La respuesta de recorridos no respeta el contrato esperado.", {
+      throw new RouteContractError("No se pudo obtener información válida de recorridos. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }
@@ -307,7 +307,7 @@ export const routesAdapter = {
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "routes" });
       throw new RouteContractError(
-        "La respuesta de referencias de recorrido no respeta el contrato esperado.",
+        "No se pudo obtener información válida de referencias de recorrido. Reintente en unos segundos.",
         { cause: parsed.error },
       );
     }

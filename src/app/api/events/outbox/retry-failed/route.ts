@@ -30,7 +30,7 @@ export async function POST(request: Request) {
         body: JSON.stringify(parsedBody.data),
         cache: "no-store",
       });
-      return validatedBackendResponse(response, retryFailedResponseSchema, path, "El resultado del reintento no respeta el contrato documentado.");
+      return validatedBackendResponse(response, retryFailedResponseSchema, path, "No se pudo obtener información válida del resultado del reintento. Reintente en unos segundos.");
     }
 
     return jsonNoStore(retryFailedResponseSchema.parse(retryFailedOutboxFixtures(parsedBody.data.limit ?? 100, scenario.actor.userId)));

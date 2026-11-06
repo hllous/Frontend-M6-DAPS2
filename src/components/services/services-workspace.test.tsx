@@ -1,5 +1,5 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -18,6 +18,7 @@ import { operationalMapAdapter } from "@/lib/operational-map";
 import { operationalZonesAdapter } from "@/lib/operational-zones";
 import { resetEnvironmentalInspectionFixtures, updateEnvironmentalInspectionFixture } from "@/lib/environmental-report-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
+import { invalidateServicesListCache } from "./services-list-cache";
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(...handlers);
@@ -29,6 +30,10 @@ function startedServiceFixture() {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => {
+  sessionStorage.clear();
+  invalidateServicesListCache();
+});
 afterEach(() => {
   server.resetHandlers();
   resetStreetClosureRequestFixtures();
@@ -48,6 +53,17 @@ describe("ServicesWorkspace component", () => {
     expect(table).toBeInTheDocument();
     expect(within(table).getByText("Recolección de residuos — Recorrido 4")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Mapa de servicios" })).toBeInTheDocument();
+  });
+
+  it("keeps the services list when the screen is left and opened again in the same session", async () => {
+    const first = render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    first.unmount();
+
+    const list = vi.spyOn(servicesAdapter, "list");
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    expect(screen.getByRole("region", { name: "Tabla operativa de Servicios" })).toBeInTheDocument();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it("shows a table skeleton while the services load and lands the table where it was", async () => {
@@ -75,7 +91,7 @@ describe("ServicesWorkspace component", () => {
     render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
 
     const region = await screen.findByRole("region", { name: "Listado de servicios" });
-    expect(within(region).getByLabelText("Período")).toBeInTheDocument();
+    expect(within(region).getByRole("combobox", { name: "Período", hidden: true })).toBeInTheDocument();
     expect(within(region).getByRole("button", { name: /Categorías/, hidden: true })).toBeInTheDocument();
     const loadingHeaders = within(region).getAllByRole("columnheader", { hidden: true }).map((header) => header.textContent?.trim());
     expect(loadingHeaders).toEqual(["#", "Servicio", "Estado", "Zona", "Equipo", "Fecha"]);
@@ -205,7 +221,11 @@ describe("ServicesWorkspace component", () => {
       const zoneLoadCount = zoneLoad.mock.calls.length;
       const serviceListCount = serviceList.mock.calls.length;
 
-      await user.type(screen.getByRole("searchbox", { name: "Buscar servicios" }), "Poda");
+      await user.click(screen.getByRole("button", { name: "Filtros (0)" }));
+      const sheet = await screen.findByRole("dialog", { name: "Filtros" });
+      await user.type(within(sheet).getByRole("searchbox", { name: "Buscar servicios" }), "Poda");
+      await user.click(within(sheet).getByRole("button", { name: "Cerrar" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Filtros" })).not.toBeInTheDocument());
       await user.click(screen.getByRole("button", { name: /Ordenar por Servicio/ }));
       await user.click(screen.getByRole("row", { name: /Poda de árbol — Av\. Rivadavia 2200/ }));
       expect(document.querySelector('[role="region"][aria-label="Mapa de servicios"]')).toBe(map);
@@ -253,24 +273,23 @@ describe("ServicesWorkspace component", () => {
     }
   });
 
-  it("hides the period and category filters while a phone service preview is open", async () => {
+  it("hides the filters button and category editor while a phone service preview is open", async () => {
     const originalWidth = window.innerWidth;
     const user = userEvent.setup();
     try {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
       render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
       await screen.findByRole("region", { name: "Mapa de servicios" });
-      expect(screen.getByRole("combobox", { name: "Período" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Filtros (0)" })).toBeVisible();
       expect(screen.getByRole("button", { name: "Categorías" })).toBeVisible();
 
       await user.click(screen.getByRole("row", { name: /Poda de árbol — Av\. Rivadavia 2200/ }));
       const preview = await screen.findByRole("complementary", { name: "Poda de árbol — Av. Rivadavia 2200" });
-      expect(screen.queryByRole("combobox", { name: "Período" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Filtros (0)" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Categorías" })).not.toBeInTheDocument();
-      expect(screen.getByRole("searchbox", { name: "Buscar servicios" })).toBeVisible();
 
       await user.click(within(preview).getByRole("button", { name: "Cerrar" }));
-      expect(await screen.findByRole("combobox", { name: "Período" })).toBeVisible();
+      expect(await screen.findByRole("button", { name: "Filtros (0)" })).toBeVisible();
       expect(screen.getByRole("button", { name: "Categorías" })).toBeVisible();
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
@@ -401,50 +420,148 @@ describe("ServicesWorkspace component", () => {
     expect(within(from).getByRole("combobox", { name: "Hora" })).toHaveTextContent("hh");
   });
 
-  it("keeps loaded zones available while column filters narrow the service list", async () => {
-    resetServiceFixtures();
-    updateServiceFixture("SVC-1042", { zoneNames: ["Zona A"], status: "SCHEDULED", crewName: "Cuadrilla A" });
-    updateServiceFixture("SVC-1043", { zoneNames: ["Zona B"], crewName: "Cuadrilla B" });
-    updateServiceFixture("SVC-1044", { zoneNames: ["Zona C"], crewName: "Cuadrilla C" });
-
-    const user = userEvent.setup();
-    try {
-      render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
-
-      await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
-      await user.click(screen.getByRole("button", { name: "Filtrar por equipo" }));
-
-      let crewFilter = screen.getByRole("dialog", { name: "Filtro de equipo" });
-      await user.click(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla A" }));
-      crewFilter = screen.getByRole("dialog", { name: "Filtro de equipo" });
-      expect(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla B" })).toBeInTheDocument();
-      expect(within(crewFilter).getByRole("checkbox", { name: "Cuadrilla C" })).toBeInTheDocument();
-      await user.click(within(crewFilter).getByRole("button", { name: "Limpiar" }));
-      await user.keyboard("{Escape}");
-      expect(screen.getByRole("button", { name: "Filtrar por equipo" })).toHaveFocus();
-
-      await user.click(screen.getByRole("button", { name: "Filtrar por zona" }));
-
-      let zoneFilter = screen.getByRole("dialog", { name: "Filtro de zona" });
-      await user.click(within(zoneFilter).getByRole("checkbox", { name: "Zona A" }));
-
-      zoneFilter = screen.getByRole("dialog", { name: "Filtro de zona" });
-      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona B" })).toBeInTheDocument();
-      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona C" })).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: "Filtrar por estado" }));
-      const statusFilter = screen.getByRole("dialog", { name: "Filtro de estado" });
-      await user.click(within(statusFilter).getByRole("checkbox", { name: "Completado" }));
-      await user.keyboard("{Escape}");
-
-      await user.click(screen.getByRole("button", { name: "Filtrar por zona" }));
-      zoneFilter = screen.getByRole("dialog", { name: "Filtro de zona" });
-      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona A" })).toBeChecked();
-      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona B" })).toBeInTheDocument();
-      expect(within(zoneFilter).getByRole("checkbox", { name: "Zona C" })).toBeInTheDocument();
-    } finally {
-      resetServiceFixtures();
+  describe("single filter bar", () => {
+    const title = (id: string) => serviceFixtures.find((service) => service.id === id)!.title;
+    const markerLabels = () => Array.from(document.querySelectorAll<HTMLElement>("[data-service-id][aria-label^='Parada']"))
+      .map((marker) => marker.getAttribute("aria-label")!);
+    const rowIds = (table: HTMLElement) => Array.from(table.querySelectorAll<HTMLElement>("tr[data-service-id]"))
+      .map((row) => row.dataset.serviceId!);
+    async function openFilter(user: ReturnType<typeof userEvent.setup>, name: string) {
+      await user.click(screen.getByRole("button", { name: new RegExp(`^${name}`) }));
+      return screen.getByRole("dialog", { name });
     }
+
+    it("filters the table and the map markers by several states at once", async () => {
+      resetServiceFixtures();
+      updateServiceFixture("SVC-1042", { status: "IN_PROGRESS" });
+      updateServiceFixture("SVC-1043", { status: "SCHEDULED" });
+      updateServiceFixture("SVC-1044", { status: "COMPLETED" });
+      const user = userEvent.setup();
+      try {
+        render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+        const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+        const bar = screen.getByRole("search", { name: "Filtros de servicios" });
+        expect(within(bar).getByRole("searchbox", { name: "Buscar servicios" })).toBeVisible();
+        expect(within(bar).getByRole("combobox", { name: "Período" })).toBeVisible();
+
+        const status = await openFilter(user, "Estado");
+        await user.click(within(status).getByRole("checkbox", { name: "En curso" }));
+        await user.click(within(status).getByRole("checkbox", { name: "Programado" }));
+        await user.keyboard("{Escape}");
+
+        await waitFor(() => expect(rowIds(table)).not.toContain("SVC-1044"));
+        expect(rowIds(table)).toEqual(expect.arrayContaining(["SVC-1042", "SVC-1043"]));
+        expect(markerLabels().join("|")).toContain(title("SVC-1042"));
+        expect(markerLabels().join("|")).not.toContain(title("SVC-1044"));
+        expect(within(bar).getByText("1 filtro activo")).toBeInTheDocument();
+      } finally {
+        resetServiceFixtures();
+      }
+    });
+
+    it("includes every barrio of a comuna and keeps individual barrios selectable", async () => {
+      resetServiceFixtures();
+      updateServiceFixture("SVC-1042", { zoneIds: ["zone-4"], zoneNames: ["Retiro"] });
+      updateServiceFixture("SVC-1043", { zoneIds: ["zone-6"], zoneNames: ["San Nicolás"] });
+      updateServiceFixture("SVC-1044", { zoneIds: ["zone-1"], zoneNames: ["Belgrano"] });
+      const user = userEvent.setup();
+      try {
+        render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+        const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+        const zone = await openFilter(user, "Comuna y barrio");
+        await user.click(await within(zone).findByRole("checkbox", { name: "Comuna 1" }));
+        await waitFor(() => expect(rowIds(table)).not.toContain("SVC-1044"));
+        expect(rowIds(table)).toEqual(expect.arrayContaining(["SVC-1042", "SVC-1043"]));
+        expect(within(zone).getByRole("checkbox", { name: "Retiro" })).toBeChecked();
+        expect(within(zone).getByRole("checkbox", { name: "San Nicolás" })).toBeChecked();
+
+        await user.click(within(zone).getByRole("checkbox", { name: "San Nicolás" }));
+        await waitFor(() => expect(rowIds(table)).not.toContain("SVC-1043"));
+        expect(within(zone).getByRole("checkbox", { name: "Comuna 1" })).not.toBeChecked();
+        await user.click(within(zone).getByRole("checkbox", { name: "Belgrano" }));
+        await waitFor(() => expect(rowIds(table)).toContain("SVC-1044"));
+      } finally {
+        resetServiceFixtures();
+      }
+    });
+
+    it("filters by crew and clears every filter with Limpiar filtros", async () => {
+      resetServiceFixtures();
+      updateServiceFixture("SVC-1042", { crewName: "Cuadrilla A" });
+      updateServiceFixture("SVC-1043", { crewName: "Cuadrilla B" });
+      const user = userEvent.setup();
+      try {
+        render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+        const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+        const crew = await openFilter(user, "Cuadrilla");
+        await user.click(within(crew).getByRole("checkbox", { name: "Cuadrilla A" }));
+        await user.keyboard("{Escape}");
+        await waitFor(() => expect(rowIds(table)).toEqual(["SVC-1042"]));
+
+        const bar = screen.getByRole("search", { name: "Filtros de servicios" });
+        await user.click(within(bar).getByRole("button", { name: "Limpiar filtros" }));
+        await waitFor(() => expect(rowIds(table)).toContain("SVC-1043"));
+        expect(within(bar).queryByText(/filtros? activos?/)).not.toBeInTheDocument();
+      } finally {
+        resetServiceFixtures();
+      }
+    });
+
+    it("lets the map lines control hide the layers without changing rows or markers", async () => {
+      const user = userEvent.setup();
+      render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+      const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+      await screen.findAllByRole("button", { name: /Parada \d+/ });
+      const rowsBefore = rowIds(table);
+      const markersBefore = markerLabels();
+      await user.click(await screen.findByRole("button", { name: "Líneas del mapa" }));
+      const panel = screen.getByRole("dialog", { name: "Líneas del mapa" });
+      await user.click(within(panel).getByRole("checkbox", { name: "Barrios" }));
+      await user.click(within(panel).getByRole("checkbox", { name: "Comunas" }));
+      expect(rowIds(table)).toEqual(rowsBefore);
+      expect(markerLabels()).toEqual(markersBefore);
+      expect(screen.queryByText(/filtros? activos?/)).not.toBeInTheDocument();
+    });
+
+    it("keeps sorting in the column headers but no longer filters from them", async () => {
+      const user = userEvent.setup();
+      render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+      const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+      for (const name of ["estado", "zona", "equipo"]) {
+        expect(within(table).queryByRole("button", { name: `Filtrar por ${name}` })).not.toBeInTheDocument();
+      }
+      await user.click(within(table).getByRole("button", { name: /Ordenar por Estado/ }));
+      expect(within(table).getByRole("columnheader", { name: /Estado/ })).toHaveAttribute("aria-sort");
+    });
+
+    it("collapses into a Filtros (n) sheet on phones with the same filters", async () => {
+      const originalWidth = window.innerWidth;
+      resetServiceFixtures();
+      updateServiceFixture("SVC-1042", { status: "IN_PROGRESS" });
+      updateServiceFixture("SVC-1044", { status: "COMPLETED" });
+      const user = userEvent.setup();
+      try {
+        Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+        render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+        await screen.findByRole("region", { name: "Mapa de servicios" });
+        expect(screen.queryByRole("combobox", { name: "Período" })).not.toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Filtros (0)" }));
+        const sheet = await screen.findByRole("dialog", { name: "Filtros" });
+        expect(within(sheet).getByRole("searchbox", { name: "Buscar servicios" })).toBeVisible();
+        expect(within(sheet).getByRole("combobox", { name: "Período" })).toBeVisible();
+        expect(within(sheet).getByRole("group", { name: "Comuna y barrio" })).toBeVisible();
+        await user.click(within(sheet).getByRole("checkbox", { name: "En curso" }));
+        expect(within(sheet).getByRole("checkbox", { name: "En curso" })).toBeChecked();
+        await user.click(within(sheet).getByRole("button", { name: "Cerrar" }));
+        expect(await screen.findByRole("button", { name: "Filtros (1)" })).toBeVisible();
+        const table = screen.getByRole("region", { name: "Tabla operativa de Servicios" });
+        await waitFor(() => expect(rowIds(table)).not.toContain("SVC-1044"));
+      } finally {
+        Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+        fireEvent(window, new Event("resize"));
+        resetServiceFixtures();
+      }
+    });
   });
 
   it("disables service start while pending and only sends one request on a double click", async () => {
@@ -685,6 +802,15 @@ describe("ServicesWorkspace component", () => {
     // Preview opens for the newly scheduled service
     expect(await screen.findByRole("complementary")).toBeInTheDocument();
     expect(screen.getByRole("complementary")).toHaveTextContent("Sin asignar");
+    const createdTitle = within(screen.getByRole("complementary")).getByRole("heading").textContent!;
+
+    // Leaving and coming back keeps the created service without asking the API again.
+    cleanup();
+    const list = vi.spyOn(servicesAdapter, "list");
+    render(<ServicesWorkspace scenario={scenarios.officeDutyQueue} />);
+    expect(list).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar servicios" }), { target: { value: createdTitle } });
+    expect(await within(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).findByText(createdTitle)).toBeInTheDocument();
   });
 
   it("opens linked scheduling dialog with a localized origin and hides the technical reference ID", async () => {
@@ -806,7 +932,7 @@ describe("ServicesWorkspace component", () => {
     await waitFor(() => {
       expect(screen.getByText("Programado")).toBeVisible();
     });
-    expect(screen.getByText(/^12 [a-záéíóú]{3,5}\.? \d{4}$/i)).toBeVisible();
+    expect(screen.getByText(/^12\/\d{2}\/\d{4}$/)).toBeVisible();
     // zoneIds preserved verbatim
     expect(screen.getByText("Zona Centro")).toBeVisible();
   });

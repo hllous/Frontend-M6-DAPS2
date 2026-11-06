@@ -76,7 +76,7 @@ export async function fetchCatalogList<T extends z.ZodType>(
   const parsed = z.array(itemSchema).safeParse(payload);
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: RESOURCE[subject] });
-    throw new NeighborhoodRequestError(`La respuesta de ${subject} no respeta el contrato esperado.`, 502);
+    throw new NeighborhoodRequestError(`No se pudo obtener información válida de ${subject}. Reintente en unos segundos.`, 502);
   }
   return parsed.data;
 }

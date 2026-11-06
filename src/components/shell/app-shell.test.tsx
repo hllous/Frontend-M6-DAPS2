@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { AppShell } from "./app-shell";
@@ -24,7 +25,7 @@ describe("AppShell", () => {
   it("renders every permitted destination as a real link with one canonical URL", () => {
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
     const links = within(moduleNavigation).getAllByRole("link");
 
     expect(links.map((link) => [link.getAttribute("aria-label"), link.getAttribute("href")])).toEqual([
@@ -36,7 +37,7 @@ describe("AppShell", () => {
       ["Catálogo", "/app?destination=catalog"],
       ["Tableros", "/app?destination=dashboards"],
       ["Accesos", "/app/access"],
-      ["Monitor de integración", "/app/admin/integration-monitor"],
+      ["Eventos", "/app/admin/integration-monitor"],
     ]);
     expect(within(moduleNavigation).queryAllByRole("button")).toHaveLength(0);
   });
@@ -45,7 +46,7 @@ describe("AppShell", () => {
     window.history.replaceState(null, "", "/app?destination=services");
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
     expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toHaveAttribute("aria-current", "page");
     expect(within(moduleNavigation).getByRole("link", { name: "Mi trabajo" })).not.toHaveAttribute("aria-current");
   });
@@ -54,17 +55,17 @@ describe("AppShell", () => {
     window.history.replaceState(null, "", "/app/admin/integration-monitor");
     render(<AppShell scenario={scenarios.officeLimited} />);
 
-    const auditorNavigation = screen.getByRole("navigation", { name: "Módulos" });
-    expect(within(auditorNavigation).getByRole("link", { name: "Monitor de integración" }))
+    const auditorNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
+    expect(within(auditorNavigation).getByRole("link", { name: "Eventos" }))
       .toHaveAttribute("href", "/app/admin/integration-monitor");
-    expect(within(auditorNavigation).getByRole("link", { name: "Monitor de integración" }))
+    expect(within(auditorNavigation).getByRole("link", { name: "Eventos" }))
       .toHaveAttribute("aria-current", "page");
   });
 
   it("hides the monitor from roles without its capability", () => {
     render(<AppShell scenario={scenarios.fieldCrewLeader} />);
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
-    expect(within(moduleNavigation).queryByRole("link", { name: "Monitor de integración" })).not.toBeInTheDocument();
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
+    expect(within(moduleNavigation).queryByRole("link", { name: "Eventos" })).not.toBeInTheDocument();
   });
 
   it("moves focus to main after a module change", async () => {
@@ -73,7 +74,7 @@ describe("AppShell", () => {
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
     const main = screen.getByRole("main");
-    await user.click(within(screen.getByRole("navigation", { name: "Módulos" })).getByRole("link", { name: "Servicios" }));
+    await user.click(within(screen.getByRole("navigation", { name: "Navegación principal" })).getByRole("link", { name: "Servicios" }));
 
     await waitFor(() => expect(main).toHaveFocus());
   });
@@ -82,7 +83,7 @@ describe("AppShell", () => {
     window.history.replaceState(null, "", `/app/catalog/${route}`);
     render(<AppShell scenario={scenarios.officeDutyQueue} routeContent={<p>Zonas</p>} />);
 
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
     expect(within(moduleNavigation).getByRole("link", { name: "Catálogo" })).toHaveAttribute("aria-current", "page");
   });
 
@@ -96,10 +97,38 @@ describe("AppShell", () => {
     expect(screen.getByRole("link", { name: "Abrir Intervenciones de arbolado" })).toHaveAttribute("href", "/app/catalog/tree-interventions");
   });
 
+  it("shows only the title and cards for a Field actor", () => {
+    window.history.replaceState(null, "", "/app?destination=catalog");
+    render(<AppShell scenario={scenarios.fieldCrewLeader} />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Catálogo" })).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Catálogo" })).getAllByRole("listitem")).toHaveLength(12);
+    expect(screen.queryByText("Solo consulta")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "Zonas operativas" })).not.toBeInTheDocument();
+  });
+
+  it("shows only the 12 catalog cards and does not request the zones list", async () => {
+    let zoneRequests = 0;
+    server.use(http.get("*/api/zones", () => {
+      zoneRequests += 1;
+      return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 0 } });
+    }));
+    window.history.replaceState(null, "", "/app?destination=catalog");
+
+    render(<AppShell scenario={scenarios.officeDutyQueue} />);
+
+    expect(await screen.findByRole("link", { name: "Abrir Intervenciones de arbolado" })).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Catálogo" })).getAllByRole("listitem")).toHaveLength(12);
+    expect(screen.queryByRole("heading", { level: 2, name: "Zonas operativas" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Belgrano", { exact: true })).not.toBeInTheDocument();
+    expect(zoneRequests).toBe(0);
+    expect(screen.getByRole("link", { name: "Abrir Zonas operativas" })).toHaveAttribute("href", "/app/catalog/zones");
+  });
+
   it("navigates client-side on a plain click but leaves modified clicks to the browser", async () => {
     const user = userEvent.setup();
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
     const services = within(moduleNavigation).getByRole("link", { name: "Servicios" });
 
     await user.keyboard("{Control>}");
@@ -116,7 +145,7 @@ describe("AppShell", () => {
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
     await user.click(screen.getByRole("button", { name: /Contraer navegaci.n/ }));
 
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
     const services = within(moduleNavigation).getByRole("link", { name: "Servicios" });
     services.focus();
 
@@ -141,7 +170,7 @@ describe("AppShell", () => {
   it("shows the Office action queue and every permitted destination", () => {
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
     expect(moduleNavigation).toBeVisible();
     expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Acciones de la jornada" })).toBeVisible();
@@ -166,7 +195,7 @@ describe("AppShell", () => {
     };
     render(<AppShell scenario={withoutInventory} />);
 
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
     expect(within(moduleNavigation).queryByRole("link", { name: "Inventario" })).not.toBeInTheDocument();
     expect(within(moduleNavigation).getByRole("link", { name: "Servicios" })).toBeVisible();
   });
@@ -175,7 +204,7 @@ describe("AppShell", () => {
     const user = userEvent.setup();
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
-    const moduleNavigation = screen.getByRole("navigation", { name: /M.dulos/ });
+    const moduleNavigation = screen.getByRole("navigation", { name: /Navegación principal/ });
     expect(moduleNavigation.querySelector('[data-slot="tooltip-trigger"]')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Contraer navegaci.n/ }));
@@ -195,7 +224,7 @@ describe("AppShell", () => {
 
     try {
       render(<AppShell scenario={scenarios.officeDutyQueue} />);
-      const moduleNavigation = screen.getByRole("navigation", { name: /M.dulos/ });
+      const moduleNavigation = screen.getByRole("navigation", { name: /Navegación principal/ });
 
       await waitFor(() => {
         expect(moduleNavigation.querySelector('[data-slot="tooltip-trigger"]')).toBeInTheDocument();
@@ -210,7 +239,7 @@ describe("AppShell", () => {
     const user = userEvent.setup();
     render(<AppShell scenario={scenarios.officeDutyQueue} />);
 
-    const moduleNavigation = screen.getByRole("navigation", { name: "Módulos" });
+    const moduleNavigation = screen.getByRole("navigation", { name: "Navegación principal" });
     await user.click(within(moduleNavigation).getByRole("link", { name: "Mapa" }));
 
     expect(await screen.findByRole("heading", { name: "Mapa operativo" })).toBeVisible();
@@ -220,7 +249,7 @@ describe("AppShell", () => {
 describe("internal jargon guard", () => {
   it("keeps module codes, backend and API field names out of the rendered copy", async () => {
     const { container } = render(<AppShell scenario={scenarios.officeDutyQueue} />);
-    expect(screen.getByRole("navigation", { name: "Módulos" })).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "Navegación principal" })).toBeVisible();
 
     expectNoInternalJargon(container);
   });

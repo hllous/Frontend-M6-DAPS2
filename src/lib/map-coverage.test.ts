@@ -25,6 +25,7 @@ const zones: OperationalZone[] = [
 
 const coverage: CoverageIndicator = {
   family: "coverage",
+  totals: { scheduled: 0, served: 0, partial: 0, notServiced: 0, pending: 0, coveragePct: 0 },
   period: { from: "2026-08-10", to: "2026-09-10" },
   freshness: { updatedAt: "2026-09-10T12:00:00.000Z" },
   primary: { value: 84.2, label: "Cobertura de objetivos", unit: "%" },

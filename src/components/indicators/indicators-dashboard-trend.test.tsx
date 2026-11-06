@@ -9,6 +9,7 @@ import { scenarios } from "@/lib/scenarios";
 import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
 import { handlers } from "@/mocks/handlers";
 
+import { axisFloor } from "./coverage-trend";
 import { IndicatorsDashboard } from "./indicators-dashboard";
 
 const server = setupServer(...handlers);
@@ -37,10 +38,19 @@ function serveCoverage(body: object) {
 
 async function renderTrend() {
   render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
   return screen.findByRole("region", { name: "Tendencia" });
 }
 
 describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
+  it("identifica los gráficos como mensuales en períodos largos", async () => {
+    serveCoverage(coverageMonthlyFixture);
+    window.history.replaceState(null, "", "/?from=2024-01-01&to=2026-10-01");
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByRole("heading", { name: "Cobertura por mes" })).toBeVisible();
+    await waitFor(() => expect(screen.getAllByText("Evolución por mes")).toHaveLength(3));
+  });
   it("dibuja un punto por semana con fechas argentinas y la meta como referencia", async () => {
     serveCoverage(coverageWeeklyFixture);
     const trend = await renderTrend();
@@ -73,13 +83,15 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     window.history.replaceState(null, "", "/?from=2026-07-15&to=2026-08-31");
     const trend = await renderTrend();
 
-    expect(within(trend).getByText("Cobertura de objetivos por semana en el período aplicado.")).toBeInTheDocument();
+    expect(within(trend).queryByText("Cobertura de objetivos por semana en el período aplicado.")).not.toBeInTheDocument();
     expect(within(trend).getByRole("button", { name: /15\/07\/2026 – 31\/07\/2026: 80 %/ })).toBeInTheDocument();
   });
 
   it("no muestra la sección cuando el backend no devuelve serie", async () => {
     serveCoverage(coverageWithoutSeriesFixture);
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
 
     await screen.findByRole("heading", { name: "Cobertura por zona" });
     expect(screen.queryByRole("region", { name: "Tendencia" })).not.toBeInTheDocument();
@@ -115,7 +127,7 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     serveCoverage(coverageWeeklyFixture);
     const trend = await renderTrend();
 
-    await user.click(screen.getByRole("button", { name: "Tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const table = await within(trend).findByRole("table");
     for (const heading of ["Período", "Programados", "Atendidos", "Programado a futuro", "Cobertura"]) {
       expect(within(table).getByRole("columnheader", { name: heading })).toBeInTheDocument();
@@ -145,5 +157,25 @@ describe("IndicatorsDashboard: tendencia semanal de cobertura (#780)", () => {
     await waitFor(() => expect(urls.length).toBeGreaterThan(0));
     expect(urls[0].searchParams.get("bucket")).toBe("week");
     expect(urls[0].searchParams.get("zoneId")).toBe("zone-1");
+  });
+});
+
+it("no muestra un cuadro emergente al pasar por la tendencia", async () => {
+  const user = userEvent.setup();
+  serveCoverage(coverageWeeklyFixture);
+  const trend = await renderTrend();
+  await user.hover(within(trend).getByRole("button", { name: /03\/08\/2026 – 09\/08\/2026: 90 %/ }));
+  expect(within(trend).queryByRole("status")).not.toHaveTextContent("03/08/2026");
+});
+
+describe("eje de la tendencia de cobertura", () => {
+  it("arranca 10 puntos bajo el menor valor o la meta, en múltiplos de 10", () => {
+    expect(axisFloor([{ pct: 81.9 }, { pct: 84 }], 95)).toBe(70);
+    expect(axisFloor([{ pct: 62 }, { pct: null }], 95)).toBe(50);
+  });
+
+  it("arranca en cero si hay valores bajos o ninguno", () => {
+    expect(axisFloor([{ pct: 5 }], 95)).toBe(0);
+    expect(axisFloor([{ pct: null }])).toBe(0);
   });
 });

@@ -5,11 +5,9 @@ import { referralLabel, reportLabel, shortId } from "./display-ids";
 const uuid = "88ef5782-6cd8-4812-9a5e-c14723ff2b72";
 
 describe("display ids (#741)", () => {
-  it("labels a report by publicId, else by a short handle, never by the full UUID", () => {
-    expect(reportLabel({ id: uuid, publicId: "TK-2026-000123" })).toBe("TK-2026-000123");
-    expect(reportLabel({ id: uuid, publicId: null })).toBe("#88ef5782");
-    expect(reportLabel({ id: uuid })).toBe("#88ef5782");
-    expect(reportLabel({ id: "ER-1001", publicId: "" })).toBe("ER-1001");
+  it("labels reports by public number or type and address", () => {
+    expect(reportLabel({ reportType: "NOISE", address: "Av. Corrientes 4200", publicId: "TK-2026-000123" })).toBe("TK-2026-000123");
+    expect(reportLabel({ reportType: "NOISE", address: "Av. Corrientes 4200" })).toBe("Ruidos molestos · Av. Corrientes 4200");
   });
 
   it("shortens only UUIDs", () => {

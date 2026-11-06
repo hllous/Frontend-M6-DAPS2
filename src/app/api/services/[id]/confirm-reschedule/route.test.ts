@@ -187,7 +187,9 @@ it.each([401, 403, 409, 503])("preserves backend error status and body (%s)", as
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(confirmBody),
   }), { params: Promise.resolve({ id: "real-service" }) });
   expect(response.status).toBe(status);
-  expect(await response.json()).toEqual(error);
+  expect(await response.json()).toEqual({ ...error, message: status < 500
+    ? "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."
+    : "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar." });
   const forwards = backendFetch.mock.calls.filter(([, init]) => init?.method === "POST");
   expect(forwards).toHaveLength(1);
   expect(String(forwards[0][0])).toBe("https://backend.internal/services/real-service/confirm-reschedule");

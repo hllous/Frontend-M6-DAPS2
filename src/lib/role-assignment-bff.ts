@@ -37,7 +37,7 @@ export async function validatedRoleAssignmentResponse<T>(
 
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return errorResponse(502, "La respuesta de asignaciones de roles no respeta el contrato documentado.", path);
+    return errorResponse(502, "No se pudo obtener información válida de asignaciones de roles. Reintente en unos segundos.", path);
   }
 
   return NextResponse.json(parsed.data, { status: response.status });

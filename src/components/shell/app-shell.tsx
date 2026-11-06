@@ -45,7 +45,6 @@ import { FieldWorkPanel } from "@/components/services/field-work-panel";
 import { ServicesWorkspace } from "@/components/services/services-workspace";
 import { ReferralsWorkspace } from "@/components/referrals/referrals-workspace";
 import { CatalogLanding } from "@/components/catalog/catalog-landing";
-import { ZonesPanel } from "./zones-panel";
 import { IndicatorsDashboard } from "@/components/indicators/indicators-dashboard";
 import { EnvironmentalReportsWorkspace } from "@/components/environmental-reports/environmental-reports-workspace";
 import { OfficeWorkPanel } from "./office-work-panel";
@@ -75,7 +74,7 @@ const navigation: NavigationItem[] = [
   { id: "catalog", label: "Catálogo", capability: "catalog:view", icon: Settings2 },
   { id: "dashboards", label: "Tableros", capability: "indicator:view", icon: BarChart3 },
   { id: "access", label: "Accesos", capability: "role:manage", icon: ShieldCheck },
-  { id: "integration-monitor", label: "Monitor de integración", capability: "integrationMonitor:view", icon: Activity },
+  { id: "integration-monitor", label: "Eventos", capability: "integrationMonitor:view", icon: Activity },
 ];
 
 // Una sola URL por pantalla: cada destino vive en /app?destination=<id>. Las rutas
@@ -142,6 +141,7 @@ export function AppShell({
           : requestedDestination && navigation.some((item) => item.id === requestedDestination)
             ? requestedDestination
             : "work";
+  const dataWidth = ["map", "catalog", "dashboards", "integration-monitor"].includes(destination) || (["services", "environment", "referrals"].includes(destination) && !searchParams.has("detail"));
   const mainRef = useRef<HTMLElement>(null);
   const previousDestination = useRef(destination);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -170,7 +170,7 @@ export function AppShell({
           <span className={styles.brandMark} aria-hidden="true"><Sprout /></span>
           <span className={styles.brandText}>Ambiente<br />y Servicios</span>
         </div>
-        <nav className={styles.moduleNav} aria-label="Módulos">
+        <nav className={styles.moduleNav} aria-label="Navegación principal">
           <LoadingRegion label="Navegación" isLoading={!scenario} className="flex flex-col gap-1.5">
             {!scenario ? navigation.map((item) => (
               <Button key={item.id} variant="sidebar" className={styles.navigationButton} disabled aria-hidden="true">
@@ -204,7 +204,7 @@ export function AppShell({
           {scenario ? (
             <>
               <p className={styles.contextLabel}>{actorLabel(scenario)}</p>
-              <p className={styles.actorName}>{identity ? `${identity.label} · ${identity.userId}` : scenario.actor.name}</p>
+              <p className={styles.actorName}>{identity ? identity.label : scenario.actor.name}</p>
             </>
           ) : (
             <div className="flex h-10 flex-col justify-center gap-1">
@@ -224,7 +224,7 @@ export function AppShell({
 
       <main
         ref={mainRef}
-        className={cn(styles.main, destination === "services" && styles.servicesMain)}
+        className={cn(styles.main, dataWidth ? styles.dataWidth : styles.readingWidth, destination === "services" && styles.servicesMain)}
         id="contenido-principal"
         tabIndex={-1}
       >
@@ -239,10 +239,7 @@ export function AppShell({
         ) : destination === "referrals" ? (
           <ReferralsWorkspace scenario={scenario} />
         ) : destination === "catalog" ? (
-          <div className="flex flex-col gap-8">
-            <CatalogLanding scenario={scenario} />
-            <ZonesPanel />
-          </div>
+          <CatalogLanding />
         ) : destination === "dashboards" ? (
           <IndicatorsDashboard scenario={scenario} />
         ) : destination === "environment" ? (
@@ -250,7 +247,7 @@ export function AppShell({
         ) : destination === "map" ? (
           <MapaOperativo scenario={scenario} />
         ) : (
-          <p role="status" className="text-sm text-muted-foreground">No hay un módulo disponible para su sesión.</p>
+          <p role="status" className="text-sm text-muted-foreground">No hay secciones disponibles para su usuario.</p>
         )}
       </main>
 
@@ -331,7 +328,7 @@ function NavigationLink({
   const link = (
     <Button
       variant={compact ? (selected ? "default" : "ghost") : "sidebar"}
-      className={compact ? styles.mobileNavigationButton : styles.navigationButton}
+      className={compact ? styles.mobileNavigationButton : cn(styles.navigationButton, "whitespace-normal text-left")}
       nativeButton={false}
       role="link"
       render={<Link href={destinationHref(item.id)} aria-current={selected ? "page" : undefined} aria-label={item.label} />}

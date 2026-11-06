@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { reportLabel } from "../src/lib/display-ids";
+import type { EnvironmentalReport } from "../src/lib/environmental-reports";
 
 import { loginViaApi } from "./support/auth";
 import { chooseDate, chooseOption, chooseTime } from "./support/reports-indicators";
@@ -100,11 +102,11 @@ test.describe("EnvironmentalReport case file", () => {
     const status = filters.getByRole("combobox", { name: "Estado" });
     const allReportsResponse = await page.request.get("/api/environmental-reports?pageSize=100");
     expect(allReportsResponse.ok()).toBeTruthy();
-    const allReports = (await allReportsResponse.json()).data as { id: string; publicId?: string | null; status: string }[];
+    const allReports = (await allReportsResponse.json()).data as EnvironmentalReport[];
     // Queue rows are named by publicId (else the id): #741.
     const expectedIds = allReports
       .filter((report) => ["RECEIVED", "UNDER_REVIEW"].includes(report.status))
-      .map((report) => report.publicId || report.id);
+      .map((report) => reportLabel(report));
 
     await status.click();
     await page.getByRole("option", { name: "Recibido" }).click();
@@ -123,7 +125,7 @@ test.describe("EnvironmentalReport case file", () => {
     await page.goto("/app?destination=environment");
     const filters = page.getByRole("region", { name: "Filtros de la cola" });
     const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
-    await expect(list.getByRole("button", { name: /ER-1004/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /Olores · Rondeau 215/ })).toBeVisible();
     await chooseDate(filters, "Desde", "2026-09-04");
     const filtered = page.waitForResponse((response) => {
       const url = new URL(response.url());
@@ -131,8 +133,8 @@ test.describe("EnvironmentalReport case file", () => {
     });
     await chooseDate(filters, "Hasta", "2026-09-05");
     expect((await filtered).ok()).toBe(true);
-    await expect(list.getByRole("button", { name: /ER-1004/ })).toBeVisible();
-    await expect(list.getByRole("button", { name: /ER-1006/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /Olores · Rondeau 215/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /Vertido de residuos · Maza 680/ })).toBeVisible();
     await expect(list.getByRole("button", { name: /TK-2026-084/ })).toHaveCount(0);
     await expect(page).toHaveURL(/from=2026-09-04.*to=2026-09-05/);
     await page.reload();
@@ -150,17 +152,17 @@ test.describe("EnvironmentalReport case file", () => {
     await expect(page.getByRole("main")).toHaveCount(1);
     const list = page.getByRole("region", { name: "Cola de expedientes ambientales" });
     await expect(list).toBeVisible();
-    await expect(list.getByRole("button", { name: /ER-1001/ })).toBeVisible();
-    await expect(list.getByRole("button", { name: /ER-1011/ })).toBeVisible();
-    await list.getByRole("button", { name: /ER-1001/ }).click();
-    const detail = page.getByRole("region", { name: "Detalle de ER-1001" });
+    await expect(list.getByRole("button", { name: /Microbasural · Av. Warnes 1840/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /Otro hallazgo ambiental · Gavilán 1550/ })).toBeVisible();
+    await list.getByRole("button", { name: /Microbasural · Av. Warnes 1840/ }).click();
+    const detail = page.getByRole("region", { name: "Detalle de Microbasural · Av. Warnes 1840" });
     await expect(detail).toBeVisible();
     await detail.getByRole("button", { name: "Iniciar revisión" }).click();
     await expect(detail.getByRole("status", { name: /En revisión/ })).toBeVisible();
     await expect(detail.getByRole("button", { name: "Derivar expediente" })).toBeVisible();
     await expect(detail.getByRole("button", { name: "Desestimar expediente" })).toBeVisible();
 
-    const reportHeading = detail.getByRole("heading", { name: "Expediente ER-1001" });
+    const reportHeading = detail.getByRole("heading", { name: "Expediente Microbasural · Av. Warnes 1840" });
     await detail.getByRole("button", { name: "Derivar expediente" }).click();
     const decisionDialog = page.getByRole("dialog", { name: "Derivar expediente" });
     const reason = decisionDialog.getByLabel(/Motivo/);
@@ -174,9 +176,9 @@ test.describe("EnvironmentalReport case file", () => {
 
     await detail.getByRole("button", { name: "Volver a expedientes" }).click();
     const updatedList = page.getByRole("region", { name: "Cola de expedientes ambientales" });
-    await updatedList.getByRole("button", { name: /ER-1008/ }).click();
-    const noticeDetail = page.getByRole("region", { name: "Detalle de ER-1008" });
-    const noticeHeading = noticeDetail.getByRole("heading", { name: "Expediente ER-1008" });
+    await updatedList.getByRole("button", { name: /Microbasural · Av. Boedo 1880/ }).click();
+    const noticeDetail = page.getByRole("region", { name: "Detalle de Microbasural · Av. Boedo 1880" });
+    const noticeHeading = noticeDetail.getByRole("heading", { name: "Expediente Microbasural · Av. Boedo 1880" });
     await noticeDetail.getByRole("button", { name: "Emitir acta" }).click();
     const noticeDialog = page.getByRole("dialog", { name: "Emitir acta" });
     await noticeDialog.getByLabel(/Buscar establecimiento/).fill("EST-BOEDO-1880");
@@ -265,7 +267,7 @@ test.describe("EnvironmentalReport case file", () => {
       if (method !== "map") expect(payload).toMatchObject({ lat: -34.5446871, lng: -58.4386826 });
       expect(payload.lat).not.toBe(0);
       expect(payload.lng).not.toBe(0);
-      await expect(page.getByText(/Expediente ER-/)).toBeVisible();
+      await expect(page.getByText(/Expediente Ruidos molestos · Calle Nueva 100 abierto/)).toBeVisible();
       await expect(page.getByText(/reporterSnapshot/i)).not.toBeVisible();
     });
   }

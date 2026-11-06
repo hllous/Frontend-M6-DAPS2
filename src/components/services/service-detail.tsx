@@ -28,7 +28,7 @@ import {
   REPAIR_SEVERITY_LABEL,
   type RepairRequest,
 } from "@/lib/repair-requests";
-import { formatArgentinaNumericDateTime, formatCalendarDay } from "@/lib/argentina-date";
+import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
 import type { StreetClosureDependency, StreetClosureRequest } from "@/lib/street-closure-requests";
 import { StatusBadge } from "./status-badge";
@@ -507,7 +507,7 @@ export function ServiceDetail({
                 Programación
               </div>
               <div className="mt-2 text-sm font-bold text-[var(--color-text)] tabular-nums">
-                {formatCalendarDay(service.scheduledDate)}
+                {formatArgentinaCalendarDate(service.scheduledDate)}
               </div>
               <div className="mt-1 flex items-center gap-1 text-xs text-[var(--color-text-secondary)] tabular-nums">
                 <Clock className="h-3.5 w-3.5" aria-hidden />
@@ -555,7 +555,7 @@ export function ServiceDetail({
               {service.ticketId && (
                 <div>
                   <span className="font-semibold text-[var(--color-text-secondary)]">Reclamo:</span>
-                  <p className="mt-1 font-medium text-[var(--color-text)]">{service.ticketId}</p>
+                  <p className="mt-1 font-medium text-[var(--color-text)]">Reclamo ciudadano</p>
                 </div>
               )}
             </div>
@@ -568,7 +568,7 @@ export function ServiceDetail({
                 Notas
               </div>
               <p className="mt-2 text-sm text-[var(--color-text)]">
-                {service.notes}
+                {service.notes.replace(/^Intervención de arbolado (?:intervention-\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.$/i, "Intervención de arbolado.")}
               </p>
             </div>
           )}
@@ -597,7 +597,7 @@ export function ServiceDetail({
                   {repairRequests.map((request) => (
                     <li key={request.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3">
                       <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="font-bold text-[var(--color-text)]">{request.id}</span>
+                        <span className="font-bold text-[var(--color-text)]">Derivación a Obras Públicas</span>
                         <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 font-semibold text-[var(--color-text)]">
                           {REPAIR_REQUEST_STATUS_LABEL[request.status]}
                         </span>

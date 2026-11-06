@@ -1,5 +1,7 @@
 "use client";
 
+import { CompactPager } from "@/components/ui/compact-pager";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -490,7 +492,7 @@ export function IntegrationMonitor({
   return (
     <section aria-labelledby="integration-monitor-title" className="flex min-w-0 flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <h1 id="integration-monitor-title" className="text-2xl font-bold tracking-tight">Monitor de integración</h1>
+        <h1 id="integration-monitor-title" className="text-2xl font-bold tracking-tight">Eventos</h1>
       </header>
 
       <Tabs value={activeTab} onValueChange={changeTab} className="min-w-0">
@@ -656,14 +658,7 @@ export function IntegrationMonitor({
                   </li>
                 ))}
               </ul>
-              <nav aria-label="Paginación de eventos" className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">Mostrando {eventStart}–{eventEnd} de {eventMeta?.total ?? 0}</p>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={eventPageNumber <= 1} onClick={() => setEventPageNumber((page) => Math.max(1, page - 1))}>Anterior</Button>
-                  <span className="text-sm tabular-nums">Página {eventPageNumber} de {Math.max(1, eventMeta?.totalPages ?? 1)}</span>
-                  <Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={eventPageNumber >= (eventMeta?.totalPages ?? 1)} onClick={() => setEventPageNumber((page) => page + 1)}>Siguiente</Button>
-                </div>
-              </nav>
+              <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Mostrando {eventStart}–{eventEnd} de {eventMeta?.total ?? 0}</p><CompactPager label="Paginación de eventos" page={eventPageNumber} totalPages={Math.max(1, eventMeta?.totalPages ?? 1)} onPageChange={setEventPageNumber} /></div>
             </>
           )}
         </TabsContent>
@@ -782,14 +777,7 @@ export function IntegrationMonitor({
                   </li>
                 ))}
               </ul>
-              <nav aria-label="Paginación del registro de actividad" className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">Mostrando {auditStart}–{auditEnd} de {auditMeta?.total ?? 0}</p>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" aria-label="Página anterior" disabled={auditPageNumber <= 1} onClick={() => setAuditPageNumber((page) => Math.max(1, page - 1))}>Anterior</Button>
-                  <span className="text-sm tabular-nums">Página {auditPageNumber} de {Math.max(1, auditMeta?.totalPages ?? 1)}</span>
-                  <Button type="button" variant="outline" size="sm" aria-label="Página siguiente" disabled={auditPageNumber >= (auditMeta?.totalPages ?? 1)} onClick={() => setAuditPageNumber((page) => page + 1)}>Siguiente</Button>
-                </div>
-              </nav>
+              <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Mostrando {auditStart}–{auditEnd} de {auditMeta?.total ?? 0}</p><CompactPager label="Paginación de registro de actividad" page={auditPageNumber} totalPages={Math.max(1, auditMeta?.totalPages ?? 1)} onPageChange={setAuditPageNumber} /></div>
             </>
           )}
         </TabsContent>

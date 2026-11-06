@@ -1,3 +1,5 @@
+import { ENVIRONMENTAL_REPORT_TYPE_LABELS, type EnvironmentalReportType } from "./environmental-reports";
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const isUuid = (id: string): boolean => UUID.test(id);
@@ -7,9 +9,9 @@ export function shortId(id: string): string {
   return UUID.test(id) ? `#${id.slice(0, 8)}` : id;
 }
 
-/** What operators call a report: its `publicId` (`TK-2026-000123`), else a short handle. Never the full UUID. */
-export function reportLabel(report: { id: string; publicId?: string | null }): string {
-  return report.publicId || shortId(report.id);
+/** Public report number or an understandable description when no number exists. */
+export function reportLabel(report: { reportType: EnvironmentalReportType; address?: string | null; location?: { address?: string | null } | null; publicId?: string | null }): string {
+  return report.publicId || `${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · ${report.address || report.location?.address || "sin dirección"}`;
 }
 
 type ReferralLike =

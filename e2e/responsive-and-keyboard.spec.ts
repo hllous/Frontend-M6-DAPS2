@@ -20,7 +20,7 @@ test.describe("responsive shell navigation @smoke", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
 
-    await expect(page.getByRole("navigation", { name: "Módulos" })).not.toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Navegación principal" })).not.toBeVisible();
     await expect(page.getByRole("navigation", { name: "Navegación móvil" })).toBeVisible();
 
     await page.getByRole("button", { name: "Más" }).click();
@@ -33,7 +33,7 @@ test.describe("responsive shell navigation @smoke", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app");
 
-    await expect(page.getByRole("navigation", { name: "Módulos" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Navegación principal" })).toBeVisible();
     await expect(page.getByText("Ambiente")).toBeVisible();
 
     await page.getByRole("button", { name: "Contraer navegación" }).click();

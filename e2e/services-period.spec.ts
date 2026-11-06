@@ -48,7 +48,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
     if (viewport.width === 390) {
-      const period = page.getByRole("combobox", { name: "Período" });
+      const period = page.getByRole("button", { name: /^Filtros \(\d+\)$/ });
       const categories = page.getByRole("button", { name: "Categorías" });
       const map = page.getByRole("region", { name: "Mapa de servicios" });
       await expect(map).toBeVisible();
@@ -114,7 +114,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await expect(assign).toBeFocused();
 
     if (viewport.width === 390) {
-      const period = page.getByRole("combobox", { name: "Período" });
+      const period = page.getByRole("button", { name: /^Filtros \(\d+\)$/ });
       const categories = page.getByRole("button", { name: "Categorías" });
       await expect(period).toHaveCount(0);
       await expect(categories).toHaveCount(0);
@@ -208,7 +208,7 @@ test.describe("Services phone preview replaces the list filters", () => {
     await page.goto("/app?destination=services&q=SVC-1043");
     await expect(page.getByRole("heading", { name: "Servicios", exact: true })).toBeVisible();
 
-    const period = page.getByRole("combobox", { name: "Período" });
+    const period = page.getByRole("button", { name: /^Filtros \(\d+\)$/ });
     const categories = page.getByRole("button", { name: "Categorías" });
     await expect(period).toBeVisible();
     await expect(categories).toBeVisible();

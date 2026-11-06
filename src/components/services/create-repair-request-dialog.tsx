@@ -1,4 +1,5 @@
 "use client";
+import { reportLabel } from "@/lib/display-ids";
 import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useId, useState } from "react";
@@ -116,8 +117,8 @@ export function CreateRepairRequestDialog({
   const sourceKey = service?.id ?? inspection?.id ?? "repair-request-source";
   const serviceId = service?.id;
   const sourceLabel = inspection
-    ? `Inspección ${inspection.id}${report ? ` · ${report.id}` : ""}`
-    : service?.title ?? `Servicio ${sourceId}`;
+    ? report ? reportLabel(report) : "Inspección ambiental"
+    : service?.title ?? "Servicio sin título disponible";
   const sourceHref = inspection
     ? `/app?destination=environment&detail=${encodeURIComponent(report?.id ?? inspection.reportId)}&inspectionId=${encodeURIComponent(inspection.id)}`
     : `/app?destination=services&detail=${encodeURIComponent(sourceId)}`;
@@ -372,7 +373,7 @@ export function CreateRepairRequestDialog({
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-action)]" aria-hidden />
             <div className="min-w-0 text-sm">
-              <p className="font-semibold text-[var(--color-text)]">{isInspection ? "Contexto de origen" : "Servicio"} {sourceId}</p>
+              <p className="font-semibold text-[var(--color-text)]">{isInspection ? "Inspección de origen" : "Servicio"}</p>
               <p className="mt-1 truncate text-[var(--color-text-secondary)]">{sourceLabel}</p>
               <a
                 className="mt-2 inline-flex items-center gap-1 font-semibold text-[var(--color-action)] hover:underline"
@@ -409,7 +410,7 @@ export function CreateRepairRequestDialog({
                   : "Derivada a Obras Públicas."}
             </AlertTitle>
             <AlertDescription>
-              Seguimiento {resolvedRequest.id} · {isInspection ? `Inspección ${sourceId}` : `Servicio ${sourceId}`}
+              {sourceLabel}
             </AlertDescription>
           </Alert>
         )}

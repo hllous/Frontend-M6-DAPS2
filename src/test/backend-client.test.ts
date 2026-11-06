@@ -10,7 +10,7 @@ describe("backend client response parsing", () => {
   it("rejects malformed JSON with a resource-specific contract error and its cause", async () => {
     const result = readJsonBody(new Response("<html>upstream</html>"), "cuadrillas");
     await expect(result).rejects.toBeInstanceOf(BackendContractError);
-    await expect(result).rejects.toMatchObject({ message: "La respuesta de cuadrillas no es JSON válido.", cause: expect.any(Error) });
+    await expect(result).rejects.toMatchObject({ message: "No se pudo obtener información válida de cuadrillas. Reintente en unos segundos.", cause: expect.any(Error) });
   });
 
   it.each(["Acceso denegado.", ["El código es obligatorio.", "La fecha es inválida."]])("parses a documented error message %j", (message) => {
@@ -24,6 +24,6 @@ describe("backend client response parsing", () => {
   it.each([null, { statusCode: 400, message: "incomplete" }, { statusCode: "400", message: "bad" }])("rejects malformed error envelopes %j", (payload) => {
     const result = parseBackendError(payload, "vehículos");
     expect(result).toBeInstanceOf(BackendContractError);
-    expect(result).toMatchObject({ message: "La respuesta de error de vehículos no respeta el contrato documentado.", cause: expect.any(Error) });
+    expect(result).toMatchObject({ message: "No se pudo obtener información válida de vehículos. Reintente en unos segundos.", cause: expect.any(Error) });
   });
 });

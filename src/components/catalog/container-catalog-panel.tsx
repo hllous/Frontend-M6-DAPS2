@@ -1,4 +1,5 @@
 "use client";
+import { InFlightServiceBadge } from "@/components/ui/in-flight-service-badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
@@ -191,9 +192,12 @@ export function ContainerCatalogPanel({
   const [requestVersion, setRequestVersion] = useState(0);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<ContainerStatus | "all">(
-    "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<ContainerStatus | "all">(() => {
+    // `?status=OVERFLOWED` (p. ej. desde el tablero) abre la lista ya filtrada.
+    const requested = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("status");
+    const parsed = containerStatusSchema.safeParse(requested);
+    return parsed.success ? parsed.data : "all";
+  });
   const [typeFilter, setTypeFilter] = useState<ContainerType | "all">("all");
   const [zoneFilter, setZoneFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -1181,10 +1185,7 @@ export function ContainerCatalogPanel({
                   ) : null}
                   {canEmpty && detailContainer.status === "OVERFLOWED" ? (
                     detailInFlight ? (
-                      <Badge variant="info" className="w-fit max-w-full">
-                        <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
-                      </Badge>
+                      <InFlightServiceBadge service={detailInFlight} />
                     ) : (
                       <Button
                         type="button"
@@ -1204,10 +1205,7 @@ export function ContainerCatalogPanel({
                   ) : null}
                   {canManage && detailContainer.status === "ACTIVE" ? (
                     detailInFlight ? (
-                      <Badge variant="info" className="w-fit max-w-full">
-                        <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
-                      </Badge>
+                      <InFlightServiceBadge service={detailInFlight} />
                     ) : (
                       <Button
                         type="button"
@@ -1227,10 +1225,7 @@ export function ContainerCatalogPanel({
                   ) : null}
                   {canManage && detailContainer.status === "RELOCATING" ? (
                     detailInFlight ? (
-                      <Badge variant="info" className="w-fit max-w-full">
-                        <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
-                      </Badge>
+                      <InFlightServiceBadge service={detailInFlight} />
                     ) : (
                       <Button
                         type="button"
@@ -1281,10 +1276,7 @@ export function ContainerCatalogPanel({
                       Iniciar reparación
                     </Button>
                   ) : detailInFlight ? (
-                    <Badge variant="info" className="w-fit max-w-full">
-                      <Clock data-icon="inline-start" aria-hidden />
-                      Servicio en curso ({detailInFlight.id})
-                    </Badge>
+                    <InFlightServiceBadge service={detailInFlight} />
                   ) : (
                     <Button
                       type="button"

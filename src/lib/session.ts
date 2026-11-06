@@ -61,7 +61,7 @@ export class AuthUnavailableError extends Error {
 export class BackendUnavailableError extends Error {
   readonly status: number;
 
-  constructor(status: number, message = "El backend no responde. Reintente en unos segundos.", options?: { cause?: unknown }) {
+  constructor(status: number, message = "El sistema no responde. Reintente en unos segundos.", options?: { cause?: unknown }) {
     super(message, options);
     this.name = "BackendUnavailableError";
     this.status = status;

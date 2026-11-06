@@ -62,7 +62,7 @@ export async function POST(
           ? (inspectionPayload as { data: unknown }).data
           : inspectionPayload;
         const inspection = environmentalInspectionSchema.safeParse(rawInspection);
-        if (!inspection.success) return errorResponse(502, "La respuesta de la inspección no respeta el contrato documentado.", path);
+        if (!inspection.success) return errorResponse(502, "No se pudo obtener información válida de la inspección. Reintente en unos segundos.", path);
         if (!inspection.data.serviceId) return errorResponse(409, "La inspección no tiene un servicio operativo vinculado.", path);
         const scopedService = await requireCrewScope(request, session, { serviceId: inspection.data.serviceId });
         if (scopedService instanceof Response) return scopedService;

@@ -16,7 +16,7 @@ import { rememberBffPath } from "./bff-response-path";
 const INVALID_BACKEND_PATH_ID = "\u0000invalid-backend-path-id\u0000";
 const BACKEND_PATH_ID_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
 const DEFAULT_BACKEND_TIMEOUT_MS = 15_000;
-const BACKEND_UNAVAILABLE_MESSAGE = "El backend no responde. Reintente en unos segundos.";
+const BACKEND_UNAVAILABLE_MESSAGE = "El sistema no responde. Reintente en unos segundos.";
 export type FetchBackendOptions = {
   timeoutMs?: number;
 };
@@ -26,6 +26,26 @@ export function pathId(id: string): string {
     return INVALID_BACKEND_PATH_ID;
   }
   return encodeURIComponent(id);
+}
+
+async function clarifyBackendError(response: Response, method: string): Promise<Response> {
+  if (response.ok || !response.headers.get("content-type")?.toLowerCase().includes("application/json")) return response;
+  const payload: unknown = await response.clone().json().catch(() => null);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return response;
+  const record = payload as Record<string, unknown>;
+  const message = record.message;
+  const values = Array.isArray(message) ? message : [message];
+  if (!values.some((value) => typeof value === "string" && /\bm[oó]dulo\s+[1-9]\b|\bM[1-9]\b|backend|\b(?:workOrderId|closureId|ticketId|serviceId|zoneId)\b/i.test(value))) return response;
+  const replacement = ["GET", "HEAD"].includes(method.toUpperCase())
+    ? "No se pudo obtener la información. Reintente en unos segundos."
+    : response.status >= 400 && response.status < 500
+      ? "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."
+      : "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar.";
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+  void response.body?.cancel().catch(() => undefined);
+  return new Response(JSON.stringify({ ...record, message: replacement }), { status: response.status, statusText: response.statusText, headers });
 }
 
 export async function fetchBackend(
@@ -45,7 +65,7 @@ export async function fetchBackend(
   const backendOrigin = process.env.M6_BACKEND_ORIGIN;
   const sessionAccessToken = session.accessToken;
   if (!backendOrigin || !sessionAccessToken) {
-    throw new AuthUnavailableError("El backend no está configurado.");
+    throw new AuthUnavailableError("El sistema no está disponible. Comuníquese con el administrador del sistema.");
   }
 
   if (resourcePath.includes(INVALID_BACKEND_PATH_ID)) {
@@ -104,7 +124,7 @@ export async function fetchBackend(
         response = await send(accessToken);
       }
     }
-    return finish(response);
+    return finish(await clarifyBackendError(response, init.method ?? "GET"));
   } catch (error) {
     if (init.signal?.aborted) throw error;
     if (error instanceof InvalidSessionError || error instanceof BackendUnavailableError) throw error;

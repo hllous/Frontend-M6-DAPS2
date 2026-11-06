@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
@@ -38,7 +39,10 @@ function incidentsWithDelta(delta: number | null) {
 }
 
 async function variationCard(label: string) {
-  return screen.findByRole("button", { name: `${label}: seleccionar familia` });
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+  await user.click(await screen.findByRole("menuitem", { name: label }));
+  return screen.findByRole("region", { name: `Resumen de ${label}` });
 }
 
 describe("variación de las tarjetas de indicadores", () => {

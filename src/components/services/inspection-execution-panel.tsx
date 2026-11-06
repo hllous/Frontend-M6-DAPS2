@@ -332,7 +332,7 @@ export function InspectionExecutionPanel({
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
           <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Inspección ambiental</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.id} · {formatCalendarDay(service.scheduledDate)} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "—"}</p>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.title} · {formatCalendarDay(service.scheduledDate)} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "—"}</p>
         </div>
         <span className="rounded-lg bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]">Punto asignado</span>
       </div>
@@ -496,7 +496,7 @@ function ServiceClosureGuide({ service, canExecute, onServiceUpdated }: { servic
   if (service.status !== "IN_PROGRESS" && service.status !== "COMPLETED" && service.status !== "PARTIALLY_COMPLETED") return null;
   const open = service.status === "IN_PROGRESS";
   return <>
-    <Alert className="mt-4" role="status" aria-label={open ? "El servicio sigue abierto" : "Servicio cerrado"}>{open ? <AlertTriangle aria-hidden /> : <CheckCircle2 aria-hidden />}<AlertTitle>{open ? "El servicio sigue abierto" : "Servicio cerrado"}</AlertTitle><AlertDescription>{open ? canExecute ? "Falta registrar la zona y completar el servicio." : "La cuadrilla asignada tiene que registrar la zona y completar el servicio." : `${service.id} quedó cerrado con el resultado por zona.`}</AlertDescription></Alert>
+    <Alert className="mt-4" role="status" aria-label={open ? "El servicio sigue abierto" : "Servicio cerrado"}>{open ? <AlertTriangle aria-hidden /> : <CheckCircle2 aria-hidden />}<AlertTitle>{open ? "El servicio sigue abierto" : "Servicio cerrado"}</AlertTitle><AlertDescription>{open ? canExecute ? "Falta registrar la zona y completar el servicio." : "La cuadrilla asignada tiene que registrar la zona y completar el servicio." : `${service.title} quedó cerrado con el resultado por zona.`}</AlertDescription></Alert>
     <ZoneExecutionPanel service={service} canExecute={canExecute} onServiceUpdated={onServiceUpdated} />
   </>;
 }

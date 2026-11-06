@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
 import { resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 import { IntegrationMonitor } from "./integration-monitor";
 
 const server = setupServer(...handlers);
@@ -21,12 +22,15 @@ afterAll(() => server.close());
 
 describe("IntegrationMonitor", () => {
   it("loads a paginated outgoing event list without exposing payload", async () => {
-    render(<IntegrationMonitor canManage initialTab="events" />);
+    const { container } = render(<IntegrationMonitor canManage initialTab="events" />);
 
     const list = await screen.findByRole("table", { name: "Eventos salientes" });
     expect(within(list).getByText("containerDamaged")).toBeVisible();
     expect(within(list).queryByText(/damageType|containerId/)).not.toBeInTheDocument();
     expect(await screen.findByLabelText("Eventos fallidos")).toHaveTextContent("2 eventos fallidos");
+    const heading = screen.getByRole("heading", { name: "Eventos" });
+    expect(heading).toBeVisible();
+    expectNoInternalJargon(container, { allowTechnicalIds: true });
   });
 
   it("announces calendar days in Spanish", async () => {
@@ -52,7 +56,7 @@ describe("IntegrationMonitor", () => {
     expect(confirmation).toHaveTextContent("Esta acción no corrige un contenido que el sistema receptor haya rechazado");
     await user.click(within(confirmation).getByRole("button", { name: "Confirmar reintento" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("El evento se reencoló y ahora está pendiente.");
+    expect(await screen.findByText("El evento se reencoló y ahora está pendiente.")).toHaveAttribute("role", "status");
     expect((await screen.findAllByLabelText("Estado: Pendiente"))[0]).toBeVisible();
   });
 
@@ -89,7 +93,7 @@ describe("IntegrationMonitor", () => {
     await user.type(within(confirmation).getByRole("spinbutton", { name: "Límite de reintentos" }), "1");
     await user.click(within(confirmation).getByRole("button", { name: "Confirmar reintento masivo" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Se reencoló 1 evento; queda 1 evento fallido.");
+    expect(await screen.findByText("Se reencoló 1 evento; queda 1 evento fallido.")).toHaveAttribute("role", "status");
   });
 
   it("filters the activity log by entity type and identifier", async () => {

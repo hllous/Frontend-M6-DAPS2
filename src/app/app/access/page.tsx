@@ -12,5 +12,5 @@ export default async function AccessPage() {
   if (!session.roles.includes("M6_ADMIN")) return <ShellForbidden />;
   const ownUserId = sessionUserId(session);
   if (!ownUserId) return <ShellForbidden />;
-  return <AccessWorkspace ownUserId={ownUserId} />;
+  return <AccessWorkspace ownUserId={ownUserId} mock={session.mode === "mock"} />;
 }

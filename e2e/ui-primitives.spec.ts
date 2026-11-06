@@ -7,7 +7,7 @@ async function heightOf(locator: import("@playwright/test").Locator) {
 }
 
 test.describe("shared control density", () => {
-  test("button, field, and tabs list match desktop and mobile targets at 760 px", async ({ page }) => {
+  test("button, field, and dashboard controls match desktop and mobile targets at 760 px", async ({ page }) => {
     await loginViaApi(page, "office-duty-queue");
 
     for (const { width, height, expected } of [
@@ -20,12 +20,31 @@ test.describe("shared control density", () => {
 
       await expect.poll(() => heightOf(page.getByRole("button", { name: "Cerrar sesión" }))).toBe(expected);
       await expect.poll(() => heightOf(page.getByRole("button", { name: "Programar servicio" }))).toBe(expected);
-      await expect.poll(() => heightOf(page.getByRole("searchbox", { name: "Buscar servicios" }))).toBe(expected);
+      // On phones the search lives in the «Filtros (n)» sheet; its trigger carries the touch target.
+      const searchTarget = width === 760
+        ? page.getByRole("button", { name: /^Filtros \(\d+\)$/ })
+        : page.getByRole("searchbox", { name: "Buscar servicios" });
+      await expect.poll(() => heightOf(searchTarget)).toBe(expected);
 
+      await page.goto("/app?destination=dashboards");
+      await expect(page.getByRole("heading", { name: "Tableros" })).toBeVisible();
+      await page.getByRole("button", { name: /^Más filtros/ }).click();
+      const periods = page.getByRole("group", { name: "Período", exact: true });
+      await expect.poll(() => heightOf(periods)).toBe(expected);
+      for (const name of ["Semana", "Mes", "Trimestre", "Más filtros - Mes", "Ver tabla", "Ver detalle de Servicios sin realizar", "Detalle por familia"]) {
+        await expect.poll(() => heightOf(page.getByRole("button", { name, exact: true }).first())).toBe(expected);
+      }
+      await page.getByRole("button", { name: "Detalle por familia" }).click();
+      for (const family of ["Cobertura", "Cumplimiento", "Incidencias", "Residuos"]) {
+        await expect.poll(() => heightOf(page.getByRole("menuitem", { name: family }))).toBe(48);
+      }
+      await page.keyboard.press("Escape");
+      await expect.poll(() => heightOf(page.getByRole("link", { name: "Ver lista de servicios sin realizar" }))).toBe(expected);
+      await page.getByRole("button", { name: "Ver detalle de Servicios sin realizar" }).click();
+      await expect.poll(() => heightOf(page.getByRole("button", { name: "Volver a Tableros" }))).toBe(expected);
       if (width === 760) {
-        await page.goto("/app?destination=dashboards");
-        await expect(page.getByRole("heading", { name: "Indicadores operativos" })).toBeVisible();
-        await expect.poll(() => heightOf(page.locator('[data-slot="tabs-list"]'))).toBe(expected);
+        await expect.poll(() => heightOf(page.getByRole("tablist", { name: "Secciones del tablero" }))).toBe(expected);
+        await expect.poll(() => heightOf(page.getByRole("tab", { name: "Resumen" }))).toBe(expected);
       }
     }
   });

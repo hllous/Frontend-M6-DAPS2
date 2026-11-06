@@ -69,7 +69,7 @@ test.describe("TreeIntervention requests #128", () => {
     await page.getByRole("button", { name: "Solicitar intervención sugerida" }).click();
     const guided = page.getByRole("dialog", { name: /Solicitar intervención/ });
     await expect(guided.getByRole("combobox", { name: "Tipo de intervención" })).toContainText("Extracción");
-    await expect(guided.getByLabel(/^Justificación/)).toHaveValue("Relevamiento 05/09/2026 (survey-4).");
+    await expect(guided.getByLabel(/^Justificación/)).toHaveValue("Relevamiento 05/09/2026 (ARB-00445).");
   });
 
   test("Field can consult intervention requests but cannot create one", async ({ page }) => {

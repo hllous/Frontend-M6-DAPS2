@@ -178,7 +178,7 @@ function mapRepairRequest(request: RepairRequest, useFixtures: boolean): Referra
     sourceType: "SERVICE",
     sourceId: request.detectedInId,
     sourceServiceId: request.detectedInId,
-    sourceLabel: source?.label ?? (isInspection ? "Inspección ambiental" : "Servicio de origen"),
+    sourceLabel: isInspection ? "Inspección ambiental" : source?.label ?? "Servicio de origen",
     sourceHref: source?.href ?? (isInspection
       ? useFixtures ? environmentalInspectionSourceHref(request.detectedInId) : `/app?destination=environment&inspectionId=${encodeURIComponent(request.detectedInId)}`
       : serviceSourceHref(request.detectedInId)),
@@ -223,7 +223,7 @@ async function requestJson(path: string): Promise<unknown> {
   try {
     payload = await response.json();
   } catch (cause) {
-    throw new ReferralContractError("La respuesta de derivaciones no es JSON válido.", { cause });
+    throw new ReferralContractError("No se pudo obtener información válida de derivaciones. Reintente en unos segundos.", { cause });
   }
   if (!response.ok) {
     const message = payload && typeof payload === "object" && "message" in payload
@@ -237,13 +237,13 @@ async function requestJson(path: string): Promise<unknown> {
 export const referralsAdapter = {
   async list(): Promise<ReferralsPage> {
     const parsed = referralsPageSchema.safeParse(await requestJson("/api/referrals"));
-    if (!parsed.success) throw new ReferralContractError("La lista de derivaciones no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new ReferralContractError("No se pudo obtener información válida de la lista de derivaciones. Reintente en unos segundos.", { cause: parsed.error });
     return { referrals: parsed.data.data as Referral[], total: parsed.data.meta.total, invalid: parsed.data.meta.invalid ?? 0 };
   },
 
   async get(id: string): Promise<Referral> {
     const parsed = referralSchema.safeParse(await requestJson(`/api/referrals/${encodeURIComponent(id)}`));
-    if (!parsed.success) throw new ReferralContractError("El detalle de la derivación no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new ReferralContractError("No se pudo obtener información válida del detalle de la derivación. Reintente en unos segundos.", { cause: parsed.error });
     return parsed.data as Referral;
   },
 };

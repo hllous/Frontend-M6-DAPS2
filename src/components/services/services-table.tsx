@@ -22,8 +22,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { DataTableResizeHandle } from "@/components/ui/data-table-resize-handle";
 import { DataTable, DataTableSortButton, useDataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
@@ -50,10 +48,14 @@ export type { SortDir, SortKey } from "./service-sorting";
 
 export type ColumnFilters = {
   zones: Set<string>;
+  /** Tipos de servicio (ids); llega por ?serviceType= desde Tableros. */
+  serviceTypes: Set<string>;
   statuses: Set<ServiceStatus>;
   crews: Set<string>;
   timeFrom: string;
   timeTo: string;
+  /** Solo servicios terminados después de su fecha programada. */
+  late: boolean;
 };
 
 type ColumnPointerDrag = {
@@ -88,16 +90,6 @@ function moveColumnOrder(
 function sameColumnOrder(a: ServicesColumnKey[], b: ServicesColumnKey[]): boolean {
   return a.length === b.length && a.every((key, index) => key === b[index]);
 }
-
-const ALL_STATUSES: ServiceStatus[] = [
-  "SCHEDULED",
-  "RESCHEDULED",
-  "IN_PROGRESS",
-  "SUSPENDED",
-  "COMPLETED",
-  "PARTIALLY_COMPLETED",
-  "CANCELLED",
-];
 
 const DEFAULT_COLUMN_ORDER: ServicesColumnKey[] = [
   "service",
@@ -197,7 +189,6 @@ function ScheduledFilterPopover({
 export function ServicesTable({
   services,
   serviceOrdinals: suppliedServiceOrdinals,
-  filterOptionsServices = services,
   selectedId,
   onSelect,
   sortKey,
@@ -212,7 +203,6 @@ export function ServicesTable({
 }: {
   services: Service[];
   serviceOrdinals?: ReadonlyMap<string, number>;
-  filterOptionsServices?: Service[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   sortKey: SortKey | null;
@@ -327,43 +317,8 @@ export function ServicesTable({
     }
   }, [selectedId]);
 
-  const availableZones = useMemo(() => {
-    const set = new Set<string>();
-    filterOptionsServices.forEach((s) => s.zoneNames.forEach((zn) => set.add(zn)));
-    columnFilters.zones.forEach((zone) => set.add(zone));
-    return Array.from(set).sort();
-  }, [filterOptionsServices, columnFilters.zones]);
-
-  const availableCrews = useMemo(() => {
-    const set = new Set<string>();
-    filterOptionsServices.forEach((s) => set.add(s.crewName ?? "Sin asignar"));
-    columnFilters.crews.forEach((crew) => set.add(crew));
-    return Array.from(set).sort();
-  }, [filterOptionsServices, columnFilters.crews]);
-
   const computedServiceOrdinals = useMemo(() => createServiceOrdinals(services), [services]);
   const serviceOrdinals = suppliedServiceOrdinals ?? computedServiceOrdinals;
-
-  const toggleZone = (zone: string) => {
-    const next = new Set(columnFilters.zones);
-    if (next.has(zone)) next.delete(zone);
-    else next.add(zone);
-    onColumnFiltersChange({ ...columnFilters, zones: next });
-  };
-
-  const toggleStatus = (status: ServiceStatus) => {
-    const next = new Set(columnFilters.statuses);
-    if (next.has(status)) next.delete(status);
-    else next.add(status);
-    onColumnFiltersChange({ ...columnFilters, statuses: next });
-  };
-
-  const toggleCrew = (crew: string) => {
-    const next = new Set(columnFilters.crews);
-    if (next.has(crew)) next.delete(crew);
-    else next.add(crew);
-    onColumnFiltersChange({ ...columnFilters, crews: next });
-  };
 
   const columns: Array<{ key: ServicesColumnKey; label: string }> = [
     { key: "service", label: "Servicio" },
@@ -668,68 +623,6 @@ export function ServicesTable({
                             onColumnFiltersChange={onColumnFiltersChange}
                           />
                         </>
-                      )}
-
-                      {col.key === "zone" && (
-                        <ColumnFilterPopover
-                          label="zona"
-                          active={columnFilters.zones.size > 0}
-                          onClear={() => onColumnFiltersChange({ ...columnFilters, zones: new Set() })}
-                        >
-                          <div className="max-h-48 overflow-y-auto space-y-1.5 py-1">
-                            {availableZones.map((z) => (
-                              <Label key={z} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
-                                <Checkbox
-                                  checked={columnFilters.zones.has(z)}
-                                  onCheckedChange={() => toggleZone(z)}
-                                />
-                                <span>{z}</span>
-                              </Label>
-                            ))}
-                          </div>
-                        </ColumnFilterPopover>
-                      )}
-
-                      {col.key === "status" && (
-                        <ColumnFilterPopover
-                          label="estado"
-                          active={columnFilters.statuses.size > 0}
-                          onClear={() => onColumnFiltersChange({ ...columnFilters, statuses: new Set() })}
-                        >
-                          <div className="max-h-56 overflow-y-auto space-y-1.5 py-1">
-                            {ALL_STATUSES.map((st) => (
-                              <Label key={st} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
-                                <Checkbox
-                                  checked={columnFilters.statuses.has(st)}
-                                  onCheckedChange={() => toggleStatus(st)}
-                                />
-                                <span data-status-filter-option={st}>
-                                  <StatusBadge status={st} className="gap-1 px-1.5 py-0 text-[10px]" />
-                                </span>
-                              </Label>
-                            ))}
-                          </div>
-                        </ColumnFilterPopover>
-                      )}
-
-                      {col.key === "crew" && (
-                        <ColumnFilterPopover
-                          label="equipo"
-                          active={columnFilters.crews.size > 0}
-                          onClear={() => onColumnFiltersChange({ ...columnFilters, crews: new Set() })}
-                        >
-                          <div className="max-h-48 overflow-y-auto space-y-1.5 py-1">
-                            {availableCrews.map((c) => (
-                              <Label key={c} className="flex items-center gap-2 text-xs text-[var(--color-text)] cursor-pointer">
-                                <Checkbox
-                                  checked={columnFilters.crews.has(c)}
-                                  onCheckedChange={() => toggleCrew(c)}
-                                />
-                                <span>{c}</span>
-                              </Label>
-                            ))}
-                          </div>
-                        </ColumnFilterPopover>
                       )}
 
                       {col.key === "scheduled" && (

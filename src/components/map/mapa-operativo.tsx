@@ -64,6 +64,7 @@ import { cn } from "@/lib/utils";
 
 import { InventoryMapDrawer } from "./inventory-map-drawer";
 import type { OperationalMapView } from "./operational-map-canvas";
+import { mapWithConcurrency } from "@/lib/map-concurrency";
 import styles from "./mapa-operativo.module.css";
 
 type LayerId = keyof OperationalMapData;
@@ -279,6 +280,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   const [isLoading, setIsLoading] = useState(true);
   const [viewError, setViewError] = useState<string | null>(null);
   const [routes, setRoutes] = useState<Route[]>([]);
+  const [inventoryComplete, setInventoryComplete] = useState(false);
   const [routesLoaded, setRoutesLoaded] = useState(false);
   const [routeDetailRequestVersion, setRouteDetailRequestVersion] = useState(0);
   const [selectedRouteId, setSelectedRouteId] = useState("");
@@ -310,7 +312,9 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
   );
 
   const load = useCallback(async () => {
-    setIsLoading(true);
+    operationalMapAdapter.invalidate(true);
+    setInventoryComplete(false);
+    setIsLoading(!data);
     setError(null);
     setViewError(null);
     if (view === "coverage") {
@@ -331,9 +335,10 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     try {
       const [nextData, nextZones] = await Promise.all([
         operationalMapAdapter.load(),
-        operationalZonesAdapter.list(),
+        operationalZonesAdapter.list().then((loadedZones) => { setZones(loadedZones); return loadedZones; }),
       ]);
       setData(nextData);
+      setInventoryComplete(true);
       setZones(nextZones);
       setLastConsultedAt(new Date().toISOString());
     } catch {
@@ -341,15 +346,23 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
     } finally {
       setIsLoading(false);
     }
-  }, [view]);
+  }, [view, data]);
 
   useEffect(() => {
     let isCurrent = true;
+    const unsubscribe = operationalMapAdapter.subscribe((partial) => {
+      if (isCurrent && Object.values(partial).some((items) => items.length > 0)) { setData(partial); setIsLoading(false); }
+    });
 
-    Promise.all([operationalMapAdapter.load(), operationalZonesAdapter.list()]).then(
+    const zonesPromise = operationalZonesAdapter.list().then((loadedZones) => {
+      if (isCurrent) setZones(loadedZones);
+      return loadedZones;
+    });
+    Promise.all([operationalMapAdapter.load(), zonesPromise]).then(
       ([nextData, nextZones]) => {
         if (!isCurrent) return;
         setData(nextData);
+        setInventoryComplete(true);
         setZones(nextZones);
         setLastConsultedAt(new Date().toISOString());
         setIsLoading(false);
@@ -363,6 +376,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
 
     return () => {
       isCurrent = false;
+      unsubscribe();
     };
   }, []);
 
@@ -374,11 +388,13 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
       const firstPage = await routesAdapter.list({ active: true, page: 1, pageSize: 100 });
       const nextRoutes = [...firstPage.routes];
 
-      for (let page = 2; page <= firstPage.totalPages; page += 1) {
-        const result = await routesAdapter.list({ active: true, page, pageSize: 100 });
-        if (!isCurrent) return;
-        nextRoutes.push(...result.routes);
-      }
+      const remaining = await mapWithConcurrency(
+        Array.from({ length: Math.max(0, firstPage.totalPages - 1) }, (_, index) => index + 2),
+        6,
+        (page) => routesAdapter.list({ active: true, page, pageSize: 100 }),
+      );
+      if (!isCurrent) return;
+      nextRoutes.push(...remaining.flatMap((page) => page.routes));
 
       if (isCurrent) {
         setRoutes(nextRoutes);
@@ -631,6 +647,8 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
                 </div>
                 <OperationalMapCanvas
                   view={view}
+                  viewLoading={isViewLoading}
+                  inventoryComplete={inventoryComplete}
                   markers={locatedItems}
                   zones={zones}
                   routeStops={routeStops}
@@ -1063,10 +1081,10 @@ function TodayMapPanel({
               <Item key={service.id} variant="outline" size="xs">
                 <ItemContent>
                   <ItemTitle>{service.title}</ItemTitle>
-                  <ItemDescription>{service.id} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "sin horario"}</ItemDescription>
+                  <ItemDescription>{service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "sin horario"}</ItemDescription>
                   <ItemDescription>{service.zoneIds.map((zoneId) => {
                     const result = zoneResults.find((candidate) => candidate.zoneId === zoneId);
-                    return `${service.zoneNames[service.zoneIds.indexOf(zoneId)] ?? zoneId}: ${result ? ZONE_RESULT_STATUS_LABEL[result.status] : "Pendiente"}`;
+                    return `${service.zoneNames[service.zoneIds.indexOf(zoneId)] ?? "Zona sin nombre disponible"}: ${result ? ZONE_RESULT_STATUS_LABEL[result.status] : "Pendiente"}`;
                   }).join(" · ")}
                   </ItemDescription>
                 </ItemContent>

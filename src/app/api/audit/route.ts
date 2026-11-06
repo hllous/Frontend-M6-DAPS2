@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         "integrationMonitor:view",
         { cache: "no-store" },
       );
-      return validatedBackendResponse(response, auditPageSchema, path, "El registro de actividad no respeta el contrato documentado.");
+      return validatedBackendResponse(response, auditPageSchema, path, "No se pudo obtener información válida del registro de actividad. Reintente en unos segundos.");
     }
 
     return jsonNoStore(auditPageSchema.parse(listAuditFixtures(parsedQuery.data)));

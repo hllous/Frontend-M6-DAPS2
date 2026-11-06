@@ -7,6 +7,7 @@ import { ServiceRequestError, servicesAdapter } from "@/lib/services";
 import { scenarios } from "@/lib/scenarios";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { ServicesWorkspace } from "./services-workspace";
+import { invalidateServicesListCache } from "./services-list-cache";
 import { choosePeriod, periodSelect } from "./services-period-test-helpers";
 
 const server = setupServer(...handlers);
@@ -14,6 +15,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 
 afterEach(() => {
+  sessionStorage.clear();
+  invalidateServicesListCache();
   vi.restoreAllMocks();
   server.resetHandlers();
   vi.useRealTimers();
@@ -21,6 +24,27 @@ afterEach(() => {
 });
 
 describe("Services workspace period", () => {
+  it("abre el rango exacto de Tableros y permite volver a un período habitual", async () => {
+    window.history.replaceState(null, "", "/app?destination=services&from=2026-01-03&to=2026-01-20");
+    const list = vi.spyOn(servicesAdapter, "list");
+    render(<ServicesWorkspace />);
+    expect(await screen.findByRole("region", { name: "Tabla operativa de Servicios" })).toBeVisible();
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ scheduledFrom: "2026-01-03", scheduledTo: "2026-01-20" }));
+    expect(periodSelect()).toHaveTextContent("Del 03/01 al 20/01");
+    await choosePeriod("Todo el período");
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ pageSize: 100 }));
+  });
+  it("no reutiliza el listado de otro rango personalizado", async () => {
+    const list = vi.spyOn(servicesAdapter, "list");
+    window.history.replaceState(null, "", "/app?from=2026-01-03&to=2026-01-20");
+    const first = render(<ServicesWorkspace />);
+    await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
+    first.unmount();
+    window.history.replaceState(null, "", "/app?from=2026-02-01&to=2026-02-10");
+    render(<ServicesWorkspace />);
+    await waitFor(() => expect(list).toHaveBeenCalledWith(expect.objectContaining({ scheduledFrom: "2026-02-01", scheduledTo: "2026-02-10" })));
+    expect(periodSelect()).toHaveTextContent("Del 01/02 al 10/02");
+  });
   it("warns with the dropped count summed across pages, and stays silent when the total only exceeds the rows because of paging (#651)", async () => {
     const mockPages = (dropped: (page: number) => number) => vi.spyOn(servicesAdapter, "list").mockImplementation(async (query) => ({
       services: query?.pageSize === 1 ? [] : [{ ...serviceFixtures[0], id: `p${query?.page ?? 1}` }],
@@ -32,6 +56,7 @@ describe("Services workspace period", () => {
     const { unmount } = render(<ServicesWorkspace />);
     expect(await screen.findByText("3 registros no se pudieron mostrar con esta versión de la aplicación.")).toBeVisible();
     unmount();
+    invalidateServicesListCache(); // a new visit after the list expired/was refreshed
     first.mockRestore();
     mockPages(() => 0);
     render(<ServicesWorkspace />);
@@ -143,6 +168,32 @@ describe("Services workspace period", () => {
     ]);
   });
 
+  it("restores the page when returning to Servicios", async () => {
+    window.history.replaceState(null, "", "/app?periodo=todo");
+    const services = Array.from({ length: 30 }, (_, index) => ({ ...serviceFixtures[0], id: `restored-${index}` }));
+    vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services, total: 30, totalPages: 1, page: 1, pageSize: 100 });
+    const { unmount } = render(<ServicesWorkspace />);
+    await userEvent.click(await screen.findByRole("button", { name: "Página siguiente" }));
+    expect(await screen.findByText("Mostrando 26–30 de 30")).toBeVisible();
+    unmount();
+    render(<ServicesWorkspace />);
+    expect(await screen.findByText("Mostrando 26–30 de 30")).toBeVisible();
+  });
+  it("restores the reset page after changing and clearing a filter", async () => {
+    window.history.replaceState(null, "", "/app?periodo=todo");
+    const services = Array.from({ length: 30 }, (_, index) => ({ ...serviceFixtures[0], id: `reset-${index}`, status: index < 15 ? "SCHEDULED" as const : "COMPLETED" as const }));
+    vi.spyOn(servicesAdapter, "list").mockResolvedValue({ services, total: 30, totalPages: 1, page: 1, pageSize: 100 });
+    const user = userEvent.setup();
+    const { unmount } = render(<ServicesWorkspace />);
+    await user.click(await screen.findByRole("button", { name: "Página siguiente" }));
+    await pick("Estado", "Completado");
+    await screen.findByText("Mostrando 1–15 de 15");
+    await clearFilters();
+    expect(await screen.findByText("Mostrando 1–25 de 30")).toBeVisible();
+    unmount();
+    render(<ServicesWorkspace />);
+    expect(await screen.findByText("Mostrando 1–25 de 30")).toBeVisible();
+  });
   it("shows 25 services per page in chronological order with a pager and quick filters", async () => {
     window.history.replaceState(null, "", "/app?periodo=todo");
     const services = Array.from({ length: 60 }, (_, index) => ({ ...serviceFixtures[0], id: `s${index}`, title: `Servicio ${String(index).padStart(2, "0")}`, scheduledDate: `2026-09-${String(28 - (index % 28)).padStart(2, "0")}`, windowFrom: "08:00" }));
@@ -153,21 +204,24 @@ describe("Services workspace period", () => {
     const table = await screen.findByRole("region", { name: "Tabla operativa de Servicios" });
     expect(await screen.findByText("Mostrando 1–25 de 60")).toBeVisible();
     expect(within(table).getAllByRole("row").length - 1).toBe(25);
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Página siguiente" }));
     expect(await screen.findByText("Mostrando 26–50 de 60")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Página siguiente" }));
     expect(await screen.findByText("Mostrando 51–60 de 60")).toBeVisible();
     expect(within(table).getAllByRole("row").length - 1).toBe(10);
-    expect(screen.getByRole("combobox", { name: "Estado" })).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "Zona" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Estado" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Comuna y barrio" })).toBeVisible();
   });
 
-  const pick = async (combobox: string, option: string) => {
+  const pick = async (filter: string, option: string) => {
     const user = userEvent.setup();
-    screen.getByRole("combobox", { name: combobox }).focus();
-    await user.keyboard("{Enter}");
-    const listbox = await screen.findByRole("listbox");
-    await user.click(within(listbox).getByRole("option", { name: option }));
+    await user.click(screen.getByRole("button", { name: new RegExp(`^${filter}`) }));
+    const panel = await screen.findByRole("dialog", { name: filter });
+    await user.click(await within(panel).findByRole("checkbox", { name: option }));
+    await user.keyboard("{Escape}");
+  };
+  const clearFilters = async () => {
+    await userEvent.setup().click(screen.getByRole("button", { name: "Limpiar filtros" }));
   };
 
   const svc = (id: string, over: Record<string, unknown> = {}) => ({ ...serviceFixtures[0], id, title: `Servicio ${id}`, scheduledDate: "2026-09-10", windowFrom: "08:00", ...over });
@@ -208,19 +262,19 @@ describe("Services workspace period", () => {
 
   it("filters by status and zone from the toolbar, goes back to page 1 and clamps an out-of-range page", async () => {
     window.history.replaceState(null, "", "/app?periodo=todo");
-    const many = Array.from({ length: 60 }, (_, index) => svc(`s${String(index).padStart(2, "0")}`, { status: index < 30 ? "SCHEDULED" : "COMPLETED", zoneNames: [index % 2 === 0 ? "Zona Norte" : "Zona Sur"], scheduledDate: `2026-09-${String(1 + (index % 28)).padStart(2, "0")}` }));
+    const many = Array.from({ length: 60 }, (_, index) => svc(`s${String(index).padStart(2, "0")}`, { status: index < 30 ? "SCHEDULED" : "COMPLETED", zoneIds: [index % 2 === 0 ? "zone-1" : "zone-2"], scheduledDate: `2026-09-${String(1 + (index % 28)).padStart(2, "0")}` }));
     pagesOf([many]);
     const user = userEvent.setup();
     render(<ServicesWorkspace />);
     await screen.findByText("Mostrando 1–25 de 60");
 
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Página siguiente" }));
     expect(await screen.findByText("Mostrando 26–50 de 60")).toBeVisible();
 
     await pick("Estado", "Completado");
     expect(await screen.findByText("Mostrando 1–25 de 30")).toBeVisible(); // page reset and filtered
 
-    await pick("Zona", "Zona Norte");
+    await pick("Comuna y barrio", "Belgrano");
     expect(await screen.findByText("Mostrando 1–15 de 15")).toBeVisible();
   });
 
@@ -230,12 +284,12 @@ describe("Services workspace period", () => {
     const user = userEvent.setup();
     render(<ServicesWorkspace />);
     await screen.findByText("Mostrando 1–25 de 60");
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Página siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Página siguiente" }));
     expect(await screen.findByText("Mostrando 51–60 de 60")).toBeVisible();
     await pick("Estado", "Completado");
     await screen.findByText("Mostrando 1–25 de 30");
-    await pick("Estado", "Todos");
+    await clearFilters();
     expect(await screen.findByText("Mostrando 1–25 de 60")).toBeVisible();
   });
 

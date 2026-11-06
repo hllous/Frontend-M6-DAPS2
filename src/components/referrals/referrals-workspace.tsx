@@ -19,8 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { CopyableId } from "@/components/ui/copyable-id";
-import { isUuid, referralLabel, shortId } from "@/lib/display-ids";
+import { isUuid, referralLabel } from "@/lib/display-ids";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -208,22 +207,6 @@ function statusLabel(referral: Referral): string {
     : closureStatusLabel[referral.status];
 }
 
-function formatDate(value: string): string {
-  const calendarDay = value.slice(0, 10);
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(calendarDay);
-  if (match && new Date(`${calendarDay}T00:00:00Z`).toISOString().slice(0, 10) === calendarDay) {
-    return `${match[3]}/${match[2]}/${match[1]}`;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return value;
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "America/Argentina/Buenos_Aires",
-  }).format(date);
-}
-
 // Una hora sin zona (`2026-09-05T08:00`) es hora argentina (UTC-3, sin horario de verano), no la de la máquina.
 const ZONELESS_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 
@@ -360,7 +343,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
   return (
     <div className="flex min-h-full flex-col bg-[var(--color-canvas)]">
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl items-end justify-between gap-4">
+        <div className="mx-auto flex w-full items-end justify-between gap-4">
           <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] sm:text-[28px]">Derivaciones</h1>
           {loadState.status === "ready" ? (
             <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-text-secondary)]">
@@ -390,7 +373,7 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
         </div>
       )}
       {loadState.status === "ready" && loadState.invalid > 0 && (
-        <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full px-4 pt-4 sm:px-6 lg:px-8">
           <Alert role="status" aria-label="Derivaciones sin mostrar" className="rounded-xl border-[var(--color-warning-line)] bg-[var(--color-surface)] p-3">
             <ShieldAlert aria-hidden />
             <AlertDescription className="text-[var(--color-text)]">
@@ -401,10 +384,10 @@ export function ReferralsWorkspace({ scenario }: { scenario: OperationalScenario
       )}
       {loadState.status === "ready" && loadState.referrals.length === 0 && <EmptyState />}
       {loadState.status === "ready" && loadState.referrals.length > 0 && (
-        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
+        <div className="mx-auto flex w-full flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
           <ReferralReconciliationSummary referrals={loadState.referrals} anomalies={anomalies} />
           <section className="w-full" aria-label="Lista de derivaciones">
-            <ItemGroup className="grid min-w-0 grid-cols-1 gap-3" aria-label="Derivaciones">
+            <ItemGroup className="grid min-w-0 grid-cols-1 gap-3 min-[1600px]:grid-cols-2" aria-label="Derivaciones">
               {loadState.referrals.map((referral) => (
                 <ReferralRow
                   key={`${referral.kind}-${referral.id}`}
@@ -515,14 +498,14 @@ function ReferralRow({
   return (
     <Item
       variant="interactive"
-      className="min-h-12 w-full items-start gap-3 p-4 text-left sm:items-center"
+      className="h-full min-h-12 w-full items-start gap-3 p-4 text-left sm:items-center"
       render={(
         <Button
           type="button"
           variant="ghost"
           className="h-auto min-h-12 min-w-0 w-full items-start justify-start whitespace-normal text-left sm:items-center"
           onClick={onOpen}
-          aria-label={`${label}${sectionSummary ? `, ${sectionSummary}` : ""}, ${shortId(referral.id)}, ${statusLabel(referral)}`}
+          aria-label={`${label}${sectionSummary ? `, ${sectionSummary}` : ""}, ${destinationLabel[referral.destination]}, ${formatDateTime(referral.createdAt)}, ${statusLabel(referral)}`}
         />
       )}
     >
@@ -536,10 +519,10 @@ function ReferralRow({
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-bold text-[var(--color-text)]">{label}</span>
             <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{referralKindLabel[referral.kind]}</span>
-            <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">{shortId(referral.id)}</span>
+            <span className="text-xs tabular-nums text-[var(--color-text-secondary)]">{formatDateTime(referral.createdAt)}</span>
           </span>
           {sectionSummary && <span className="mt-1 block text-xs text-[var(--color-text-secondary)]">{sectionSummary}</span>}
-          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {isUuid(referral.sourceId) ? "" : `${referral.sourceId} · `}{referral.sourceLabel}</span>
+          <span className="mt-1 block truncate text-xs text-[var(--color-text-secondary)]">{sourceKindLabel(referral)}: {referral.sourceLabel}</span>
         </span>
         <ItemActions className="w-full basis-full justify-end sm:ml-auto sm:w-auto sm:basis-auto">
           <Badge variant="status" className="min-h-7 shrink-0 gap-1.5 px-2.5 py-1 text-xs font-semibold" role="status" aria-label={`Estado: ${statusLabel(referral)}`}>
@@ -580,7 +563,7 @@ function ReferralDetail({
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Volver a derivaciones
           </Button>
-          <span className="text-xs font-semibold text-[var(--color-text-secondary)]">{shortId(referral.id)}</span>
+          
         </div>
       </header>
       <div className="mx-auto w-full max-w-6xl flex-1 space-y-5 p-4 sm:p-6 lg:p-8">
@@ -589,7 +572,7 @@ function ReferralDetail({
             <p className="text-sm font-semibold text-[var(--color-action)]">{referralKindLabel[referral.kind]}</p>
             <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-text)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)] sm:text-[28px]">Detalle de {referralLabel(referral, repairDamageLabel)}</h1>
             <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-              <div className="flex items-center gap-1.5"><dt className="text-[var(--color-text-secondary)]">Identificador técnico</dt><dd><CopyableId value={referral.id} label="identificador técnico de la derivación" /></dd></div>
+              
               <div className="flex gap-1.5"><dt className="text-[var(--color-text-secondary)]">Creada</dt><dd className="text-[var(--color-text)]">{formatDateTime(referral.createdAt)}</dd></div>
               <div className="flex gap-1.5"><dt className="text-[var(--color-text-secondary)]">Actualizada</dt><dd className="text-[var(--color-text)]">{formatDateTime(referral.updatedAt)}</dd></div>
             </dl>
@@ -610,7 +593,7 @@ function ReferralDetail({
             </span>
             <div className="min-w-0">
               <h2 id="referral-source-title" className="text-sm font-bold text-[var(--color-text)]">{sourceKindLabel(referral)}</h2>
-              <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceId} · {referral.sourceLabel}</p>
+              <p className="mt-1 text-sm text-[var(--color-text)]">{referral.sourceLabel}</p>
               <a className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-action)] underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-[var(--color-focus)]" href={referral.sourceHref}>
                 {sourceLinkLabel(referral)}
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
@@ -916,7 +899,7 @@ function RepairDetail({ referral }: { referral: Extract<Referral, { kind: "REPAI
         <DataField label="Severidad" value={severityLabel[request.severity] ?? request.severity} />
         <DataField label="Riesgo" value={request.publicSafetyRisk ? "Sí" : "No"} />
         <DataField label="Ubicación" value={request.address ?? "Sin dirección registrada"} />
-        {request.workOrderId && <DataField label="Nº de orden de trabajo" value={request.workOrderId} />}
+        {request.workOrderId && <DataField label="Nº de orden de trabajo" value={isUuid(request.workOrderId) || /^M[1-9]-/i.test(request.workOrderId) ? "Número no disponible" : request.workOrderId} />}
       </dl>
     </section>
   );
@@ -941,7 +924,7 @@ function ClosureDetail({ referral }: { referral: Extract<Referral, { kind: "STRE
         {referral.status === "REJECTED" && (
           <DataField label="Motivo del rechazo" value={request.rejectionReason || "Sin informar"} />
         )}
-        {request.closureId && <DataField label="Nº de corte" value={request.closureId} />}
+        {request.closureId && <DataField label="Nº de corte" value={isUuid(request.closureId) || /^M[1-9]-/i.test(request.closureId) ? "Número no disponible" : request.closureId} />}
       </dl>
       <div className="mt-5 border-t border-[var(--color-border)] pt-4">
         <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Tramos afectados</h3>
@@ -1005,7 +988,7 @@ function LoadingState() {
       </section>
       <ItemGroup aria-hidden="true" data-skeleton="referral-records" className="grid min-w-0 grid-cols-1 gap-3">
         {Array.from({ length: 3 }, (_, index) => (
-          <Item key={index} variant="interactive" data-skeleton="referral-record" className="min-h-12 w-full items-start gap-3 p-4 text-left sm:items-center">
+          <Item key={index} variant="interactive" data-skeleton="referral-record" className="h-full min-h-12 w-full items-start gap-3 p-4 text-left sm:items-center">
             <span data-skeleton="referral-record-icon" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:mt-0">
               <Skeleton className="h-9 w-9 rounded-xl" />
             </span>
