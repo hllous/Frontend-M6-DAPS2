@@ -22,7 +22,7 @@ import { sectionTitleClass } from "./section-title";
 type FamilyKey = IndicatorData["family"];
 type LoadStatus = "loading" | "ready" | "empty" | "error";
 export type SignalFamilyState = { status: LoadStatus; data?: IndicatorData };
-type Period = { from?: string; to?: string };
+type Period = { from?: string; to?: string; zoneId?: string; serviceTypeId?: string };
 
 type LoadedSignal = {
   id: string;
@@ -56,7 +56,12 @@ export function buildAttentionSignals(states: Record<FamilyKey, SignalFamilyStat
   const coverage = states.coverage.data?.family === "coverage" ? states.coverage.data : undefined;
   const compliance = states.compliance.data?.family === "compliance" ? states.compliance.data : undefined;
   const incidents = states.incidents.data?.family === "incidents" ? states.incidents.data : undefined;
-  const periodo = period.from && period.to ? `from=${period.from}&to=${period.to}` : `periodo=${servicesPeriodParam(period)}`;
+  // La lista de Servicios lleva el mismo recorte que el tablero: período, zona y tipo de servicio elegidos en «Más filtros».
+  const periodo = [
+    period.from && period.to ? `from=${period.from}&to=${period.to}` : `periodo=${servicesPeriodParam(period)}`,
+    period.zoneId ? `zone=${encodeURIComponent(period.zoneId)}` : "",
+    period.serviceTypeId ? `serviceType=${encodeURIComponent(period.serviceTypeId)}` : "",
+  ].filter(Boolean).join("&");
 
   return [
     coverage
