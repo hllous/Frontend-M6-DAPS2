@@ -20,13 +20,13 @@ describe("Dónde se concentra", () => {
     expect(await within(panel).findByText("Norte tiene 10 de los 24 objetivos sin atención.")).toBeVisible();
     expect(within(panel).queryByText("Servicios fuera de horario")).toBeNull();
     const user = userEvent.setup();
-    await user.click(within(panel).getByRole("button", { name: "Contenedores desbordados ahora, por zona" }));
+    await user.click(within(panel).getByRole("button", { name: "Contenedores desbordados" }));
     expect(within(panel).getByText("Centro tiene 6 de los 14 contenedores desbordados ahora.")).toBeVisible();
     await user.click(within(panel).getByRole("button", { name: "Ver tabla" }));
     const table = within(panel).getByRole("table");
     expect(within(table).getByRole("row", { name: /Centro.*6/ })).toBeVisible();
     expect(within(table).queryByText(/Prioritario/)).toBeNull();
-    await user.click(within(panel).getByRole("button", { name: "Objetivos sin atención por zona" }));
+    await user.click(within(panel).getByRole("button", { name: "Objetivos sin atención" }));
     expect(within(table).getByRole("row", { name: /Norte.*Prioritario.*10/ })).toBeVisible();
   });
   it("explica cuando todas las zonas tienen cero casos", async () => {

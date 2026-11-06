@@ -117,9 +117,8 @@ describe("IndicatorsDashboard", () => {
     expect(within(tabs).getByRole("tab", { name: "Territorio" })).toBeVisible();
     expect(within(tabs).queryByRole("tab", { name: "Registros" })).not.toBeInTheDocument();
 
-    const viewToggle = screen.getByRole("group", { name: "Vista" });
-    await user.click(within(viewToggle).getByRole("button", { name: "Ver tabla" }));
-    expect(within(viewToggle).getByRole("button", { name: "Ver tabla" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
+    expect(screen.getByRole("button", { name: "Ver gráfico" })).toHaveAttribute("aria-pressed", "true");
 
     await user.click(within(tabs).getByRole("tab", { name: "Territorio" }));
     expect(screen.getByRole("heading", { name: "Detalle de Incidencias" })).toBeVisible();
@@ -220,7 +219,7 @@ describe("IndicatorsDashboard", () => {
 
     await openFamily("Residuos");
     expect(screen.getAllByText(/Desvío de relleno sanitario/)[0]).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
+    expect(screen.getByRole("button", { name: "Ver gráfico" })).toHaveAttribute("aria-pressed", "true");
     const wasteTable = screen.getByRole("region", { name: "Tabla de datos de Residuos" });
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Kilogramos" })[0]).toBeVisible();
     expect(within(wasteTable).getAllByRole("columnheader", { name: "Metros cúbicos" })[0]).toBeVisible();
@@ -341,7 +340,7 @@ describe("IndicatorsDashboard", () => {
 
     const requested: string[] = [];
     server.use(http.get("*/api/indicators/:family", ({ request }) => { requested.push(new URL(request.url).search); return passthrough(); }));
-    await user.click(screen.getByRole("button", { name: "Más filtros" }));
+    await user.click(screen.getByRole("button", { name: /^Más filtros/ }));
     await user.click(await screen.findByRole("combobox", { name: "Zona operativa" }));
     await user.click(await screen.findByRole("option", { name: "Zona Sur real" }));
     await user.click(screen.getByRole("combobox", { name: "Tipo de servicio" }));
@@ -358,7 +357,7 @@ describe("IndicatorsDashboard", () => {
       http.get("*/api/service-types", async () => { await delay("infinite"); return HttpResponse.json({}); }),
     );
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Más filtros" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Más filtros/ }));
 
     expect(screen.getByLabelText("Zona operativa")).toBeDisabled();
     expect(screen.getByLabelText("Tipo de servicio")).toBeDisabled();
@@ -373,7 +372,7 @@ describe("IndicatorsDashboard", () => {
     let indicatorRequests = 0;
     server.use(http.get("*/api/indicators/:family", () => { indicatorRequests += 1; return HttpResponse.json({}, { status: 500 }); }));
 
-    await user.click(screen.getByRole("button", { name: "Más filtros" }));
+    await user.click(screen.getByRole("button", { name: /^Más filtros/ }));
     await chooseDate(user, "Desde", "2026-09-20");
     await chooseDate(user, "Hasta", "2026-09-01");
     await user.click(screen.getByRole("button", { name: "Actualizar" }));

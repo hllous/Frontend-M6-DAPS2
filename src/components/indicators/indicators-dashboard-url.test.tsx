@@ -28,10 +28,10 @@ describe("IndicatorsDashboard: estado en la URL y filtros no aplicables (#334)",
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
     await screen.findByRole("heading", { name: "Detalle de Incidencias" });
-    await userEvent.setup().click(screen.getByRole("button", { name: "Más filtros" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Más filtros/ }));
     expect(screen.getByRole("button", { name: /^Desde/ })).toHaveTextContent("01/09/2026");
     expect(screen.getByRole("button", { name: /^Hasta/ })).toHaveTextContent("15/09/2026");
-    expect(screen.getByRole("button", { name: "Ver tabla" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Ver gráfico" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/Filtros sin efecto en Incidencias: Zona y Tipo de servicio/)).toBeVisible();
   });
 

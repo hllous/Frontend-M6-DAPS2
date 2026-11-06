@@ -28,7 +28,7 @@ it("abre el detalle de cada familia y vuelve al tablero", async () => {
 it("devuelve el foco al control de origen y conserva el período", async () => {
   render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "Más filtros" }));
+  await user.click(screen.getByRole("button", { name: /^Más filtros/ }));
   await user.click(screen.getByRole("button", { name: "Semana" }));
   const before = new URLSearchParams(window.location.search).get("from");
   const trigger = screen.getByRole("button", { name: "Detalle por familia" });
