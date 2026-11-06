@@ -83,7 +83,7 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Más filtros" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Más filtros/ }));
     const filter = screen.getByLabelText("Tipo de servicio");
     const hint = screen.getByRole("region", { name: "Opciones de Tipo de servicio" });
     expectBusy(hint);

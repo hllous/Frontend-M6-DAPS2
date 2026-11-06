@@ -100,7 +100,7 @@ describe("Requiere atención", () => {
     expect(screen.queryByLabelText("Familia")).toBeNull();
     expect(screen.queryByRole("button", { name: /^Desde/ })).toBeNull();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Más filtros" }));
+    await user.click(screen.getByRole("button", { name: /^Más filtros/ }));
     expect(await screen.findByRole("button", { name: /^Desde/ })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Semana" }));
     await waitFor(() => expect(requests.some((url) => new URL(url).searchParams.get("from") === "2026-09-28")).toBe(true));

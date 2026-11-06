@@ -100,8 +100,7 @@ describe("IndicatorsDashboard: barras accesibles (#778)", () => {
     expect(bar).toHaveFocus();
     expect(bar).toHaveAttribute("aria-pressed", "true");
 
-    const viewToggle = screen.queryByRole("group", { name: "Vista" }) ?? screen.getByRole("group", { name: "Vista del detalle" });
-    await user.click(within(viewToggle).getByRole("button", { name: "Ver tabla" }));
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
     const tableRegion = await screen.findByRole("region", { name: `Tabla de datos de ${family}` });
     expect(within(tableRegion).getAllByRole("table")[0]).toBeVisible();
   });
@@ -124,7 +123,6 @@ it("no muestra detalles emergentes al pasar por las barras de zona y familia", a
 it("ofrece controles de vista con nombres accesibles", async () => {
   render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
   const zones = await screen.findByRole("region", { name: "¿Dónde se concentra?" });
-  expect(within(zones).getByRole("button", { name: "Ver gráfico" })).toBeVisible();
   expect(within(zones).getByRole("button", { name: "Ver tabla" })).toBeVisible();
 });
 

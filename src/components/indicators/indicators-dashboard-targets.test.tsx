@@ -145,9 +145,8 @@ describe("metas de las tablas de cobertura", () => {
 
     await screen.findByRole("table", { name: /Cobertura por zona/ });
     const coverageRegion = screen.getByRole("region", { name: "Detalle de Cobertura" });
-    const viewToggle = within(coverageRegion).getByRole("group", { name: "Vista del detalle" });
-
-    await user.click(within(viewToggle).getByRole("button", { name: "Ver tabla" }));
+    
+    await user.click(within(coverageRegion).getByRole("button", { name: "Ver tabla" }));
 
     const zones = within(coverageRegion).getByRole("table", { name: /Cobertura por zona/ });
     const serviceTypes = within(coverageRegion).getByRole("table", { name: /Cobertura por tipo de servicio/ });

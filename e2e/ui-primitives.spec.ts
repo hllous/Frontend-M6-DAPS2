@@ -28,10 +28,10 @@ test.describe("shared control density", () => {
 
       await page.goto("/app?destination=dashboards");
       await expect(page.getByRole("heading", { name: "Tableros" })).toBeVisible();
-      await page.getByRole("button", { name: "Más filtros", exact: true }).click();
+      await page.getByRole("button", { name: /^Más filtros/ }).click();
       const periods = page.getByRole("group", { name: "Período", exact: true });
       await expect.poll(() => heightOf(periods)).toBe(expected);
-      for (const name of ["Semana", "Mes", "Trimestre", "Más filtros", "Ver gráfico", "Ver tabla", "Ver detalle de Servicios sin realizar", "Detalle por familia"]) {
+      for (const name of ["Semana", "Mes", "Trimestre", "Más filtros - Mes", "Ver tabla", "Ver detalle de Servicios sin realizar", "Detalle por familia"]) {
         await expect.poll(() => heightOf(page.getByRole("button", { name, exact: true }).first())).toBe(expected);
       }
       await page.getByRole("button", { name: "Detalle por familia" }).click();

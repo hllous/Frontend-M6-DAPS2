@@ -220,6 +220,7 @@ export function ServicesWorkspace({
   // Column filters
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>(() => {
     const zones = new Set(getAllParams("zone"));
+    const serviceTypes = new Set(getAllParams("serviceType"));
     const rawStatuses = getAllParams("status");
     const statuses = new Set<ServiceStatus>(
       rawStatuses.filter((st): st is ServiceStatus =>
@@ -237,7 +238,7 @@ export function ServicesWorkspace({
     const crews = new Set(getAllParams("crew"));
     const timeFrom = getParam("timeFrom") ?? "";
     const timeTo = getParam("timeTo") ?? "";
-    return { zones, statuses, crews, timeFrom, timeTo, late: getParam("late") === "true" };
+    return { zones, serviceTypes, statuses, crews, timeFrom, timeTo, late: getParam("late") === "true" };
   });
 
   // Selection & Detail
@@ -481,6 +482,7 @@ export function ServicesWorkspace({
     if (sortKey && sortKey !== "scheduled") newParams.set("sort", sortKey);
     if (sortKey && sortDir !== "asc") newParams.set("dir", sortDir);
     columnFilters.zones.forEach((z) => newParams.append("zone", z));
+    columnFilters.serviceTypes.forEach((t) => newParams.append("serviceType", t));
     columnFilters.statuses.forEach((st) => newParams.append("status", st));
     columnFilters.crews.forEach((cr) => newParams.append("crew", cr));
     if (columnFilters.timeFrom) newParams.set("timeFrom", columnFilters.timeFrom);
@@ -544,6 +546,8 @@ export function ServicesWorkspace({
         if (!matchesAnyZone) return false;
       }
 
+      if (columnFilters.serviceTypes.size > 0 && !columnFilters.serviceTypes.has(service.serviceTypeId)) return false;
+
       // Column: Status
       if (columnFilters.statuses.size > 0) {
         if (!columnFilters.statuses.has(service.status)) return false;
@@ -579,7 +583,7 @@ export function ServicesWorkspace({
   );
   // Paginación de la tabla sobre lo ya cargado y filtrado; el mapa sigue mostrando todo el período.
   // La página vuelve a 1 cuando cambia la búsqueda, un filtro, el orden o el período; también al elegir un servicio que está en otra página.
-  const pageKey = [search, [...columnFilters.statuses].join(","), [...columnFilters.zones].join(","), [...columnFilters.crews].join(","), columnFilters.timeFrom, columnFilters.timeTo, columnFilters.late, sortKey, sortDir, activePeriod].join("|");
+  const pageKey = [search, [...columnFilters.statuses].join(","), [...columnFilters.zones].join(","), [...columnFilters.serviceTypes].join(","), [...columnFilters.crews].join(","), columnFilters.timeFrom, columnFilters.timeTo, columnFilters.late, sortKey, sortDir, activePeriod].join("|");
   const [pageState, setPageState] = useState({ page: 1, key: pageKey, revealedId: null as string | null });
   const initialPageKey = useRef(pageKey);
   const pageRestored = useRef(false);

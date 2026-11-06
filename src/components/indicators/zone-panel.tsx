@@ -31,14 +31,14 @@ export function ZonePanel({ states, onRetry, ignoredFilters }: { states: States;
     const zones = coverage.breakdowns.find((item) => item.id === "zones")?.points ?? [];
     const points = zones.map((point) => ({ id: point.id, label: point.label, value: point.details?.find((detail) => detail.label === "No atendidos")?.value ?? 0, unit: "objetivos" }));
     const max = Math.max(0, ...points.map((point) => point.value));
-    choices.push({ id: "coverage", label: "Objetivos sin atención por zona", noun: "objetivos sin atención", empty: "No hay objetivos sin atención en ninguna zona.", points: points.map((point) => ({ ...point, tone: worse && max > 0 && point.value === max ? "danger" : undefined })) });
+    choices.push({ id: "coverage", label: "Objetivos sin atención", noun: "objetivos sin atención", empty: "No hay objetivos sin atención en ninguna zona.", points: points.map((point) => ({ ...point, tone: worse && max > 0 && point.value === max ? "danger" : undefined })) });
   }
   if (incidents?.family === "incidents") {
     const signal = signals.find((item) => item.id === "overflow");
     const worse = signal?.value !== undefined && signal.previous !== null && signal.value > signal.previous;
     const points = incidents.containers.byZone.map((zone) => ({ id: zone.zoneId, label: zone.name, value: zone.overflowed, unit: "contenedores" }));
     const max = Math.max(0, ...points.map((point) => point.value));
-    choices.push({ id: "incidents", label: "Contenedores desbordados ahora, por zona", noun: "contenedores desbordados ahora", empty: "No hay contenedores desbordados en ninguna zona.", points: points.map((point) => ({ ...point, tone: worse && max > 0 && point.value === max ? "danger" : undefined })) });
+    choices.push({ id: "incidents", label: "Contenedores desbordados", noun: "contenedores desbordados ahora", empty: "No hay contenedores desbordados en ninguna zona.", points: points.map((point) => ({ ...point, tone: worse && max > 0 && point.value === max ? "danger" : undefined })) });
   }
   const available = choices.filter((item) => item.points.length > 0);
   const active = available.find((item) => item.id === choice) ?? available[0];

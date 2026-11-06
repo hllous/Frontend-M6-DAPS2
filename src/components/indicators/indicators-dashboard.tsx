@@ -377,6 +377,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     const values = familyOrder.map((family) => familyStates[family].data?.freshness.updatedAt).filter((value): value is string => Boolean(value));
     return values.sort().at(-1);
   }, [familyStates]);
+  const FamilyIcon = familyMeta[selectedFamily].icon;
   const selectedFamilyState = familyStates[selectedFamily];
   const selectedData = selectedFamilyState.status === "empty" ? undefined : selectedFamilyState.data;
   useEffect(() => {
@@ -403,6 +404,12 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  // «Tableros» en la barra lateral navega a /app?destination=dashboards sin «family»: vuelve a la vista principal y deja período y filtros como están.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (detailOpen && !new URLSearchParams(window.location.search).has("family")) setDetailOpen(false);
+  }, [searchParams, detailOpen]);
 
   useEffect(() => { if (detailOpen) detailHeadingRef.current?.focus(); }, [detailOpen, selectedFamily]);
   const trendBreakdowns = selectedFamilyState.data ? moduleBreakdowns(selectedFamilyState.data, "trend") : [];
@@ -507,10 +514,9 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
       <Collapsible className={styles.quickFilters}>
         <div className={styles.quickBar}>
-          <CollapsibleTrigger render={<Button type="button" variant="outline" size="sm" className="group/filters" aria-label="Más filtros" aria-describedby="indicator-filters-summary" />}>
+          <CollapsibleTrigger render={<Button type="button" variant="outline" size="sm" className="group/filters" />}>
             <SlidersHorizontal data-icon="inline-start" aria-hidden />
-            Más filtros
-            <span id="indicator-filters-summary" className="max-w-72 truncate font-medium text-foreground">{filtersSummary}</span>
+            <span className="max-w-80 truncate">Más filtros{filtersSummary ? <> - <span className="font-medium text-foreground">{filtersSummary}</span></> : null}</span>
             <ChevronDown data-icon="inline-end" aria-hidden className="transition-transform group-aria-expanded/filters:rotate-180" />
           </CollapsibleTrigger>
         </div>
@@ -542,13 +548,13 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       </> : <>
       <div className={styles.detailTop}>
         <Button type="button" variant="outline" onClick={closeDetail}><ArrowLeft data-icon="inline-start" aria-hidden />Volver a Tableros</Button>
-        <h2 ref={detailHeadingRef} tabIndex={-1} className={cn(styles.detailTitle, sectionTitleClass)}>Detalle de {familyMeta[selectedFamily].label}</h2>
+        <h2 ref={detailHeadingRef} tabIndex={-1} className={cn(styles.detailTitle, sectionTitleClass, "inline-flex items-center gap-2 rounded-md px-1")}><FamilyIcon aria-hidden className="size-5 shrink-0" />Detalle de {familyMeta[selectedFamily].label}</h2>
       </div>
       {selectedFamilyState.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo actualizar {familyMeta[selectedFamily].label}. Los datos pueden estar desactualizados.</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => retryFamily(selectedFamily)}>Reintentar</Button></Alert> : null}
       <FamilyDetailSummary family={selectedFamily} state={selectedFamilyState} />
 
 
-      {isNarrow ? <ChartViewToggle value={viewMode} onChange={setViewMode} label="Vista" /> : null}
+      {isNarrow ? <div className="flex justify-end"><ChartViewToggle value={viewMode} onChange={setViewMode} label="Vista" /></div> : null}
       {isNarrow ? <Tabs defaultValue="summary" className={styles.mobileTabs}>
         <TabsList aria-label="Secciones del tablero" className={styles.tabList}>
           <TabsTrigger value="summary">Resumen</TabsTrigger>

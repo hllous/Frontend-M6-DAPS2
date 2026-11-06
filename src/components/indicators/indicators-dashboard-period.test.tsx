@@ -22,7 +22,7 @@ describe("Atajos de período", () => {
     server.events.on("request:start", ({ request }) => { if (request.url.includes("/api/indicators/coverage")) requests.push(request.url); });
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Más filtros" }));
+    await user.click(screen.getByRole("button", { name: /^Más filtros/ }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Actualizar" })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: label }));
     await waitFor(() => expect(new URLSearchParams(window.location.search).get("from")).toBe(from));
@@ -36,18 +36,18 @@ describe("Atajos de período", () => {
     const user = userEvent.setup();
     expect(screen.queryByRole("button", { name: "Semana" })).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Período" })).not.toBeInTheDocument();
-    const trigger = screen.getByRole("button", { name: "Más filtros" });
+    const trigger = screen.getByRole("button", { name: /^Más filtros/ });
     await user.click(trigger);
     await user.click(screen.getByRole("button", { name: "Mes" }));
-    await waitFor(() => expect(trigger).toHaveAccessibleDescription(/^Mes/));
+    await waitFor(() => expect(trigger).toHaveAccessibleName("Más filtros - Mes"));
     await user.click(screen.getByRole("button", { name: "Trimestre" }));
-    await waitFor(() => expect(trigger).toHaveAccessibleDescription("Trimestre"));
+    await waitFor(() => expect(trigger).toHaveAccessibleName("Más filtros - Trimestre"));
   });
 
   it("permite elegir el período con el teclado", async () => {
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
     const user = userEvent.setup();
-    screen.getByRole("button", { name: "Más filtros" }).focus();
+    screen.getByRole("button", { name: /^Más filtros/ }).focus();
     await user.keyboard("{Enter}");
     const week = await screen.findByRole("button", { name: "Semana" });
     week.focus();
@@ -67,7 +67,7 @@ describe("Atajos de período", () => {
       return HttpResponse.json({ ...coverageIndicatorFixture, totals: { ...coverageIndicatorFixture.totals, coveragePct: 42 } });
     }));
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Más filtros" }));
+    await user.click(screen.getByRole("button", { name: /^Más filtros/ }));
     await user.click(screen.getByRole("button", { name: "Semana" }));
     expect(within(card).getByText("82,2 %")).toBeVisible();
     expect(within(card).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
@@ -83,7 +83,7 @@ describe("Atajos de período", () => {
     await within(card).findByText("82,2 %");
     server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({ message: "Error" }, { status: 503 })));
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Más filtros" }));
+    await user.click(screen.getByRole("button", { name: /^Más filtros/ }));
     await user.click(screen.getByRole("button", { name: "Semana" }));
     expect(await screen.findByRole("button", { name: "Reintentar" })).toBeVisible();
     expect(within(card).getByText("82,2 %")).toBeVisible();

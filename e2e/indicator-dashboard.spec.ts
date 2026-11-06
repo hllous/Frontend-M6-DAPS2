@@ -23,9 +23,8 @@ test.describe("operational indicator dashboard #138", () => {
     await page.getByRole("button", { name: "Detalle por familia" }).click();
     await page.getByRole("menuitem", { name: "Cobertura" }).click();
 
-    const viewToggle = page.getByRole("group", { name: "Vista" });
-    await expect(viewToggle.getByRole("button", { name: "Ver gráfico" })).toHaveAttribute("aria-pressed", "true");
-    await viewToggle.getByRole("button", { name: "Ver tabla" }).click();
+    await expect(page.getByRole("button", { name: "Ver tabla" })).toHaveAttribute("aria-pressed", "false");
+    await page.getByRole("button", { name: "Ver tabla" }).click();
     await page.getByRole("tab", { name: "Territorio" }).click();
 
     const territory = page.getByRole("region", { name: "Detalle territorial" });
@@ -128,7 +127,6 @@ test.describe("operational indicator dashboard #138", () => {
     await page.getByRole("button", { name: "Volver a Tableros" }).click();
     await page.getByRole("button", { name: "Detalle por familia" }).click();
     await page.getByRole("menuitem", { name: "Residuos" }).click();
-    await page.getByRole("button", { name: "Ver tabla", exact: true }).click();
     const wasteTable = page.getByRole("region", { name: "Tabla de datos de Residuos" });
     await expect(wasteTable.getByRole("columnheader", { name: "Kilogramos" }).first()).toBeVisible();
     await expect(wasteTable.getByRole("columnheader", { name: "Metros cúbicos" }).first()).toBeVisible();
