@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { DEMO_IDENTITIES } from "@/lib/demo-identities";
 import { handlers } from "@/mocks/handlers";
 import { resetRoleAssignmentFixtures } from "@/mocks/role-assignment-fixtures";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 import { AccessWorkspace } from "./access-workspace";
 const server = setupServer(...handlers);
 const demoAdminId = DEMO_IDENTITIES["office-duty-queue"].sub;
@@ -12,15 +13,23 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => { server.resetHandlers(); resetRoleAssignmentFixtures(); });
 afterAll(() => server.close());
 it("lista, abre por id y guarda una asignación", async () => {
-  const user = userEvent.setup(); render(<AccessWorkspace ownUserId={demoAdminId} />);
+  const user = userEvent.setup(); const { container } = render(<AccessWorkspace ownUserId={demoAdminId} />);
   expect(await screen.findByText(`${demoAdminId} (su usuario)`)).toBeVisible();
   expect(screen.getByText(/El sistema de identidad no comparte los nombres/)).toBeVisible();
-  expect(screen.queryByText(/\bM[16]\b/)).not.toBeInTheDocument();
+  expectNoInternalJargon(container);
   await user.type(screen.getByLabelText("Identificador numérico de persona"), "999");
   await user.click(screen.getByRole("button", { name: "Abrir persona" }));
+  expect(await screen.findByRole("heading", { name: "Roles de Legajo 999" })).toBeVisible();
   await user.click(await screen.findByRole("checkbox", { name: /Campo, inspección/ }));
   await user.click(screen.getByRole("button", { name: "Guardar roles" }));
   expect(await screen.findByText(/Los roles asignados se guardaron/)).toBeVisible();
+});
+it("muestra el nombre del perfil mock al administrar sus roles", async () => {
+  const user = userEvent.setup();
+  render(<AccessWorkspace ownUserId={demoAdminId} mock />);
+  const row = await screen.findByRole("row", { name: new RegExp(`${demoAdminId} \\(su usuario\\)`) });
+  await user.click(within(row).getByRole("button", { name: "Administrar" }));
+  expect(await screen.findByRole("heading", { name: "Roles de Carlos Rodríguez (su usuario)" })).toBeVisible();
 });
 it("impide mezclar Oficina y Campo", async () => {
   const user = userEvent.setup(); render(<AccessWorkspace ownUserId={demoAdminId} />);

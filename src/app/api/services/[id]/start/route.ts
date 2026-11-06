@@ -62,14 +62,14 @@ export async function POST(
     if (closureDependency.outcome === "blocked") {
       return errorResponse(
         409,
-        "No se puede iniciar el Servicio: la solicitud de corte de calle sigue pendiente de respuesta de M7.",
+        "No se puede iniciar el Servicio: la solicitud de corte de calle sigue pendiente de respuesta de Tránsito.",
         path,
       );
     }
     if (closureDependency.outcome === "rejected") {
       return errorResponse(
         409,
-        "M7 rechazó el corte de calle. Oficina debe elegir explícitamente entre reprogramar o cancelar el Servicio.",
+        "Tránsito rechazó el corte de calle. Oficina debe elegir explícitamente entre reprogramar o cancelar el Servicio.",
         path,
       );
     }

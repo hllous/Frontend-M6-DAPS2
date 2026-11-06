@@ -21,14 +21,14 @@ export const ME_TIMEOUT_MS = LOGIN_TIMEOUT_MS;
 
 /** Interpreta la respuesta de `GET /me`: 401 es sesión rechazada, 403 es un ciudadano, lo demás es indisponibilidad. */
 export async function readMeResponse(response: Response): Promise<Me> {
-  if (response.status === 401) throw new InvalidSessionError("El backend rechazó la sesión.");
+  if (response.status === 401) throw new InvalidSessionError("No pudimos confirmar su sesión. Vuelva a ingresar.");
   if (response.status === 403) throw new CitizenForbiddenError();
   if (!response.ok) {
-    throw new BackendUnavailableError(response.status, `El backend respondió con un error (HTTP ${response.status}).`);
+    throw new BackendUnavailableError(response.status, "No pudimos confirmar su sesión. Reintente en unos segundos.");
   }
   const parsed = meSchema.safeParse(await response.json().catch(() => undefined));
   if (!parsed.success) {
-    throw new BackendUnavailableError(502, "La respuesta de identidad no respeta el contrato documentado.");
+    throw new BackendUnavailableError(502, "No pudimos confirmar su sesión. Reintente en unos segundos.");
   }
   return parsed.data;
 }
@@ -72,7 +72,7 @@ export function sealRolesIfChanged(response: NextResponse, request: Request, rol
 /** Selecciona la cuadrilla del backend, priorizando liderazgo y luego el nombre del perfil. */
 export function sessionFromMe(session: Session, me: Me): Session {
   if (session.identity && (me.subType !== "EMPLEADO" || me.userId !== session.identity.userId)) {
-    throw new InvalidSessionError("La identidad de Backend no coincide con la sesión M1.");
+    throw new InvalidSessionError("No pudimos confirmar su sesión. Vuelva a ingresar.");
   }
 
   const isFieldCrew = me.roles.includes("M6_CAMPO_CUADRILLA");

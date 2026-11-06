@@ -219,7 +219,7 @@ describe("AssignCrewDialog", () => {
     await choose(user, /Cuadrilla asignada/i, "Cuadrilla Belgrano — Recolección");
 
     const warning = screen.getByText(/Revise la asignación$/i).closest("[role=alert]") as HTMLElement;
-    expect(within(warning).getByText(overlapping.id)).toBeInTheDocument();
+    expect(within(warning).getByText(overlapping.title)).toBeInTheDocument();
     expect(screen.queryByText(/No se requiere justificación/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Confirmar asignación" }));
@@ -293,7 +293,7 @@ describe("AssignCrewDialog", () => {
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     const warning = screen.getByText(/Revise la asignación$/i).closest("[role=alert]") as HTMLElement;
-    expect(within(warning).getByText(overlapping.id)).toBeInTheDocument();
+    expect(within(warning).getByText(overlapping.title)).toBeInTheDocument();
     expect(screen.getByLabelText(/Justificación de la asignación/i)).toBeVisible();
     expect(onAssigned).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeInTheDocument();

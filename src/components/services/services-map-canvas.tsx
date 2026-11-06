@@ -2,14 +2,16 @@
 
 import { LatLngBounds, divIcon } from "leaflet";
 import type { Marker as LeafletMarker } from "leaflet";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Polygon, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
 
 import type { Service } from "@/lib/services";
 import type { MapCoordinate } from "@/lib/operational-zones";
 import { summarizeServiceZones, type ServiceMapLocation } from "@/lib/services-map";
 
-import { MapBoundaryControl, MapBoundaryLayers, useMapBoundaries } from "@/components/map/map-boundaries";
+import { MapBoundaryLayers, useMapBoundaries } from "@/components/map/map-boundaries";
+
+import { ServicesMapLinesControl } from "./services-map-lines-control";
 
 import { SERVICE_MODE_LABEL } from "./service-ui-labels";
 import styles from "./services-map.module.css";
@@ -23,6 +25,7 @@ type ServicesMapCanvasProps = {
   selectedId: string | null;
   onSelect: (id: string) => void;
   compact?: boolean;
+  ready?: boolean;
 };
 
 // Paths of lucide's TreeDeciduous: divIcon takes an HTML string, not a React node.
@@ -247,7 +250,14 @@ export function ServicesMapCanvas({
   selectedId,
   onSelect,
   compact = false,
+  ready = true,
 }: ServicesMapCanvasProps) {
+  const [tilesLoaded, setTilesLoaded] = useState(false);
+  useEffect(() => {
+    if (!tilesLoaded || !ready) return;
+    const frame = requestAnimationFrame(() => performance.mark("map-ready:services"));
+    return () => cancelAnimationFrame(frame);
+  }, [tilesLoaded, ready]);
   const locationsByServiceId = useMemo(
     () => new Map(locations.map((location) => [location.serviceId, location])),
     [locations],
@@ -255,14 +265,10 @@ export function ServicesMapCanvas({
   // Every zone with a service gets its outline, so neighbouring barrios stay distinguishable.
   const serviceZones = useMemo(() => summarizeServiceZones(locations), [locations]);
   const boundaries = useMapBoundaries();
-  const { isPointVisible } = boundaries;
   const visibleMarkers = services.flatMap((service) => {
     const location = locationsByServiceId.get(service.id);
     const markerNumber = serviceOrdinals.get(service.id);
     if (!location || !location.coordinates || markerNumber === undefined) return [];
-    // La visibilidad de comunas y barrios también filtra los marcadores (#720); el servicio seleccionado
-    // nunca se oculta, para no dejar su panel de detalle abierto sobre algo invisible.
-    if (service.id !== selectedId && !isPointVisible(location.coordinates)) return [];
 
     return [{ service, location, markerNumber }];
   });
@@ -277,6 +283,7 @@ export function ServicesMapCanvas({
         aria-label="Mapa de servicios"
       >
         <TileLayer
+          eventHandlers={{ load: () => setTilesLoaded(true) }}
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
@@ -314,7 +321,7 @@ export function ServicesMapCanvas({
           );
         })}
       </MapContainer>
-      <MapBoundaryControl state={boundaries} />
+      <ServicesMapLinesControl state={boundaries} />
     </div>
   );
 }

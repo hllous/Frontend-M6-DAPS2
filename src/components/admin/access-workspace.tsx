@@ -32,6 +32,8 @@ import {
 import { authenticatedFetch, ROLES_STALE_EVENT } from "@/lib/authenticated-fetch";
 import { hasOfficeFieldRoleMix, M6_ROLES, type M6Role } from "@/lib/m6-roles";
 import { SESSION_MUTATION_HEADERS } from "@/lib/session-request";
+import { DEMO_IDENTITIES } from "@/lib/demo-identities";
+import { personNameOrLegajo } from "@/lib/m1-identity";
 
 type Assignment = { userId: string; roles: M6Role[] };
 type Listing = { data: Assignment[]; meta: { page: number; totalPages: number } };
@@ -45,11 +47,12 @@ const labels: Record<M6Role, string> = {
   M6_AUDITOR: "Auditoría: consulta información sin modificarla.",
 };
 
-export function AccessWorkspace({ ownUserId }: { ownUserId: string }) {
+export function AccessWorkspace({ ownUserId, mock = false }: { ownUserId: string; mock?: boolean }) {
   const [listing, setListing] = useState<Listing>();
   const [page, setPage] = useState(1);
   const [id, setId] = useState("");
   const [selected, setSelected] = useState<Assignment>();
+  const [selectedName, setSelectedName] = useState("");
   const [roles, setRoles] = useState<M6Role[]>([]);
   const [message, setMessage] = useState("");
   const [listError, setListError] = useState("");
@@ -82,7 +85,7 @@ export function AccessWorkspace({ ownUserId }: { ownUserId: string }) {
     setRoles([]);
 
     if (!/^\d+$/.test(userId)) {
-      setLookupError("Ingrese un identificador numérico de persona.");
+      setLookupError("Ingrese el número de legajo.");
       return;
     }
 
@@ -90,6 +93,8 @@ export function AccessWorkspace({ ownUserId }: { ownUserId: string }) {
       const response = await authenticatedFetch(`/api/role-assignments/${userId}`);
       if (!response.ok) throw new Error();
       const data = await response.json() as Assignment;
+      const demo = mock ? Object.values(DEMO_IDENTITIES).find((entry) => entry.sub === data.userId) : undefined;
+      setSelectedName(demo?.name ?? await personNameOrLegajo(data.userId));
       setSelected(data);
       setRoles(data.roles);
       setId(userId);
@@ -137,7 +142,7 @@ export function AccessWorkspace({ ownUserId }: { ownUserId: string }) {
   }
 
   return (
-    <div className="flex max-w-5xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <header className="flex max-w-prose flex-col gap-2">
         <h1 className="text-2xl font-semibold">Accesos</h1>
         <p>Administre los roles asignados. Los roles efectivos también dependen del rol de la persona en el sistema de identidad.</p>
@@ -172,7 +177,7 @@ export function AccessWorkspace({ ownUserId }: { ownUserId: string }) {
       {selected && (
         <section className="flex flex-col gap-4" aria-labelledby="edit-heading">
           <h2 id="edit-heading" className="text-xl font-semibold">
-            Roles de {selected.userId}{selected.userId === ownUserId ? " (su usuario)" : ""}
+            Roles de {selectedName}{selected.userId === ownUserId ? " (su usuario)" : ""}
           </h2>
           <FieldSet
             data-invalid={mixed || Boolean(saveError && !confirm)}

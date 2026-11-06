@@ -40,6 +40,19 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+describe("Container list opened from a link", () => {
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  it("applies the status from the URL as the list filter", async () => {
+    window.history.replaceState(null, "", "/app/catalog/containers?status=OVERFLOWED");
+    const requested: string[] = [];
+    server.events.on("request:start", ({ request }) => { if (request.url.includes("/api/containers")) requested.push(request.url); });
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await waitFor(() => expect(requested.some((url) => new URL(url).searchParams.get("status") === "OVERFLOWED")).toBe(true));
+    server.events.removeAllListeners();
+  });
+});
+
 describe("Container Service lookup", () => {
   const containerId = "70423999-647b-4b29-98ce-efcd33b3d7c2";
   beforeEach(() => {
@@ -91,7 +104,7 @@ describe("Container Service lookup", () => {
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
-    expect(await within(dialog).findByText(`Servicio en curso (${service.id})`)).toBeVisible();
+    expect(await within(dialog).findByRole("link", { name: `Servicio en curso: ${service.title}` })).toBeVisible();
     expect(within(dialog).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
     expect(requestedPages).toContain(2);
   });
@@ -773,7 +786,7 @@ describe("ContainerCatalogPanel", () => {
       expect(within(detail).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
 
       // Instead, in-flight badge must be rendered
-      expect(await within(detail).findByText(/Servicio en curso \(SVC-9901\)/)).toBeVisible();
+      expect(await within(detail).findByText(/Servicio en curso/)).toBeVisible();
     });
 
     it("keeps relocation hidden for Field while allowing emptying", async () => {

@@ -15,7 +15,7 @@ export default async function AppLayout({
   const session = await getSession();
   if (!session) redirect(loginUrl({ expired: true, destination: (await headers()).get(DESTINATION_HEADER) ?? undefined }));
   if (session.roles.length === 0) redirect("/no-role");
-  const actor = sessionActor(session);
+  const actor = await sessionActor(session);
 
   return (
     <SessionShell actorId={actor.userId} scenarioId={actor.scenarioId} identity={actor.m1Identity} logoutAction={leaveApplication}>

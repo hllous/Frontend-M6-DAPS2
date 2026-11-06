@@ -38,15 +38,21 @@ describe("contrato de indicadores", () => {
     expect(incidents.containers.history?.trackingSince).toBe("2026-10-30T15:00:00.000Z");
   });
 
-  it("conserva comparaciones y metas sin número sin pedir series a familias sin tendencia", async () => {
+  it("conserva comparaciones y metas sin número y pide series para incidencias", async () => {
+    const requests: URL[] = [];
+    const recordRequest = ({ request }: { request: Request }) => requests.push(new URL(request.url));
+    server.events.on("request:start", recordRequest);
     const incidents = await indicatorsAdapter.getIncidents();
     const waste = await indicatorsAdapter.getWaste();
+    server.events.removeListener("request:start", recordRequest);
     expect(incidents.targets?.overflowTrend).toEqual({ direction: "down", value: null });
     expect(incidents.containers.history?.pendingDamage).toBeNull();
-    expect(incidents.series).toBeUndefined();
+    expect(requests.find((url) => url.pathname.endsWith("/incidents"))?.searchParams.get("bucket")).toBe("week");
+    expect(incidents.series?.length).toBeGreaterThan(0);
     expect(incidents.delta?.pendingDamage).toBeNull();
     expect(waste.targets?.landfillDiversionPct).toBeNull();
     expect(waste.series).toBeUndefined();
+    expect(requests.find((url) => url.pathname.endsWith("/waste"))?.searchParams.has("bucket")).toBe(false);
   });
 
   it("tolera bloques ausentes y direcciones desconocidas sin perder el valor", async () => {

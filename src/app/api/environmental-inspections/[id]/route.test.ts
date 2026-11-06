@@ -111,7 +111,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
     const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual(error);
+    expect(await response.json()).toEqual({ ...error, message: "No se pudo obtener la información. Reintente en unos segundos." });
     expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 
@@ -121,7 +121,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
-      message: "El backend no responde. Reintente en unos segundos.",
+      message: "El sistema no responde. Reintente en unos segundos.",
       error: "Service Unavailable",
     });
     expect(backendFetch).toHaveBeenCalledTimes(1);
@@ -134,7 +134,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
 
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
-      statusCode: 502, message: "La respuesta del backend no contiene una inspección válida.", error: "Bad Gateway",
+      statusCode: 502, message: "No se pudo obtener la inspección. Reintente en unos segundos.", error: "Bad Gateway",
       timestamp: expect.any(String),
       path: `/api/environmental-inspections/${inspectionId}`,
     });
@@ -146,7 +146,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
     const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(502);
-    expect((await response.json()).message).toBe("La respuesta del backend no contiene una inspección válida.");
+    expect((await response.json()).message).toBe("No se pudo obtener la inspección. Reintente en unos segundos.");
     expect(backendFetch).toHaveBeenCalledTimes(1);
   });
 

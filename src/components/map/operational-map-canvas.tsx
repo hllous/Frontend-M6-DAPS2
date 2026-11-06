@@ -29,6 +29,8 @@ type OperationalMapMarker = {
 
 type OperationalMapCanvasProps = {
   view: OperationalMapView;
+  viewLoading?: boolean;
+  inventoryComplete?: boolean;
   markers: OperationalMapMarker[];
   zones?: OperationalZone[];
   routeStops?: RouteStopOverlay[];
@@ -169,6 +171,8 @@ function coveragePathOptions(zone: CoverageZoneOverlay, selected: boolean) {
 
 export function OperationalMapCanvas({
   view,
+  viewLoading = false,
+  inventoryComplete = true,
   markers,
   zones = [],
   routeStops = [],
@@ -181,6 +185,12 @@ export function OperationalMapCanvas({
   selectedMarkerKey = null,
   onSelectMarker,
 }: OperationalMapCanvasProps) {
+  const [tilesLoaded, setTilesLoaded] = useState(false);
+  useEffect(() => {
+    if (!tilesLoaded || viewLoading || (view === "inventory" && markers.length === 0 && !inventoryComplete)) return;
+    const frame = requestAnimationFrame(() => performance.mark(`map-ready:${view}`));
+    return () => cancelAnimationFrame(frame);
+  }, [tilesLoaded, view, viewLoading, markers.length, inventoryComplete]);
   const boundaries = useMapBoundaries();
   // La visibilidad de comunas y barrios también filtra los marcadores (#720). Sin filtro se devuelve `markers`
   // tal cual para que el clúster reciba una identidad estable; el seleccionado nunca se oculta.
@@ -216,6 +226,7 @@ export function OperationalMapCanvas({
         aria-label={mapLabel}
       >
         <TileLayer
+          eventHandlers={{ load: () => setTilesLoaded(true) }}
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />

@@ -10,7 +10,7 @@ describe("vehicles adapter error compatibility", () => {
     const telemetry = vi.spyOn(console, "info").mockImplementation(() => {});
     const error = await vehiclesAdapter.list().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(VehicleContractError);
-    expect(error).toMatchObject({ message: "La respuesta de vehículos no es JSON válido.", cause: expect.any(Error) });
+    expect(error).toMatchObject({ message: "No se pudo obtener información válida de vehículos. Reintente en unos segundos.", cause: expect.any(Error) });
     expect(telemetry).toHaveBeenCalledExactlyOnceWith("[m6-telemetry]", { name: "request_malformed_response", resource: "vehicles" });
   });
 
@@ -29,7 +29,7 @@ describe("vehicles adapter error compatibility", () => {
     const telemetry = vi.spyOn(console, "info").mockImplementation(() => {});
     const error = await vehiclesAdapter.list().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(VehicleContractError);
-    expect(error).toMatchObject({ message: "La respuesta de error de vehículos no respeta el contrato documentado.", cause: expect.any(Error) });
+    expect(error).toMatchObject({ message: "No se pudo obtener información válida de vehículos. Reintente en unos segundos.", cause: expect.any(Error) });
     expect(telemetry).toHaveBeenCalledExactlyOnceWith("[m6-telemetry]", { name: "request_malformed_response", resource: "vehicles" });
   });
 });

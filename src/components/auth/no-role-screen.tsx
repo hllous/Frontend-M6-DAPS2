@@ -68,7 +68,7 @@ export function NoRoleScreen({ identity }: { identity: string }) {
         <CardHeader className="gap-2 px-0">
           <CardTitle role="heading" aria-level={1} className="text-[28px] leading-[34px]">Sin rol asignado</CardTitle>
           <CardDescription className="text-base leading-6">
-            Su cuenta ya inició sesión, pero todavía no tiene un rol de M6 asignado en Ambiente. Solicite a un administrador de M6 que le asigne un rol para poder acceder.
+            Su usuario todavía no tiene un rol en Ambiente e Higiene. Solicite acceso a un administrador del sistema.
           </CardDescription>
           <p className="text-sm leading-5 text-muted-foreground">
             Comprobaremos su acceso cuando vuelva a interactuar con esta pantalla. Si recibe un rol, ingresará automáticamente.

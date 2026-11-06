@@ -410,7 +410,7 @@ function AssignCrewForm({
                   <p>
                     La cuadrilla{" "}
                     <strong>{selectedCrew?.name ?? conflicts.crewConflict.crewName}</strong> ya tiene asignado el servicio{" "}
-                    <strong>{conflicts.crewConflict.id}</strong> (&quot;{conflicts.crewConflict.title}&quot;) en la misma fecha (
+                    <strong>{conflicts.crewConflict.title}</strong> en la misma fecha (
                     {formatArgentinaCalendarDate(conflicts.crewConflict.scheduledDate)} {conflicts.crewConflict.windowFrom ?? ""}&ndash;{conflicts.crewConflict.windowTo ?? ""}).
                   </p>
                 )}
@@ -421,7 +421,7 @@ function AssignCrewForm({
                   <p>
                     El vehículo{" "}
                     <strong>{selectedVehicle?.plate ?? conflicts.vehicleConflict.vehiclePlate}</strong> ya está asignado al servicio{" "}
-                    <strong>{conflicts.vehicleConflict.id}</strong> (&quot;{conflicts.vehicleConflict.title}&quot;) en la misma fecha (
+                    <strong>{conflicts.vehicleConflict.title}</strong> en la misma fecha (
                     {formatArgentinaCalendarDate(conflicts.vehicleConflict.scheduledDate)} {conflicts.vehicleConflict.windowFrom ?? ""}&ndash;{conflicts.vehicleConflict.windowTo ?? ""}).
                   </p>
                 )}

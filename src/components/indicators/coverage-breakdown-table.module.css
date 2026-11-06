@@ -1,14 +1,14 @@
-/* Paleta validada con dataviz/validate_palette.js (modo claro): #0F7A5C #A86A00 #C2185B + gris neutro para pendientes. */
+/* Segmentos con tokens del tema: éxito, advertencia, peligro y borde fuerte para pendientes. Parciales va rayado: sus vecinos de tono (advertencia y peligro) se parecen, así que la textura es el segundo código; además hay leyenda y columna numérica. */
 .wrap { display: flex; min-width: 0; flex-direction: column; gap: var(--space-8); }
 .legend { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-16); margin: 0; padding: 0; list-style: none; color: var(--color-text-secondary); font-size: 12px; }
 .legend li { display: inline-flex; align-items: center; gap: var(--space-6); }
 .swatch { width: 12px; height: 12px; border-radius: 3px; }
 .targetSwatch { position: relative; width: 12px; height: 12px; }
 .targetSwatch::after { position: absolute; top: 0; bottom: 0; left: 5px; width: 2px; background: var(--color-text); content: ""; }
-.served { background: #0F7A5C; }
-.partial { background: #A86A00; }
-.missed { background: #C2185B; }
-.pending { background: #7A8796; }
+.served { background: var(--color-success); }
+.partial { background: repeating-linear-gradient(135deg, var(--color-warning) 0 3px, var(--color-surface) 3px 5px); }
+.missed { background: var(--color-danger); }
+.pending { background: var(--color-border-strong); }
 .scroll { overflow-x: auto; }
 .table[data-slot="table"] { width: 100%; border-collapse: collapse; caption-side: top; font-size: 14px; }
 .table caption { margin-bottom: var(--space-8); color: var(--color-text-secondary); font-size: 12px; text-align: left; }
@@ -23,6 +23,21 @@
 .bar { position: relative; display: flex; flex: 1 1 auto; gap: 2px; height: 22px; min-width: 45px; border-radius: 4px; background: var(--color-surface-subtle); overflow: hidden; }
 .bar > span { flex-basis: 0; min-width: 2px; }
 .bar > .targetLine { position: absolute; z-index: 1; top: 0; bottom: 0; width: 2px; border-inline: 1px solid var(--color-surface); background: var(--color-text); }
+.barTrigger { display: flex; flex: 1 1 auto; min-width: 45px; min-height: 32px; align-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
+.barTrigger:focus-visible { outline: 2px solid var(--color-focus, var(--color-text)); outline-offset: 2px; }
+.barTrigger .bar { width: 100%; }
+.popup { width: min(22rem, calc(100vw - 2rem)); gap: var(--space-8); padding: var(--space-12); }
+.popupTitle { margin: 0; font-size: 14px; font-weight: 600; }
+.bigBar { position: relative; display: flex; gap: 2px; height: 32px; border-radius: 6px; background: var(--color-surface-subtle); overflow: hidden; }
+.bigBar > a { flex-basis: 0; min-width: 4px; transition: filter 120ms; }
+.bigBar > a:hover { filter: brightness(0.9); }
+.bigBar > .targetLine { position: absolute; z-index: 1; top: 0; bottom: 0; width: 2px; border-inline: 1px solid var(--color-surface); background: var(--color-text); }
+.popupList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.popupRow { display: flex; min-height: 44px; align-items: center; gap: var(--space-8); padding: 0 var(--space-6); border-radius: 6px; color: var(--color-text); font-size: 13px; text-decoration: none; }
+.popupRow[data-empty] { color: var(--color-text-secondary); }
+a.popupRow:hover, a.popupRow:focus-visible { background: var(--color-surface-subtle); }
+.popupRow strong { margin-left: auto; font-variant-numeric: tabular-nums; }
+.popupAction { min-width: 7.5rem; color: var(--color-text-secondary); font-size: 12px; text-align: right; text-decoration: underline; }
 .pct { flex: 0 0 auto; width: 6ch; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .nameButton { height: auto; min-height: 32px; min-width: 0; max-width: 100%; flex: 0 1 auto; justify-content: flex-start; gap: var(--space-8); text-align: left; white-space: normal; }
 .lowSample { padding: 0 var(--space-6); border: 1px solid var(--color-border-strong); border-radius: 6px; color: var(--color-text-secondary); font-size: 12px; font-weight: 400; }

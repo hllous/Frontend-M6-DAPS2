@@ -17,8 +17,13 @@ const organizations: M1IdentityReference[] = [
 
 // Replace this fixture implementation with the confirmed M1 lookup adapter when its contract exists.
 export const m1IdentityAdapter = {
-  async getUser(id: string) { return users.find((item) => item.id === id) ?? { id, displayName: "Usuario M1 no resuelto", kind: "USER" as const }; },
-  async getOrganization(id: string) { return organizations.find((item) => item.id === id) ?? { id, displayName: "Organización M1 no resuelta", kind: "ORGANIZATION" as const }; },
+  async getUser(id: string) { return users.find((item) => item.id === id) ?? { id, displayName: "Persona sin nombre registrado", kind: "USER" as const }; },
+  async getOrganization(id: string) { return organizations.find((item) => item.id === id) ?? { id, displayName: "Organización sin nombre registrado", kind: "ORGANIZATION" as const }; },
   async listUsers() { return users; },
   async listOrganizations() { return organizations; },
 };
+
+export async function personNameOrLegajo(id: string): Promise<string> {
+  const person = await m1IdentityAdapter.getUser(id);
+  return person.displayName === "Persona sin nombre registrado" ? `Legajo ${id}` : person.displayName;
+}

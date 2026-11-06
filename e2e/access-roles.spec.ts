@@ -13,6 +13,7 @@ test("administra roles con teclado y mouse y pasa axe", async ({ page }) => {
   await page.getByRole("checkbox", { name: /Campo, inspección/ }).click();
   await page.getByRole("button", { name: "Guardar roles" }).click();
   await expect(page.getByRole("status")).toContainText("se guardaron");
+  await expect(page.getByRole("button", { name: "Guardar roles" })).toBeEnabled();
   const scan = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   expect(scan.violations).toEqual([]);
   await page.getByRole("button", { name: "Quitar todos los roles" }).click();

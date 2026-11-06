@@ -29,12 +29,16 @@ function documentedError(statusCode: number, message: string) {
 }
 
 describe("FoundationDemo", () => {
+  it("muestra en el encabezado la persona del perfil de ingreso", async () => {
+    render(<FoundationDemo scenarioId="office-duty-queue" />);
+    expect(await within(screen.getByRole("banner")).findByText("Carlos Rodríguez")).toBeVisible();
+  });
   it("keeps the frame visible while navigation and actor data load", async () => {
     server.use(http.get("*/api/mock/scenarios/office-duty-queue", () =>
       mockResponseAfter(150, () => HttpResponse.json(scenarios.officeDutyQueue))));
     render(<FoundationDemo scenarioId="office-duty-queue" />);
     const banner = screen.getByRole("banner");
-    const navigation = screen.getByRole("navigation", { name: "Módulos" });
+    const navigation = screen.getByRole("navigation", { name: "Navegación principal" });
     const region = screen.getByRole("region", { name: "Navegación" });
     expect(region).toHaveAttribute("aria-busy", "true");
     expect(region).toHaveTextContent("Cargando");
@@ -43,7 +47,7 @@ describe("FoundationDemo", () => {
     expect(await within(navigation).findByRole("link", { name: "Servicios" })).toBeVisible();
     expect(region).toHaveAttribute("aria-busy", "false");
     expect(screen.getByRole("banner")).toBe(banner);
-    expect(screen.getByRole("navigation", { name: "Módulos" })).toBe(navigation);
+    expect(screen.getByRole("navigation", { name: "Navegación principal" })).toBe(navigation);
   });
 
   it("renders the unauthenticated state on a 401 scenario response", async () => {

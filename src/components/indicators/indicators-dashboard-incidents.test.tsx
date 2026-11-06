@@ -36,7 +36,9 @@ describe("indicadores stage 2 de Incidencias", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const incidents = await screen.findByRole("button", { name: "Incidencias: seleccionar familia" });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Incidencias" }));
+    const incidents = await screen.findByRole("region", { name: "Resumen de Incidencias" });
     expect(within(incidents).getByText("2 días hábiles")).toBeVisible();
     expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
     expect(within(incidents).getByText(/-0,2 días/)).toBeVisible();
@@ -52,7 +54,9 @@ describe("indicadores stage 2 de Incidencias", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const incidents = await screen.findByRole("button", { name: "Incidencias: seleccionar familia" });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Incidencias" }));
+    const incidents = await screen.findByRole("region", { name: "Resumen de Incidencias" });
     expect(within(incidents).getByText("Meta ≤ 3 días hábiles")).toBeVisible();
   });
 
@@ -65,7 +69,9 @@ describe("indicadores stage 2 de Incidencias", () => {
 
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
 
-    const incidents = await screen.findByRole("button", { name: "Incidencias: seleccionar familia" });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Incidencias" }));
+    const incidents = await screen.findByRole("region", { name: "Resumen de Incidencias" });
     expect(within(incidents).getByText("2,4 días corridos")).toBeVisible();
     expect(within(incidents).getByText("-0,6 días")).toBeVisible();
     expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
@@ -74,7 +80,8 @@ describe("indicadores stage 2 de Incidencias", () => {
   it("muestra reportes en plazo y vencidos hoy con su comparación y sus metas", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await user.click(await screen.findByRole("button", { name: "Incidencias: seleccionar familia" }));
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Incidencias" }));
 
     const metrics = await screen.findByRole("region", { name: "Indicadores complementarios de Incidencias" });
     expect(within(metrics).getByText("88,9 %")).toBeVisible();
@@ -92,7 +99,8 @@ describe("indicadores stage 2 de Incidencias", () => {
   it("muestra el desvío de programación contra su máximo y su variación", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await user.click(await screen.findByRole("button", { name: "Cumplimiento: seleccionar familia" }));
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Cumplimiento" }));
 
     const metrics = await screen.findByRole("region", { name: "Indicadores complementarios de Cumplimiento" });
     expect(within(metrics).getByText("8,8 %")).toBeVisible();
@@ -105,7 +113,8 @@ describe("indicadores stage 2 de Incidencias", () => {
   it("muestra el historial de contenedores y distingue el estado actual", async () => {
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await user.click(await screen.findByRole("button", { name: "Incidencias: seleccionar familia" }));
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Incidencias" }));
 
     const metrics = await screen.findByRole("region", { name: "Indicadores complementarios de Incidencias" });
     const overflow = within(metrics).getByRole("group", { name: "Desbordes de contenedores" });
@@ -129,7 +138,8 @@ describe("indicadores stage 2 de Incidencias", () => {
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json(response)));
     const user = userEvent.setup();
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await user.click(await screen.findByRole("button", { name: "Incidencias: seleccionar familia" }));
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Incidencias" }));
 
     const metrics = await screen.findByRole("region", { name: "Indicadores complementarios de Incidencias" });
     const overflow = within(metrics).getByRole("group", { name: "Desbordes de contenedores" });
@@ -141,7 +151,8 @@ describe("indicadores stage 2 de Incidencias", () => {
     const user = userEvent.setup();
     server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json(incidentsStage2NoDataFixture)));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
-    await user.click(await screen.findByRole("button", { name: "Incidencias: seleccionar familia" }));
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Incidencias" }));
 
     const metrics = await screen.findByRole("region", { name: "Indicadores complementarios de Incidencias" });
     const withinDeadline = within(metrics).getByRole("group", { name: "Reportes resueltos en plazo" });

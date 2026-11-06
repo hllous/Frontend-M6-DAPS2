@@ -142,7 +142,7 @@ export type IndicatorBreakdown = { target?: IndicatorTarget; id: string; title: 
 export type IndicatorPeriod = { from: string; to: string };
 export type IndicatorFreshness = { updatedAt: string };
 
-export type CoverageIndicator = Pick<CoverageWire, "targets" | "series" | "previous" | "delta"> & {
+export type CoverageIndicator = Pick<CoverageWire, "totals" | "targets" | "series" | "previous" | "delta"> & {
   family: "coverage";
   seriesBucket?: "week" | "month";
   /** Mensaje del backend cuando rechazó el intervalo de la serie; el resto de la familia sí llegó. */
@@ -153,7 +153,7 @@ export type CoverageIndicator = Pick<CoverageWire, "targets" | "series" | "previ
   summaryMetrics: IndicatorMetric[];
   breakdowns: IndicatorBreakdown[];
 };
-export type ComplianceIndicator = Pick<ComplianceWire, "targets" | "series" | "previous" | "delta" | "schedulingDeviation"> & {
+export type ComplianceIndicator = Pick<ComplianceWire, "finished" | "targets" | "series" | "previous" | "delta" | "schedulingDeviation"> & {
   family: "compliance";
   period: IndicatorPeriod;
   freshness: IndicatorFreshness;
@@ -262,7 +262,7 @@ export function serializeIndicatorUrlState(state: Omit<IndicatorUrlState, "query
   return params.toString();
 }
 
-function coverageBucket(query: IndicatorQuery): "week" | "month" {
+export function coverageBucket(query: IndicatorQuery): "week" | "month" {
   const resolved = resolveIndicatorQuery(query);
   const start = new Date(`${resolved.from}T00:00:00Z`);
   const days = (Date.parse(`${resolved.to}T00:00:00Z`) - start.getTime()) / 86400000 + 1;
@@ -273,7 +273,7 @@ function coverageBucket(query: IndicatorQuery): "week" | "month" {
 function queryString(query: IndicatorQuery, family: string, withSeries = true) {
   const resolved = resolveIndicatorQuery(query);
   const params = new URLSearchParams({ from: resolved.from, to: resolved.to, compare: "previous" });
-  if (withSeries && family === "coverage") params.set("bucket", coverageBucket(resolved));
+  if (withSeries && family !== "waste") params.set("bucket", coverageBucket(resolved));
   if (familyAppliesCatalogFilters(family)) {
     if (resolved.zoneId) params.set("zoneId", resolved.zoneId);
     if (resolved.serviceTypeId) params.set("serviceTypeId", resolved.serviceTypeId);
@@ -294,11 +294,11 @@ async function request(path: string) {
     payload = await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "indicators" });
-    throw new IndicatorContractError("La respuesta de indicadores no es JSON válido.", { cause });
+    throw new IndicatorContractError("No se pudo obtener información válida de indicadores. Reintente en unos segundos.", { cause });
   }
   if (!response.ok) {
     const parsed = z.object({ statusCode: z.number(), message: z.union([z.string(), z.array(z.string())]) }).safeParse(payload);
-    if (!parsed.success) throw new IndicatorContractError("La respuesta de error de indicadores no respeta el contrato esperado.", { cause: parsed.error });
+    if (!parsed.success) throw new IndicatorContractError("No se pudo obtener información válida de error de indicadores. Reintente en unos segundos.", { cause: parsed.error });
     const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
     throw new IndicatorRequestError(message, parsed.data.statusCode);
   }
@@ -337,6 +337,7 @@ function coveragePoints(rows: CoverageWire["byZone"]): IndicatorPoint[] {
 function normalizeCoverage(wire: CoverageWire, readAt: string): CoverageIndicator {
   const coverageTarget = wire.targets === undefined ? defaultIndicatorTarget("coverage") : wire.targets.coveragePct ?? null;
   return {
+    totals: wire.totals,
     targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
     family: "coverage", period: wire.period, freshness: { updatedAt: readAt },
     primary: { value: wire.totals.coveragePct, label: "Cobertura de objetivos", unit: "%" },
@@ -361,6 +362,7 @@ function normalizeCompliance(wire: ComplianceWire, readAt: string): ComplianceIn
   return {
     targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
     schedulingDeviation: wire.schedulingDeviation,
+    finished: wire.finished,
     family: "compliance", period: wire.period, freshness: { updatedAt: readAt },
     primary: { value: wire.finished.onTimePct, label: "Cumplimiento en fecha", unit: "%" },
     summaryMetrics: [

@@ -124,7 +124,7 @@ const workGroups: WorkGroupDefinition[] = [
           return {
             id: report.id,
             href: `/app?destination=environment&detail=${encodeURIComponent(report.id)}`,
-            title: `${reportLabel(report)} · ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}${report.address ? ` · ${report.address}` : ""}`,
+            title: report.publicId ? `${reportLabel(report)} · ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}${report.address ? ` · ${report.address}` : ""}` : reportLabel(report),
             detail: since
               ? `Ingresó el ${formatArgentinaCalendarDate(since)} · ${waitingLabel(since, today)}`
               : "Sin fecha de ingreso",

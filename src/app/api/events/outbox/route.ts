@@ -12,11 +12,11 @@ export async function GET(request: Request) {
   try {
     const { session } = authorize(request, {
       capability: "integrationMonitor:view",
-      fallbackMessage: "No se pudieron cargar los eventos salientes.",
+      fallbackMessage: "No se pudieron cargar los envíos a otras áreas.",
       throwOnError: true,
     });
     const parsedQuery = parseOutboxQuery(new URL(request.url));
-    if (!parsedQuery.success) return invalidQueryResponse(path, "Los filtros de eventos salientes no son válidos.");
+    if (!parsedQuery.success) return invalidQueryResponse(path, "Los filtros de envíos a otras áreas no son válidos.");
 
     if (backendMode(session)) {
       const response = await fetchBackend(
@@ -25,11 +25,11 @@ export async function GET(request: Request) {
         "integrationMonitor:view",
         { cache: "no-store" },
       );
-      return validatedBackendResponse(response, outboxPageSchema, path, "La respuesta de eventos salientes no respeta el contrato documentado.");
+      return validatedBackendResponse(response, outboxPageSchema, path, "No se pudo obtener información válida de envíos a otras áreas. Reintente en unos segundos.");
     }
 
     return jsonNoStore(outboxPageSchema.parse(listOutboxFixtures(parsedQuery.data)));
   } catch (error) {
-    return noStore(mapSessionError(error, path, "No se pudieron cargar los eventos salientes."));
+    return noStore(mapSessionError(error, path, "No se pudieron cargar los envíos a otras áreas."));
   }
 }

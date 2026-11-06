@@ -78,7 +78,7 @@ export async function GET(request: Request) {
       if (!backendResponse.ok) return forwardResponse(backendResponse);
       const parsed = servicesEnvelopeSchema.safeParse(await backendResponse.json().catch(() => undefined));
       if (!parsed.success) {
-        return errorResponse(502, "La respuesta de servicios no respeta el contrato esperado.", path);
+        return errorResponse(502, "No se pudo obtener información válida de servicios. Reintente en unos segundos.", path);
       }
       const dropped = droppedRecords(parsed.data.data);
       return NextResponse.json(dropped ? { ...parsed.data, meta: { ...parsed.data.meta, dropped } } : parsed.data);

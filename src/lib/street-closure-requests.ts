@@ -152,7 +152,7 @@ export const streetClosureRequestSchema = z.preprocess(fromWireShape, streetClos
 export type StreetClosureRequest = z.infer<typeof streetClosureRequestSchema>;
 
 export const approveStreetClosureRequestInputSchema = z.object({
-  closureId: z.string().trim().min(1, "El identificador de M7 es obligatorio"),
+  closureId: z.string().trim().min(1, "El número de corte de Tránsito es obligatorio"),
 });
 export type ApproveStreetClosureRequestInput = z.infer<
   typeof approveStreetClosureRequestInputSchema
@@ -255,7 +255,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "street-closure-requests" });
-    throw new StreetClosureRequestContractError("La respuesta de cortes de calle no es JSON válido.", {
+    throw new StreetClosureRequestContractError("No se pudo obtener información válida de cortes de calle. Reintente en unos segundos.", {
       cause,
     });
   }
@@ -266,7 +266,7 @@ async function requestError(payload: unknown, response: Response): Promise<never
   if (!parsedError.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "street-closure-requests" });
     throw new StreetClosureRequestContractError(
-      "La respuesta de error de cortes de calle no respeta el contrato documentado.",
+      "No se pudo obtener información válida de cortes de calle. Reintente en unos segundos.",
       { cause: parsedError.error },
     );
   }
@@ -309,7 +309,7 @@ export const streetClosureRequestsAdapter = {
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "street-closure-requests" });
       throw new StreetClosureRequestContractError(
-        "La lista de cortes de calle no respeta el contrato esperado.",
+        "No se pudo obtener información válida de la lista de cortes de calle. Reintente en unos segundos.",
         { cause: parsed.error },
       );
     }
@@ -335,7 +335,7 @@ export const streetClosureRequestsAdapter = {
     // An unreadable record could be the one that decides the dependency: do not guess.
     if (page.invalid > 0) {
       throw new StreetClosureRequestContractError(
-        "Un corte de calle del Servicio no respeta el contrato esperado; no se puede resolver la dependencia.",
+        "No se pudo obtener información válida del corte de calle. No se puede resolver la dependencia.",
       );
     }
     return resolveStreetClosureDependency(page.requests);
@@ -344,7 +344,7 @@ export const streetClosureRequestsAdapter = {
   async get(id: string): Promise<StreetClosureRequest> {
     return parseRequest(
       await sendRequest(`/api/street-closure-requests/${id}`),
-      "El detalle de corte de calle no respeta el contrato esperado.",
+      "No se pudo obtener información válida del detalle de corte de calle. Reintente en unos segundos.",
     );
   },
 
@@ -361,14 +361,14 @@ export const streetClosureRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de creación del corte de calle no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la creación del corte de calle. Reintente en unos segundos.",
     );
   },
 
   async approve(id: string, input: ApproveStreetClosureRequestInput): Promise<StreetClosureRequest> {
     const parsedInput = approveStreetClosureRequestInputSchema.safeParse(input);
     if (!parsedInput.success) {
-      throw new StreetClosureRequestContractError("El identificador de M7 es inválido.", {
+      throw new StreetClosureRequestContractError("El número de corte de Tránsito es inválido.", {
         cause: parsedInput.error,
       });
     }
@@ -378,21 +378,21 @@ export const streetClosureRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de aprobación del corte de calle no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la aprobación del corte de calle. Reintente en unos segundos.",
     );
   },
 
   async reject(id: string): Promise<StreetClosureRequest> {
     return parseRequest(
       await sendRequest(`/api/street-closure-requests/${id}/reject`, { method: "POST" }),
-      "La respuesta de rechazo del corte de calle no respeta el contrato esperado.",
+      "No se pudo obtener información válida del rechazo del corte de calle. Reintente en unos segundos.",
     );
   },
 
   async end(id: string): Promise<StreetClosureRequest> {
     return parseRequest(
       await sendRequest(`/api/street-closure-requests/${id}/end`, { method: "POST" }),
-      "La respuesta de finalización del corte de calle no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la finalización del corte de calle. Reintente en unos segundos.",
     );
   },
 };

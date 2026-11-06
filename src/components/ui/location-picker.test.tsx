@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { LocationPicker } from "./location-picker";
@@ -9,7 +9,7 @@ it("starts without a point and only confirms a deliberate existing point rounded
   expect(screen.getByRole("button", { name: "Confirmar ubicación" })).toBeDisabled();
   unmount();
   render(<LocationPicker currentPoint={{ lat: -34.123456789, lng: -58.123456789 }} searchAddresses={vi.fn()} onConfirm={onConfirm} onCancel={vi.fn()} />);
-  expect(screen.getByRole("status")).toHaveTextContent("Fuera de las zonas operativas");
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Fuera de las zonas operativas"));
   await userEvent.click(screen.getByRole("button", { name: "Confirmar ubicación" }));
   expect(onConfirm).toHaveBeenCalledWith({ lat: -34.1234568, lng: -58.1234568 }, undefined);
 });
@@ -54,9 +54,9 @@ it.each([1, 2, 3])("preserves the point after GPS error %s", async (code) => {
   await userEvent.click(screen.getByRole("button", {name: "Confirmar ubicación"}));
   expect(onConfirm).toHaveBeenCalledWith({lat: -34.56, lng: -58.45}, undefined);
 });
-it("names an operational zone from the actual polygons", () => {
+it("names an operational zone from the actual polygons", async () => {
   render(<LocationPicker currentPoint={{lat: -34.5446871, lng: -58.4386826}} searchAddresses={vi.fn()} onConfirm={vi.fn()} onCancel={vi.fn()} />);
-  expect(screen.getByRole("status")).toHaveTextContent("Ubicación marcada: Belgrano");
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Ubicación marcada: Belgrano"));
 });
 
 afterEach(() => vi.useRealTimers());

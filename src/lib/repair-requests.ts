@@ -156,7 +156,7 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
     payload = await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "repair-requests" });
-    throw new RepairRequestContractError("La respuesta de derivaciones no es JSON válido.", { cause });
+    throw new RepairRequestContractError("No se pudo obtener información válida de derivaciones. Reintente en unos segundos.", { cause });
   }
 
   if (!response.ok) {
@@ -164,7 +164,7 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
     if (!parsedError.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "repair-requests" });
       throw new RepairRequestContractError(
-        "La respuesta de error de derivaciones no respeta el contrato documentado.",
+        "No se pudo obtener información válida de derivaciones. Reintente en unos segundos.",
         { cause: parsedError.error },
       );
     }
@@ -201,7 +201,7 @@ export const repairRequestsAdapter = {
     }).safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "repair-requests" });
-      throw new RepairRequestContractError("La lista de derivaciones no respeta el contrato esperado.", { cause: parsed.error });
+      throw new RepairRequestContractError("No se pudo obtener información válida de la lista de derivaciones. Reintente en unos segundos.", { cause: parsed.error });
     }
     return {
       repairRequests: parsed.data.data,
@@ -215,7 +215,7 @@ export const repairRequestsAdapter = {
   async get(id: string): Promise<RepairRequest> {
     return parseResource(
       await requestJson(`/api/repair-requests/${id}`),
-      "El detalle de la derivación no respeta el contrato esperado.",
+      "No se pudo obtener información válida del detalle de la derivación. Reintente en unos segundos.",
     );
   },
 
@@ -230,7 +230,7 @@ export const repairRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de creación de la derivación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la creación de la derivación. Reintente en unos segundos.",
     );
   },
 
@@ -243,7 +243,7 @@ export const repairRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de inicio de la derivación no respeta el contrato esperado.",
+      "No se pudo obtener información válida del inicio de la derivación. Reintente en unos segundos.",
     );
   },
 
@@ -256,7 +256,7 @@ export const repairRequestsAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de cierre de la derivación no respeta el contrato esperado.",
+      "No se pudo obtener información válida del cierre de la derivación. Reintente en unos segundos.",
     );
   },
 };

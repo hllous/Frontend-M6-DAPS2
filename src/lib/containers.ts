@@ -1,3 +1,4 @@
+import { notifyMapInventoryChanged } from "./map-inventory-events";
 import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
@@ -219,7 +220,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
     return await response.json();
   } catch (cause) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
-    throw new ContainerContractError("La respuesta de contenedores no es JSON válido.", { cause });
+    throw new ContainerContractError("No se pudo obtener información válida de contenedores. Reintente en unos segundos.", { cause });
   }
 }
 
@@ -228,7 +229,7 @@ function requestError(payload: unknown): ContainerRequestError | ContainerContra
   if (!parsed.success) {
     recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
     return new ContainerContractError(
-      "La respuesta de error de contenedores no respeta el contrato documentado.",
+      "No se pudo obtener información válida de contenedores. Reintente en unos segundos.",
       { cause: parsed.error },
     );
   }
@@ -268,7 +269,7 @@ export const containersAdapter = {
     const parsed = containersEnvelopeSchema.safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
-      throw new ContainerContractError("La respuesta de contenedores no respeta el contrato esperado.", {
+      throw new ContainerContractError("No se pudo obtener información válida de contenedores. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }
@@ -284,7 +285,7 @@ export const containersAdapter = {
   async get(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}`),
-      "El detalle de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida del detalle de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -295,14 +296,16 @@ export const containersAdapter = {
         cause: parsedInput.error,
       });
     }
-    return parseContainer(
+    const saved = parseContainer(
       await send("/api/containers", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de creación de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la creación de contenedor. Reintente en unos segundos.",
     );
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async update(id: string, input: UpdateContainerInput): Promise<Container> {
@@ -312,14 +315,16 @@ export const containersAdapter = {
         cause: parsedInput.error,
       });
     }
-    return parseContainer(
+    const saved = parseContainer(
       await send(`/api/containers/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de actualización de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la actualización de contenedor. Reintente en unos segundos.",
     );
+    notifyMapInventoryChanged();
+    return saved;
   },
 
   async reportOverflow(id: string): Promise<Container> {
@@ -327,7 +332,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/report-overflow`, {
         method: "POST",
       }),
-      "La respuesta de reporte de desborde no respeta el contrato esperado.",
+      "No se pudo obtener información válida del reporte de desborde. Reintente en unos segundos.",
     );
   },
 
@@ -344,28 +349,28 @@ export const containersAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de reporte de daño no respeta el contrato esperado.",
+      "No se pudo obtener información válida del reporte de daño. Reintente en unos segundos.",
     );
   },
 
   async startRepair(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}/start-repair`, { method: "POST" }),
-      "La respuesta de inicio de reparación no respeta el contrato esperado.",
+      "No se pudo obtener información válida del inicio de reparación. Reintente en unos segundos.",
     );
   },
 
   async completeRepair(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}/complete-repair`, { method: "POST" }),
-      "La respuesta de finalización de reparación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la finalización de reparación. Reintente en unos segundos.",
     );
   },
 
   async remove(id: string): Promise<Container> {
     return parseContainer(
       await send(`/api/containers/${id}/remove`, { method: "POST" }),
-      "La respuesta de retiro de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida del retiro de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -424,7 +429,7 @@ export const containersAdapter = {
     const parsed = z.array(attachmentSchema).safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
-      throw new ContainerContractError("La lista de evidencia de contenedores no respeta el contrato.", {
+      throw new ContainerContractError("No se pudo obtener información válida de la evidencia de contenedores. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }
@@ -436,7 +441,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/empty`, {
         method: "POST",
       }),
-      "La respuesta de vaciado de contenedor no respeta el contrato esperado.",
+      "No se pudo obtener información válida del vaciado de contenedor. Reintente en unos segundos.",
     );
   },
 
@@ -445,7 +450,7 @@ export const containersAdapter = {
       await send(`/api/containers/${id}/relocate`, {
         method: "POST",
       }),
-      "La respuesta de inicio de reubicación no respeta el contrato esperado.",
+      "No se pudo obtener información válida del inicio de reubicación. Reintente en unos segundos.",
     );
   },
 
@@ -462,7 +467,7 @@ export const containersAdapter = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       }),
-      "La respuesta de confirmación de reubicación no respeta el contrato esperado.",
+      "No se pudo obtener información válida de la confirmación de reubicación. Reintente en unos segundos.",
     );
   },
 };

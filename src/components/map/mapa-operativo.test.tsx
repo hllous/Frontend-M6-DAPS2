@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 
 import * as argentinaDate from "@/lib/argentina-date";
 import { scenarios } from "@/lib/scenarios";
+import { operationalMapAdapter } from "@/lib/operational-map";
 import { mockResponseAfter } from "@/mocks/delayed-response";
 import { handlers } from "@/mocks/handlers";
 import { MapaOperativo } from "./mapa-operativo";
@@ -31,6 +32,7 @@ const canonicalZoneResponse = {
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
+  operationalMapAdapter.invalidate();
   server.resetHandlers();
   vi.restoreAllMocks();
   vi.useRealTimers();

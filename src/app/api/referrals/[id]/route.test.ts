@@ -77,7 +77,7 @@ describe("referral detail BFF", () => {
 
     expect(response.status).toBe(502);
     expect(await response.json()).toMatchObject({
-      message: "El backend devolvió una respuesta inválida.",
+      message: "No se pudo obtener la derivación. Reintente en unos segundos.",
       path: "/api/referrals/RR-NONJSON",
     });
   });
@@ -103,7 +103,7 @@ describe("referral detail BFF", () => {
     expect(body).toMatchObject({
       statusCode: 503,
       error: "Service Unavailable",
-      message: "La respuesta del backend no tiene un tipo de contenido JSON válido.",
+      message: "El sistema devolvió una respuesta que no se pudo leer. Reintente en unos segundos.",
       path: "/api/referrals/RR-UPSTREAM-ERROR",
     });
     expect(JSON.stringify(body)).not.toContain("internal proxy detail");

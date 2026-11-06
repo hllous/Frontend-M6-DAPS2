@@ -29,14 +29,14 @@ export async function readJsonBody(response: Response, resource: string): Promis
   try {
     return await response.json();
   } catch (cause) {
-    throw new BackendContractError(`La respuesta de ${resource} no es JSON válido.`, { cause });
+    throw new BackendContractError(`No se pudo obtener información válida de ${resource}. Reintente en unos segundos.`, { cause });
   }
 }
 
 export function parseBackendError(payload: unknown, resource: string): BackendRequestError | BackendContractError {
   const parsed = errorResponseSchema.safeParse(payload);
   if (!parsed.success) {
-    return new BackendContractError(`La respuesta de error de ${resource} no respeta el contrato documentado.`, {
+    return new BackendContractError(`No se pudo obtener información válida de ${resource}. Reintente en unos segundos.`, {
       cause: parsed.error,
     });
   }

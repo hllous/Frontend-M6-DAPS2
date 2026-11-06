@@ -18,7 +18,7 @@ it("renders the frame before hydration without mounting Field children for anoth
   const readDraft = vi.fn(() => <p>Private Field content</p>);
   const FieldChild = readDraft;
   const html = renderToString(<SessionShell actorId="actor-a" scenarioId="office-duty-queue" logoutAction={async () => undefined}><FieldChild /></SessionShell>);
-  expect(html).toContain('aria-label="Módulos"');
+  expect(html).toContain('aria-label="Navegación principal"');
   expect(html).toContain("<header");
   expect(html).toContain('aria-busy="true"');
   expect(readDraft).not.toHaveBeenCalled();
