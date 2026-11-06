@@ -43,7 +43,8 @@ describe("CreateRepairRequestDialog", () => {
     await user.click(screen.getByRole("button", { name: "Derivar" }));
 
     await waitFor(() => expect(screen.getByText(/Derivada a Obras Públicas/i)).toBeVisible());
-    expect(dialog).toHaveTextContent("SVC-1043");
+    expect(dialog).toHaveTextContent(service.title);
+    expect(dialog).not.toHaveTextContent("SVC-1043");
   });
 
   it("shows an unsent referral and retains entered values after a network failure", async () => {
@@ -147,7 +148,8 @@ describe("CreateRepairRequestDialog", () => {
     await user.click(screen.getByRole("button", { name: "Derivar" }));
 
     expect(await screen.findByText("Ya estaba derivada.")).toBeVisible();
-    expect(screen.getByText("Seguimiento RR-LOST-RESPONSE · Servicio SVC-1043")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(service.title);
+    expect(screen.queryByText(/RR-LOST-RESPONSE/)).not.toBeInTheDocument();
     expect(createRequests).toBe(1);
     expect(listQueries).toEqual([`?detectedInId=${service.id}`]);
     expect(onCreated).toHaveBeenCalledWith(existingRequest);

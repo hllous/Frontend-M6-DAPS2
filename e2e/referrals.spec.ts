@@ -10,13 +10,13 @@ test.describe("Referral workspace", () => {
     await expect(page.getByRole("main")).toHaveCount(1);
     const list = page.getByRole("region", { name: "Lista de derivaciones" });
     await expect(list).toBeVisible();
-    await expect(list.getByRole("button", { name: /RR-1001/ })).toBeVisible();
-    await expect(list.getByRole("button", { name: /SCR-1001/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /Reparación · Pavimento roto · Bulevar Costero y Calle 12/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /Corte de calle · Bulevar Costero/ })).toBeVisible();
     await expect(list.getByText("Obras Públicas · Reparación")).toBeVisible();
     await expect(list.getByText("Tránsito · Corte de calle").first()).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await list.getByRole("button", { name: /SCR-1001/ }).click();
+    await list.getByRole("button", { name: /Corte de calle · Bulevar Costero/ }).click();
     const detail = page.getByRole("region", { name: "Detalle de Corte de calle · Bulevar Costero" });
     await expect(detail).toBeVisible();
     await expect(detail.getByRole("heading", { name: "Detalle de Corte de calle · Bulevar Costero" })).toBeFocused();
@@ -40,7 +40,7 @@ test.describe("Referral workspace", () => {
 
     const list = page.getByRole("region", { name: "Lista de derivaciones" });
     await expect(list).toBeVisible();
-    await list.getByRole("button", { name: /SCR-1003/ }).click();
+    await list.getByRole("button", { name: /Corte de calle · Av. Independencia/ }).click();
 
     const approvedDetail = page.getByRole("region", { name: "Detalle de Corte de calle · Av. Independencia" });
     await expect(approvedDetail).toBeVisible();
@@ -52,7 +52,7 @@ test.describe("Referral workspace", () => {
     await approvedDetail.getByRole("button", { name: "Volver a derivaciones" }).click();
     const returnedList = page.getByRole("region", { name: "Lista de derivaciones" });
     await expect(returnedList).toBeVisible();
-    await returnedList.getByRole("button", { name: /SCR-1004/ }).click();
+    await returnedList.getByRole("button", { name: /Corte de calle · Bulevar Norte/ }).click();
 
     const rejectedDetail = page.getByRole("region", { name: "Detalle de Corte de calle · Bulevar Norte" });
     await expect(rejectedDetail).toBeVisible();
@@ -66,11 +66,11 @@ test.describe("Referral workspace", () => {
 
     const list = page.getByRole("region", { name: "Lista de derivaciones" });
     await expect(list).toBeVisible();
-    await expect(list.getByText("SVC-1050", { exact: false }).first()).toBeVisible();
-    await expect(list.getByRole("button", { name: /RR-1001/ })).toBeVisible();
-    await expect(list.getByRole("button", { name: /SCR-1001/ })).toBeVisible();
 
-    await list.getByRole("button", { name: /RR-1001/ }).focus();
+    await expect(list.getByRole("button", { name: /Reparación · Pavimento roto · Bulevar Costero y Calle 12/ })).toBeVisible();
+    await expect(list.getByRole("button", { name: /Corte de calle · Bulevar Costero/ })).toBeVisible();
+
+    await list.getByRole("button", { name: /Reparación · Pavimento roto · Bulevar Costero y Calle 12/ }).focus();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" })).toBeVisible();
   });

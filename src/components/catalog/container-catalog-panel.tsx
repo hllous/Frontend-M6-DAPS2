@@ -1,4 +1,5 @@
 "use client";
+import { InFlightServiceBadge } from "@/components/ui/in-flight-service-badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
@@ -1184,10 +1185,7 @@ export function ContainerCatalogPanel({
                   ) : null}
                   {canEmpty && detailContainer.status === "OVERFLOWED" ? (
                     detailInFlight ? (
-                      <Badge variant="info" className="w-fit max-w-full">
-                        <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
-                      </Badge>
+                      <InFlightServiceBadge service={detailInFlight} />
                     ) : (
                       <Button
                         type="button"
@@ -1207,10 +1205,7 @@ export function ContainerCatalogPanel({
                   ) : null}
                   {canManage && detailContainer.status === "ACTIVE" ? (
                     detailInFlight ? (
-                      <Badge variant="info" className="w-fit max-w-full">
-                        <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
-                      </Badge>
+                      <InFlightServiceBadge service={detailInFlight} />
                     ) : (
                       <Button
                         type="button"
@@ -1230,10 +1225,7 @@ export function ContainerCatalogPanel({
                   ) : null}
                   {canManage && detailContainer.status === "RELOCATING" ? (
                     detailInFlight ? (
-                      <Badge variant="info" className="w-fit max-w-full">
-                        <Clock data-icon="inline-start" aria-hidden />
-                        Servicio en curso ({detailInFlight.id})
-                      </Badge>
+                      <InFlightServiceBadge service={detailInFlight} />
                     ) : (
                       <Button
                         type="button"
@@ -1284,10 +1276,7 @@ export function ContainerCatalogPanel({
                       Iniciar reparación
                     </Button>
                   ) : detailInFlight ? (
-                    <Badge variant="info" className="w-fit max-w-full">
-                      <Clock data-icon="inline-start" aria-hidden />
-                      Servicio en curso ({detailInFlight.id})
-                    </Badge>
+                    <InFlightServiceBadge service={detailInFlight} />
                   ) : (
                     <Button
                       type="button"

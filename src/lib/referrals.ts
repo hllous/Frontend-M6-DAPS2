@@ -178,7 +178,7 @@ function mapRepairRequest(request: RepairRequest, useFixtures: boolean): Referra
     sourceType: "SERVICE",
     sourceId: request.detectedInId,
     sourceServiceId: request.detectedInId,
-    sourceLabel: source?.label ?? (isInspection ? "Inspección ambiental" : "Servicio de origen"),
+    sourceLabel: isInspection ? "Inspección ambiental" : source?.label ?? "Servicio de origen",
     sourceHref: source?.href ?? (isInspection
       ? useFixtures ? environmentalInspectionSourceHref(request.detectedInId) : `/app?destination=environment&inspectionId=${encodeURIComponent(request.detectedInId)}`
       : serviceSourceHref(request.detectedInId)),

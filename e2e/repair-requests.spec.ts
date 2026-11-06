@@ -24,7 +24,7 @@ test.describe("RepairRequest Service-sourced workflow", () => {
     await page.getByRole("button", { name: "Crear derivación de reparación" }).click();
 
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText("Servicio SVC-1043")).toBeVisible();
+    await expect(dialog.getByText("Poda de árbol — Av. Rivadavia 2200")).toBeVisible();
     await chooseFieldOption(dialog, "Tipo de daño", "Vereda hundida o rota");
     await chooseFieldOption(dialog, "Severidad", "Baja");
     await chooseFieldRadio(dialog, "Sí");
@@ -32,7 +32,8 @@ test.describe("RepairRequest Service-sourced workflow", () => {
     await dialog.getByRole("button", { name: "Derivar" }).click();
 
     await expect(dialog.getByRole("status")).toContainText("Derivada a Obras Públicas");
-    await expect(dialog.getByText("SVC-1043").last()).toBeVisible();
+    await expect(dialog.getByRole("status")).toContainText("Poda de árbol — Av. Rivadavia 2200");
+    await expect(dialog.getByText("SVC-1043")).toHaveCount(0);
     await expect(dialog.getByRole("link", { name: /Ver servicio/ })).toHaveAttribute("href", /detail=SVC-1043/);
   });
 

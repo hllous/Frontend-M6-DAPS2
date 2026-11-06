@@ -1,4 +1,5 @@
 "use client";
+import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/error-message";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -8,7 +9,7 @@ import { CalendarClock, CheckCircle2, CircleX, Clock3, Eye, Info, Plus, RefreshC
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { CompactPager } from "@/components/ui/compact-pager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -274,6 +275,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestPrefill, setRequestPrefill] = useState<Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification">>({});
   const [detail, setDetail] = useState<TreeInterventionDetail | null>(null);
+  const [linkedService, setLinkedService] = useState<Service | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -290,6 +292,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const detailOpenedFromUrl = useRef(false);
   const initialDetailId = useSearchParams()?.get("detail") ?? null;
   const [notice, setNotice] = useState<string | null>(null);
+  const [duplicateService, setDuplicateService] = useState<PendingServiceLink | null>(null);
   const query = useMemo<TreeInterventionQuery>(() => ({ interventionType: interventionType || undefined, status: status || undefined, priority: priority || undefined, page, pageSize: 10 }), [interventionType, page, priority, status]);
 
   useEffect(() => {
@@ -313,7 +316,13 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     return () => { current = false; };
   }, [scheduleOpen]);
 
-  const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); };
+  useEffect(() => {
+    let active = true;
+    if (detail?.serviceId) void servicesAdapter.get(detail.serviceId).then((service) => { if (active) setLinkedService(service); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [detail?.serviceId]);
+
+  const openRequest = (prefill: Pick<RequestDialogProps, "initialTreeIds" | "initialType" | "initialAddress" | "initialRequiresStreetClosure" | "initialPriority" | "initialJustification"> = {}) => { setRequestPrefill(prefill); setRequestOpen(true); setNotice(null); setDuplicateService(null); };
   const verifyExistingService = useCallback(async (intervention: TreeInterventionDetail) => {
     const requestId = ++serviceLookupRequest.current;
     setServiceLookupStatus("loading");
@@ -422,6 +431,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           setUnsyncedService(null);
           setScheduleOpen(false);
           setRequestVersion((version) => version + 1);
+          setDuplicateService(linkedTo === createdService.id ? null : { id: createdService.id, title: createdService.title });
           setNotice(linkNotice(createdService.id, linkedTo));
         } catch (caught) {
           writeUnsynced(detail.id, createdService.id);
@@ -440,6 +450,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       setDetail(updated);
       setScheduleOpen(false);
       setRequestVersion((version) => version + 1);
+      setDuplicateService(null);
       setNotice(action === "submit" ? "Extracción enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
       if (action === "reject") setRejectConfirmOpen(false);
     } catch (caught) {
@@ -460,8 +471,8 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     }
   };
   const linkNotice = (serviceId: string, linkedTo: string) => linkedTo === serviceId
-    ? `Intervención programada. Servicio ${serviceId} vinculado correctamente.`
-    : `Ya estaba vinculada al servicio ${linkedTo}. Cancele el servicio ${serviceId} desde Servicios.`;
+    ? "Intervención programada. Servicio vinculado correctamente."
+    : "Ya estaba vinculada a otro servicio. Cancele el servicio duplicado desde Servicios.";
 
   const retryServiceLink = async () => {
     if (!detail || !unsyncedService) return;
@@ -473,6 +484,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
       writeUnsynced(detail.id, null);
       setUnsyncedService(null);
       setRequestVersion((version) => version + 1);
+      setDuplicateService(linkedTo === unsyncedService.id ? null : unsyncedService);
       setNotice(linkNotice(unsyncedService.id, linkedTo));
     } catch (caught) {
       setActionError(errorMessage(caught, "No se pudo vincular el servicio."));
@@ -489,7 +501,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         actions={canRequest ? <Button type="button" onClick={() => openRequest()}><Plus data-icon="inline-start" aria-hidden />Solicitar intervención</Button> : null}
       />
       {!canRequest ? <Alert><Info data-icon="inline-start" aria-hidden /><AlertDescription>Solo consulta</AlertDescription></Alert> : null}
-      {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}</AlertDescription></Alert> : null}
+      {notice ? <Alert><CheckCircle2 data-icon="inline-start" aria-hidden /><AlertDescription>{notice}{duplicateService && <Link className={cn(buttonVariants({ variant: "link-wrap" }))} href={serviceSourceHref(duplicateService.id)}>{duplicateService.title ?? "Servicio sin título disponible"}</Link>}</AlertDescription></Alert> : null}
       <FieldGroup className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="intervention-type-filter">Tipo de intervención</FieldLabel>
@@ -570,7 +582,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         <CompactPager label="Paginación de intervenciones" page={state.page.page} totalPages={state.page.totalPages} onPageChange={setPage} />
       </> : null}
 
-      {canRequest ? <TreeInterventionRequestDialog key={`${requestOpen}-${JSON.stringify(requestPrefill)}`} open={requestOpen} onOpenChange={setRequestOpen} trees={trees} {...requestPrefill} onCreated={() => { setNotice("Solicitud de intervención creada. Estado inicial: solicitada."); setPage(1); setRequestVersion((version) => version + 1); }} /> : null}
+      {canRequest ? <TreeInterventionRequestDialog key={`${requestOpen}-${JSON.stringify(requestPrefill)}`} open={requestOpen} onOpenChange={setRequestOpen} trees={trees} {...requestPrefill} onCreated={() => { setDuplicateService(null); setNotice("Solicitud de intervención creada. Estado inicial: solicitada."); setPage(1); setRequestVersion((version) => version + 1); }} /> : null}
       {canRequest && streetClosureIntervention ? (
         <CreateStreetClosureRequestDialog
           key={streetClosureIntervention.id}
@@ -581,7 +593,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
             if (!open) setStreetClosureIntervention(null);
           }}
           onCreated={() => {
-            setNotice("Solicitud de corte enviada a Tránsito.");
+            setDuplicateService(null); setNotice("Solicitud de corte enviada a Tránsito.");
             setStreetClosureIntervention(null);
             setRequestVersion((version) => version + 1);
           }}
@@ -592,21 +604,21 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle></DialogHeader>
           {detailLoading ? <LoadingRegion label="Detalle de la intervención"><DetailFieldsSkeleton fieldCount={6} /></LoadingRegion> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
-          {detail && !detailLoading && !detailError ? <div className="flex flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <Item key={tree?.id ?? detail.treeIds[index]} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</Item>)}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
+          {detail && !detailLoading && !detailError ? <div className="flex shrink-0 flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <Item key={tree?.id ?? detail.treeIds[index]} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</Item>)}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
             <>
               {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
-              {unsyncedService ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El Servicio {unsyncedService.id}{unsyncedService.title ? ` — ${unsyncedService.title}` : ""} fue creado, pero quedó sin vincular. La vinculación quedó pendiente. Complétela antes de salir de esta página.</span><Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button></AlertDescription></Alert> : null}
+              {unsyncedService ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>El servicio {unsyncedService.title ?? "sin título disponible"} fue creado, pero quedó sin vincular. La vinculación quedó pendiente. Complétela antes de salir de esta página.</span><Button type="button" variant="outline" disabled={activeAction !== null} aria-busy={activeAction === "retry-link"} onClick={() => void retryServiceLink()}><RefreshCw data-icon="inline-start" aria-hidden />{activeAction === "retry-link" ? "Reintentando vinculación…" : "Reintentar vinculación"}</Button></AlertDescription></Alert> : null}
               {canSchedule && detail.status === "AUTHORIZED" && serviceLookupStatus === "loading" ? <Alert role="status"><AlertDescription>Verificando si ya existe un servicio para esta intervención…</AlertDescription></Alert> : null}
               {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && serviceLookupStatus === "error" ? <Alert variant="destructive"><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{SERVICE_LOOKUP_FAILURE}</span><Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => void verifyExistingService(detail)}>Reintentar</Button></AlertDescription></Alert> : null}
-              <div className="flex flex-col gap-3">
+              <div className="flex shrink-0 flex-col gap-3">
                 {detail.status === "AUTHORIZED" ? (
                   <dl aria-label="Registro de autorización" className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3 text-sm sm:grid-cols-2">
-                    <div><dt className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><UserRound className="size-3.5" aria-hidden />Persona autorizante</dt><dd className="mt-1">{detail.authorizedByUserId ?? "No registrada"}</dd></div>
+                    <div><dt className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><UserRound className="size-3.5" aria-hidden />Persona autorizante</dt><dd className="mt-1">{detail.authorizedByUserId ? "Nombre no disponible" : "No registrada"}</dd></div>
                     <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de autorización</dt><dd className="mt-1 tabular-nums">{dateTimeLabel(detail.authorizedAt)}</dd></div>
                   </dl>
                 ) : null}
-                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className="font-mono font-semibold underline" href={serviceSourceHref(detail.serviceId)}>{detail.serviceId}</Link>.</AlertDescription></Alert> : null}
+                {canSchedule && detail.status === "AUTHORIZED" && detail.serviceId ? <Alert><CalendarClock data-icon="inline-start" aria-hidden /><AlertDescription>Servicio vinculado: <Link className={cn(buttonVariants({ variant: "link-wrap" }))} href={serviceSourceHref(detail.serviceId)} aria-label={`Servicio: ${(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "sin título disponible"}`}>{(linkedService?.id === detail.serviceId ? linkedService.title : null) ?? "Servicio sin título disponible"}</Link>.</AlertDescription></Alert> : null}
                 {canSchedule && detail.status === "AUTHORIZED" && !detail.serviceId && !unsyncedService && serviceLookupStatus === "ready" && scheduleOpen ? (
                   <form
                     aria-label="Programar servicio para la intervención"

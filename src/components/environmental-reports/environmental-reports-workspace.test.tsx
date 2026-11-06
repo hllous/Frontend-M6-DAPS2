@@ -314,8 +314,8 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
 
     const exceptionPanel = await screen.findByRole("region", { name: "Resoluciones sin acta" });
-    expect(within(exceptionPanel).getByText("NOTICE-UNKNOWN")).toBeVisible();
-    expect(within(exceptionPanel).getByText("M4-CLOSURE-UNKNOWN")).toBeVisible();
+    expect(within(exceptionPanel).queryByText("NOTICE-UNKNOWN")).not.toBeInTheDocument();
+    expect(within(exceptionPanel).queryByText("M4-CLOSURE-UNKNOWN")).not.toBeInTheDocument();
     expect(within(exceptionPanel).getByText("No coinciden con ningún acta.")).toBeVisible();
   });
 
@@ -324,11 +324,11 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1010") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1010" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1010") });
 
     expect(within(detail).getByRole("region", { name: "Resolución de Faltas" })).toBeVisible();
     expect(within(detail).getByText("Multa emitida")).toBeVisible();
-    expect(within(detail).getByText("M4-FINE-1010")).toBeVisible();
+    expect(within(detail).getByText("Multa registrada en Faltas")).toBeVisible();
     expect(within(detail).queryByText(/solo lectura|M6 no edita/i)).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: /Editar|Eliminar|Modificar/ })).not.toBeInTheDocument();
   });
@@ -339,7 +339,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
     const list = await screen.findByRole("region", { name: "Reportes ambientales asignados" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1010") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1010" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1010") });
 
     expect(within(detail).queryByRole("region", { name: "Resolución de Faltas" })).not.toBeInTheDocument();
     expect(within(detail).queryByText("M4-FINE-1010")).not.toBeInTheDocument();
@@ -352,7 +352,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1009") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1009" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1009") });
 
     expect(within(detail).getByRole("region", { name: "Cierre" })).toHaveTextContent("Esperando resolución de Faltas");
     expect(within(detail).getByText(/Faltas debe resolver antes del/)).toBeVisible();
@@ -365,13 +365,13 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1009") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1009" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1009") });
     expect(within(detail).getByRole("region", { name: "Cierre" })).toHaveTextContent("Cierre automático por vencimiento");
 
     await user.click(within(detail).getByRole("button", { name: "Volver a expedientes" }));
     const nextList = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(nextList).getByRole("button", { name: reportRowName("ER-1011") }));
-    const localDetail = await screen.findByRole("region", { name: "Detalle de ER-1011" });
+    const localDetail = await screen.findByRole("region", { name: reportRowName("ER-1011") });
     expect(within(localDetail).getByRole("region", { name: "Cierre" })).toHaveTextContent("Cierre local");
   });
 
@@ -382,7 +382,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(list).getByRole("button", { name: reportRowName("ER-1001") })).toBeVisible();
     expect(within(list).getByRole("button", { name: reportRowName("ER-1011") })).toBeVisible();
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1001") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1001" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1001") });
     expect(within(detail).getByRole("button", { name: "Iniciar revisión" })).toBeVisible();
     expect(within(detail).queryByRole("button", { name: "Derivar expediente" })).not.toBeInTheDocument();
     await user.click(within(detail).getByRole("button", { name: "Iniciar revisión" }));
@@ -493,7 +493,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1001") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1001" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1001") });
     await user.click(within(detail).getByRole("button", { name: "Iniciar revisión" }));
     await user.click(await within(detail).findByRole("button", { name: "Derivar expediente" }));
 
@@ -512,7 +512,7 @@ describe("EnvironmentalReportsWorkspace", () => {
 
     await waitFor(() => expect(forward).toHaveBeenCalledWith("ER-1001", { reason: "Corresponde a otra dependencia" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Derivar expediente" })).not.toBeInTheDocument());
-    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1001" })).toHaveFocus());
+    await waitFor(() => expect(within(detail).getByRole("heading", { name: reportRowName("ER-1001") })).toHaveFocus());
   });
 
   it("returns focus to the report heading after dismissing a report", async () => {
@@ -520,7 +520,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1001") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1001" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1001") });
     await user.click(within(detail).getByRole("button", { name: "Iniciar revisión" }));
     await user.click(await within(detail).findByRole("button", { name: "Desestimar expediente" }));
 
@@ -529,7 +529,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(dialog).getByRole("button", { name: "Desestimar expediente" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Desestimar expediente" })).not.toBeInTheDocument());
-    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1001" })).toHaveFocus());
+    await waitFor(() => expect(within(detail).getByRole("heading", { name: reportRowName("ER-1001") })).toHaveFocus());
   });
 
   it("asks the neighbour for information, then shows the pending request and hides the decisions the backend would reject", async () => {
@@ -562,7 +562,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1001") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1001" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1001") });
     await user.click(within(detail).getByRole("button", { name: "Iniciar revisión" }));
     await within(detail).findByRole("button", { name: "Derivar expediente" });
     expect(within(detail).queryByRole("button", { name: "Pedir información al vecino" })).not.toBeInTheDocument();
@@ -632,7 +632,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     await user.click(within(picker).getByRole("button", { name: "Confirmar ubicación" }));
     expect(within(dialog).getByText("Belgrano")).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Abrir reporte" }));
-    expect(await screen.findByText(/Expediente ER-/)).toBeInTheDocument();
+    expect(await screen.findByText(/Expediente .* abierto/)).toBeInTheDocument();
     expect(payloads).toEqual([expect.objectContaining({ address: "Calle Nueva 100", lat: -34.5446871, lng: -58.4386826 })]);
   });
 
@@ -756,7 +756,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1005") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1005" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1005") });
 
     await user.click(await within(detail).findByRole("button", { name: "Reprogramar inspección" }));
     const reasonDialog = await screen.findByRole("dialog", { name: /^Reprogramar/ });
@@ -782,12 +782,12 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1005") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1005" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1005") });
 
-    const item = (await within(detail).findByText(/^Inspección 1 · /)).closest<HTMLElement>('[role="listitem"]')!;
+    const item = (await within(detail).findByText(/^Inspección del /)).closest<HTMLElement>('[role="listitem"]')!;
     expect(within(item).getByText("Resultado: Infracción constatada")).toBeVisible();
     // #321: fecha legible, sin el ISO del backend ni una versión de checklist que no existe.
-    expect(await within(item).findByText(/^Inspección 1 · 05\/09\/2026 · 13:00–16:00$/)).toBeVisible();
+    expect(await within(item).findByText(/^Inspección del 05\/09\/2026 · 13:00–16:00$/)).toBeVisible();
     expect(item).not.toHaveTextContent("ambiental-v");
     expect(within(item).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
     expect(item).not.toHaveTextContent("crew-c");
@@ -799,7 +799,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1008") });
     await user.click(within(detail).getByRole("button", { name: "Emitir acta" }));
 
     const dialog = screen.getByRole("dialog");
@@ -812,7 +812,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(within(detail).getByText("Acta emitida. No se puede modificar.")).toBeVisible();
     expect(within(detail).getByText("Actas previas")).toBeVisible();
     expect(within(detail).queryByRole("button", { name: /Editar acta|Eliminar acta/ })).not.toBeInTheDocument();
-    await waitFor(() => expect(within(detail).getByRole("heading", { name: "Expediente ER-1008" })).toHaveFocus());
+    await waitFor(() => expect(within(detail).getByRole("heading", { name: reportRowName("ER-1008") })).toHaveFocus());
   });
 
   it.each([
@@ -824,7 +824,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1008") });
     expect(await within(detail).findByRole("button", { name: "Emitir acta" })).toBeVisible();
     expect(within(detail).queryByText("No se pudo cargar el acta.")).not.toBeInTheDocument();
   });
@@ -835,7 +835,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1008") });
     expect(await within(detail).findByText(/No se pudo completar la operación ambiental|boom/)).toBeVisible();
   });
 
@@ -845,7 +845,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1008") });
 
     const issueButton = await within(detail).findByRole("button", { name: "Emitir acta" });
     expect(issueButton).toBeDisabled();
@@ -857,7 +857,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1008") });
     await user.click(within(detail).getByRole("button", { name: "Emitir acta" }));
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText(/Buscar establecimiento/), "referencia inexistente");
@@ -882,7 +882,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1008") });
     await user.click(within(detail).getByRole("button", { name: "Emitir acta" }));
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText(/Buscar establecimiento/), "EST-BOEDO-1880");
@@ -897,7 +897,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeLimited} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1008") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1008" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1008") });
 
     expect(within(detail).queryByRole("button", { name: "Emitir acta" })).not.toBeInTheDocument();
   });
@@ -908,12 +908,12 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1012") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1012") });
     const action = await within(detail).findByRole("button", { name: "Crear derivación de reparación" });
     await user.click(action);
 
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText("Contexto de origen INS-1012")).toBeVisible();
+    expect(within(dialog).getByText("Inspección de origen")).toBeVisible();
     expect(within(dialog).getByLabelText(/Ubicación del daño/)).toHaveValue("Av. Brasil 2450");
     expect(within(dialog).getByRole("link", { name: /Ver inspección/ })).toHaveAttribute("href", "/app?destination=environment&detail=ER-1012&inspectionId=INS-1012");
     await chooseOption(user, within(dialog), /^Severidad/, "Baja");
@@ -944,8 +944,8 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1012") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
-    await within(detail).findByText(/^Inspección 1 · /);
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1012") });
+    await within(detail).findByText(/^Inspección del /);
 
     const button = within(detail).queryByRole("button", { name: "Crear derivación de reparación" });
     if (expected) expect(button).toBeVisible();
@@ -956,7 +956,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenario} />);
     const list = await screen.findByRole("region", { name: label });
     await user.click(within(list).getByRole("button", { name: reportRowName(id) }));
-    return screen.findByRole("region", { name: `Detalle de ${id}` });
+    return screen.findByRole("region", { name: reportRowName(id) });
   }
 
   it.each([
@@ -967,7 +967,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     updateEnvironmentalInspectionFixture("INS-1008", { allowedActions });
     const user = userEvent.setup();
     const detail = await openReport(user, scenarios.officeDutyQueue, "ER-1008", "Cola de expedientes ambientales");
-    await within(detail).findByText(/^Inspección 1 · /);
+    await within(detail).findByText(/^Inspección del /);
 
     const button = within(detail).queryByRole("button", { name: "Emitir acta" });
     if (expected) expect(button).toBeVisible();
@@ -1016,7 +1016,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     updateEnvironmentalInspectionFixture("INS-1008", { allowedActions: { repair: true, notice: true, suggestedViolationType: "ILLEGAL_DUMPING" } });
     const user = userEvent.setup();
     const detail = await openReport(user, scenarios.officeLimited, "ER-1008", "Cola de expedientes ambientales");
-    await within(detail).findByText(/^Inspección 1 · /);
+    await within(detail).findByText(/^Inspección del /);
 
     expect(within(detail).queryByRole("button", { name: "Emitir acta" })).not.toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
@@ -1027,12 +1027,12 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1012") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1012") });
 
-    const title = await within(detail).findByText(/^Inspección 1 · /);
+    const title = await within(detail).findByText(/^Inspección del /);
     expect(title).not.toHaveTextContent("INS-1012");
-    expect(title).toHaveTextContent(/^Inspección 1 · 07\/09\/2026 · 10:00–13:00$/);
-    expect(within(detail).getByRole("button", { name: "Copiar identificador de la inspección" })).toBeVisible();
+    expect(title).toHaveTextContent(/^Inspección del 07\/09\/2026 · 10:00–13:00$/);
+    expect(within(detail).queryByRole("button", { name: "Copiar identificador de la inspección" })).not.toBeInTheDocument();
   });
 
   it("shows the inspection action to Field only when its linked Service belongs to the actor crew", async () => {
@@ -1041,7 +1041,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.fieldCrewLeader} />);
     const list = await screen.findByRole("region", { name: "Reportes ambientales asignados" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1012") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1012") });
     await waitFor(() => expect(within(detail).queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument());
   });
 
@@ -1052,7 +1052,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     render(<EnvironmentalReportsWorkspace scenario={scenarios.officeDutyQueue} />);
     const list = await screen.findByRole("region", { name: "Cola de expedientes ambientales" });
     await user.click(within(list).getByRole("button", { name: reportRowName("ER-1012") }));
-    const detail = await screen.findByRole("region", { name: "Detalle de ER-1012" });
+    const detail = await screen.findByRole("region", { name: reportRowName("ER-1012") });
     await user.click(await within(detail).findByRole("button", { name: "Crear derivación de reparación" }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Derivar" }));

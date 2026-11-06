@@ -429,7 +429,7 @@ export const containersAdapter = {
     const parsed = z.array(attachmentSchema).safeParse(payload);
     if (!parsed.success) {
       recordTelemetryEvent({ name: "request_malformed_response", resource: "containers" });
-      throw new ContainerContractError("La lista de evidencia de contenedores no respeta el contrato.", {
+      throw new ContainerContractError("No se pudo obtener información válida de la evidencia de contenedores. Reintente en unos segundos.", {
         cause: parsed.error,
       });
     }

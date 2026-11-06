@@ -103,7 +103,7 @@ describe("TreeSurveyPanel", () => {
     const dialog = screen.getByRole("dialog", { name: /Solicitar intervención/ });
     expect(within(dialog).getByRole("combobox", { name: "Tipo de intervención" })).toHaveTextContent("Poda de seguridad");
     expect(within(dialog).getByRole("combobox", { name: "Árboles a intervenir" })).toHaveTextContent("ARB-00443");
-    expect(within(dialog).getByLabelText(/^Justificación/)).toHaveValue("Relevamiento 06/09/2026 (survey-2).");
+    expect(within(dialog).getByLabelText(/^Justificación/)).toHaveValue("Relevamiento 06/09/2026 (ARB-00443).");
   });
 
   it("covers accessible empty and retryable error states", async () => {

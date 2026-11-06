@@ -104,7 +104,7 @@ describe("Container Service lookup", () => {
     const row = await screen.findByRole("row", { name: /CONT-REMOTO/ });
     await openContainerDetail(user, row);
     const dialog = screen.getByRole("dialog");
-    expect(await within(dialog).findByText(`Servicio en curso (${service.id})`)).toBeVisible();
+    expect(await within(dialog).findByRole("link", { name: `Servicio en curso: ${service.title}` })).toBeVisible();
     expect(within(dialog).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
     expect(requestedPages).toContain(2);
   });
@@ -786,7 +786,7 @@ describe("ContainerCatalogPanel", () => {
       expect(within(detail).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
 
       // Instead, in-flight badge must be rendered
-      expect(await within(detail).findByText(/Servicio en curso \(SVC-9901\)/)).toBeVisible();
+      expect(await within(detail).findByText(/Servicio en curso/)).toBeVisible();
     });
 
     it("keeps relocation hidden for Field while allowing emptying", async () => {
