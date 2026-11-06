@@ -74,7 +74,8 @@ test.describe("Tableros: ajustes de la revisión del PO (#887)", () => {
     await page.goto(COBERTURA);
     await page.getByRole("tab", { name: "Territorio" }).click();
     const trigger = page.getByRole("button", { name: /Porcentajes de Norte/ }).first();
-    await trigger.scrollIntoViewIfNeeded();
+    // The Territorio tab re-renders its rows once data settles; wait for the stable bar before tapping.
+    await expect(trigger).toBeVisible();
     await trigger.tap();
     const popup = page.getByRole("dialog", { name: /Norte/ });
     await expect(popup).toBeVisible();
