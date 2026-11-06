@@ -548,13 +548,13 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       </> : <>
       <div className={styles.detailTop}>
         <Button type="button" variant="outline" onClick={closeDetail}><ArrowLeft data-icon="inline-start" aria-hidden />Volver a Tableros</Button>
-        <h2 ref={detailHeadingRef} tabIndex={-1} className={cn(styles.detailTitle, sectionTitleClass, "inline-flex items-center gap-2")}><FamilyIcon aria-hidden className="size-5 shrink-0" />Detalle de {familyMeta[selectedFamily].label}</h2>
+        <h2 ref={detailHeadingRef} tabIndex={-1} className={cn(styles.detailTitle, sectionTitleClass, "inline-flex items-center gap-2 rounded-md px-1")}><FamilyIcon aria-hidden className="size-5 shrink-0" />Detalle de {familyMeta[selectedFamily].label}</h2>
       </div>
       {selectedFamilyState.status === "error" ? <Alert variant="danger"><AlertTitle>No se pudo actualizar {familyMeta[selectedFamily].label}. Los datos pueden estar desactualizados.</AlertTitle><Button type="button" variant="outline" size="sm" onClick={() => retryFamily(selectedFamily)}>Reintentar</Button></Alert> : null}
       <FamilyDetailSummary family={selectedFamily} state={selectedFamilyState} />
 
 
-      {isNarrow ? <ChartViewToggle value={viewMode} onChange={setViewMode} label="Vista" /> : null}
+      {isNarrow ? <div className="flex justify-end"><ChartViewToggle value={viewMode} onChange={setViewMode} label="Vista" /></div> : null}
       {isNarrow ? <Tabs defaultValue="summary" className={styles.mobileTabs}>
         <TabsList aria-label="Secciones del tablero" className={styles.tabList}>
           <TabsTrigger value="summary">Resumen</TabsTrigger>
