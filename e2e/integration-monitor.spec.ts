@@ -93,3 +93,27 @@ test("monitor de integración: admin, auditor, filtros, reintentos y acceso @smo
   await page.goto("/app/admin/integration-monitor");
   await expect(page.getByRole("heading", { name: "Sin acceso" })).toBeVisible();
 });
+
+test("monitor de integración: eventos recibidos y actor de sistema en el registro (#875)", async ({ page }) => {
+  await resetMockData(page);
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/app/admin/integration-monitor");
+
+    await page.getByRole("tab", { name: "Eventos recibidos" }).click();
+    const received = page.getByRole(viewport.width > 760 ? "table" : "list", { name: "Eventos recibidos" });
+    await expect(received).toBeVisible();
+    await expect(received).toContainText("workOrderCompleted");
+    await expect(received).toContainText("Obras Públicas");
+    await expect(received).toContainText("closureRequestId inexistente");
+    const size = await page.evaluate(() => ({ width: window.innerWidth, documentWidth: document.documentElement.scrollWidth }));
+    expect(size.documentWidth).toBeLessThanOrEqual(size.width);
+    await expectNoViolations(page);
+
+    await page.getByRole("tab", { name: "Registro de actividad" }).click();
+    const activity = page.getByRole(viewport.width > 760 ? "table" : "list", { name: "Registro de actividad" });
+    await expect(activity).toContainText("Sistema · Obras Públicas");
+    await expect(activity).not.toContainText("system:m3");
+  }
+});
