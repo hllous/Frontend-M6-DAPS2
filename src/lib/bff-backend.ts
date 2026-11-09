@@ -28,24 +28,44 @@ export function pathId(id: string): string {
   return encodeURIComponent(id);
 }
 
+const RATE_LIMIT_MESSAGE = "Hay demasiados pedidos en curso. Espere unos segundos e intente de nuevo.";
+
+/**
+ * Tipos de contenido JSON que el BFF deja pasar: los dos que emite el Backend. Desde Backend #597 los errores salen como
+ * `application/problem+json` (RFC 9457); comparar solo con `application/json` los trataría como ilegibles. Es una lista
+ * cerrada a propósito: cualquier otro tipo, incluidos otros `+json`, `application/jsonp` y `text/*`, se sigue envolviendo.
+ */
+const JSON_MEDIA_TYPES = new Set(["application/json", "application/problem+json"]);
+
+export function isJsonMediaType(contentType: string | null | undefined): boolean {
+  const mediaType = contentType?.split(";", 1)[0]?.trim().toLowerCase();
+  return mediaType !== undefined && JSON_MEDIA_TYPES.has(mediaType);
+}
+
 async function clarifyBackendError(response: Response, method: string): Promise<Response> {
-  if (response.ok || !response.headers.get("content-type")?.toLowerCase().includes("application/json")) return response;
+  if (response.ok || !isJsonMediaType(response.headers.get("content-type"))) return response;
   const payload: unknown = await response.clone().json().catch(() => null);
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return response;
   const record = payload as Record<string, unknown>;
   const message = record.message;
   const values = Array.isArray(message) ? message : [message];
-  if (!values.some((value) => typeof value === "string" && /\bm[oó]dulo\s+[1-9]\b|\bM[1-9]\b|backend|\b(?:workOrderId|closureId|ticketId|serviceId|zoneId)\b/i.test(value))) return response;
-  const replacement = ["GET", "HEAD"].includes(method.toUpperCase())
-    ? "No se pudo obtener la información. Reintente en unos segundos."
-    : response.status >= 400 && response.status < 500
-      ? "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."
-      : "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar.";
+  const rateLimited = response.status === 429;
+  const mentionsInternals = values.some((value) => typeof value === "string" && /\bm[oó]dulo\s+[1-9]\b|\bM[1-9]\b|backend|\b(?:workOrderId|closureId|ticketId|serviceId|zoneId)\b/i.test(value));
+  if (!rateLimited && !mentionsInternals) return response;
+  const replacement = rateLimited
+    ? RATE_LIMIT_MESSAGE
+    : ["GET", "HEAD"].includes(method.toUpperCase())
+      ? "No se pudo obtener la información. Reintente en unos segundos."
+      : response.status >= 400 && response.status < 500
+        ? "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."
+        : "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar.";
   const headers = new Headers(response.headers);
   headers.delete("content-length");
   headers.delete("content-encoding");
   void response.body?.cancel().catch(() => undefined);
-  return new Response(JSON.stringify({ ...record, message: replacement }), { status: response.status, statusText: response.statusText, headers });
+  // `detail` (RFC 9457) repite `message`: si solo se reescribiera `message`, el texto original llegaría por `detail`.
+  const clarified = { ...record, message: replacement, ...("detail" in record ? { detail: replacement } : {}) };
+  return new Response(JSON.stringify(clarified), { status: response.status, statusText: response.statusText, headers });
 }
 
 export async function fetchBackend(

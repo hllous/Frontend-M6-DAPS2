@@ -8,7 +8,7 @@ This document describes the API behavior the frontend consumes, the frontend-onl
 
 - **Success**: bare resource object (or array) on the wire, never wrapped in `{ data: ... }`.
 - **Paginated lists**: `{ data: T[], meta: { total, page, pageSize, totalPages } }`.
-- **Errors**: `{ statusCode, message, error, timestamp, path }`, produced by a global exception filter.
+- **Errors**: Problem Details (RFC 9457, `Content-Type: application/problem+json`) with the historical fields kept, so the body is `{ type, title, status, detail, instance, statusCode, message, error, timestamp, path }` plus an optional `code` (Backend #597, ADR-011), produced by a global exception filter. `detail` repeats `message`, `status` repeats `statusCode`, `title` repeats `error` and `instance` repeats `path`; read the historical fields. The BFF relays only `application/json` and `application/problem+json` (`isJsonMediaType` in `src/lib/bff-backend.ts`); any other type is wrapped as a 502 or the original status without the upstream body. `clarifyBackendError` rewrites both `message` and `detail` when the text exposes internal terms, and shows a Spanish copy for **429** (the Backend has a global rate limit, ADR-010) while keeping `Retry-After`.
 - **Routes**: kebab-case plural (`/environmental-reports`), action-on-resource for non-CRUD verbs (`POST /services/:id/start`), never raw verbs in the URL.
 - **Auth**: Bearer JWT issued by M1, `Authorization: Bearer <token>`.
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { forwardResponse } from "@/lib/bff-route";
 
 describe("BFF upstream relay", () => {
-  it.each(["application/json", "application/json; charset=utf-8", "Application/JSON; charset=UTF-8"])("relays %s bytes and status with nosniff", async (contentType) => {
+  it.each(["application/json", "application/json; charset=utf-8", "Application/JSON; charset=UTF-8", "application/problem+json", "Application/Problem+JSON; charset=UTF-8"])("relays %s bytes and status with nosniff", async (contentType) => {
     const body = '{"message":"Error documentado."}';
     const result = forwardResponse(new Response(body, {
       status: 422, headers: { "content-type": contentType, "set-cookie": "upstream=secret", "x-internal": "private" },
@@ -16,7 +16,7 @@ describe("BFF upstream relay", () => {
     expect(await result.text()).toBe(body);
   });
 
-  it.each(["text/html", "text/plain", "application/problem+json", "application/jsonp", "application/json-malicious", ""])("wraps disallowed type %s without exposing upstream body", async (contentType) => {
+  it.each(["text/html", "text/plain", "application/vnd.api+json", "application/jsonp", "application/json-malicious", "application/problem+xml", ""])("wraps disallowed type %s without exposing upstream body", async (contentType) => {
     const result = forwardResponse(new Response("<script>upstream detail</script>", {
       status: 502, headers: { "content-type": contentType },
     }), "/api/services");
