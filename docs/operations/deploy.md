@@ -62,6 +62,24 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 
 La cookie de sesión es `httpOnly`, `Secure` en producción y `SameSite=Lax`, y se cifra con AES-256-GCM; guarda los tokens de M1, que nunca llegan al navegador. Para desarrollo sin M1 usá `mock`; para probar el login real en local, el M1 falso con el backend mockeado (`docs/agents/real-m1-development.md`). No publiques secretos en el repositorio ni los incluyas en variables públicas.
 
+### Estado de las variables en Vercel (09/11/2026)
+
+Lo confirma el equipo con su planilla de variables de entorno del despliegue; **no está verificado contra el panel de Vercel**. Los valores de los secretos no se documentan: solo se dice si están definidos.
+
+| Variable | ¿Obligatoria? | En Vercel | Valor que se puede documentar |
+|---|---|---|---|
+| `M6_AUTH_MODE` | Sí | Definida | `real-m1` |
+| `M6_BACKEND_ORIGIN` | Sí, en `real-m1` | Definida | Origen del backend en Render: `https://m6-backend-m64k.onrender.com` |
+| `M1_BASE_URL` | Sí, en `real-m1` | Definida | `https://ciudadanos-m1-backend.onrender.com/` |
+| `M6_SESSION_SECRET` | Sí, con `NODE_ENV=production` | Definida | Secreto aleatorio de 32 bytes o más; no se documenta el valor |
+| `BFF_SHARED_KEY` | No: opcional en el código | Definida | Secreto; no se documenta el valor. Según el equipo (09/11/2026) es idéntica a la `BFF_SHARED_KEY` del backend en Render |
+| `M6_JWT_SECRET` | No: **retirada** | **Sigue cargada: hay que borrarla** | Secreto sin uso en el código; no se documenta el valor |
+| `M6_JWT_ISSUER` | No: **retirada** | **Sigue cargada: hay que borrarla** | `modulo1-ciudadanos`, el valor por defecto de cuando se usaba |
+
+`M6_JWT_SECRET` y `M6_JWT_ISSUER` ya no las lee ninguna parte del código (ver «Variables retiradas»). Que sigan cargadas no rompe nada, pero un secreto sin uso es una exposición sin motivo: borrarlas del proyecto en Vercel es el paso de operador que falta.
+
+> **Limitación conocida: `BFF_SHARED_KEY` solo cubre `/api/public/*`.** `X-M6-BFF-Key` y `X-Forwarded-For` se agregan únicamente en `src/lib/public-bff.ts`. Las llamadas autenticadas de los operadores no mandan ninguno de los dos, así que el backend las cuenta por la IP de salida del BFF y todos los operadores comparten el mismo límite por endpoint: 600 por minuto y, en `POST /evidence`, 30 por minuto en total ([ADR-010 del backend](https://github.com/hllous/Backend-M6-DAPS2/blob/develop/docs/decisiones/adr-010-rate-limit-global.md)). Que la clave sea idéntica en los dos lados no cambia esto. El pedido de mandarlas también en las rutas autenticadas está en [Frontend-M6-DAPS2#898](https://github.com/hllous/Frontend-M6-DAPS2/issues/898).
+
 ### IP del vecino y `X-Forwarded-For`
 
 Según la [documentación de Vercel](https://vercel.com/docs/headers/request-headers#x-forwarded-for), `x-forwarded-for` lleva la IP pública del cliente, Vercel lo sobrescribe y no reenvía IPs externas (para evitar suplantación); `x-real-ip` es idéntico. Por eso, desplegado en Vercel, el primer salto es la IP real y el BFF lo reenvía. Si se pone un proxy delante de Vercel, ese header trae la IP del proxy (no la del vecino). Fuera de Vercel (Docker, local) no hay garantía: un cliente podría mandar el header, así que ahí no se debe activar `BFF_SHARED_KEY` salvo que un proxy propio lo sobrescriba. El backend además descarta una primera entrada que no sea una IP válida.
