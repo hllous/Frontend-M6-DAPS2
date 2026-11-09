@@ -59,16 +59,39 @@ describe("backendMode", () => {
     expect(await response.json()).toMatchObject({ message, path: "/api/test" });
   });
 
-  it("wraps an upstream content type outside application/json in the standard error envelope", async () => {
+  it("wraps an upstream content type outside JSON in the standard error envelope", async () => {
     const response = await forwardResponse(new Response("upstream body", {
       status: 409,
-      headers: { "content-type": "application/problem+json" },
+      headers: { "content-type": "text/html" },
     }));
 
     expect(response.status).toBe(409);
     expect(response.headers.get("content-type")).toContain("application/json");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(await response.json()).toMatchObject({ statusCode: 409, error: "Conflict" });
+  });
+
+  it("relays a Backend application/problem+json error (RFC 9457) with its status and body intact", async () => {
+    const body = {
+      type: "about:blank",
+      title: "Conflict",
+      status: 409,
+      detail: "La transición no es válida para el estado actual.",
+      instance: "/services/service-1/start",
+      statusCode: 409,
+      message: "La transición no es válida para el estado actual.",
+      error: "Conflict",
+      timestamp: "2026-11-09T12:00:00.000Z",
+      path: "/services/service-1/start",
+    };
+    const response = forwardResponse(new Response(JSON.stringify(body), {
+      status: 409,
+      headers: { "content-type": "application/problem+json; charset=utf-8" },
+    }));
+
+    expect(response.status).toBe(409);
+    expect(response.headers.get("content-type")).toContain("application/problem+json");
+    expect(await response.json()).toEqual(body);
   });
 
   it("relays bodyless upstream responses", async () => {

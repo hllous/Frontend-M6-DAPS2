@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BackendUnavailableError } from "./session";
-import { fetchBackend, pathId } from "./bff-backend";
+import { fetchBackend, isJsonMediaType, pathId } from "./bff-backend";
 import { forwardResponse } from "./bff-route";
 import { createSessionCookie } from "@/test/session";
 
@@ -72,6 +72,90 @@ describe("backend error copy", () => {
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject({ message: expected, code: "INVALID", statusCode: status });
   });
+
+  it("applies the same copy to an application/problem+json error and rewrites detail as well", async () => {
+    const original = "El backend de M4 rechazó el pedido.";
+    const copy = "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente.";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      type: "about:blank",
+      title: "Unprocessable Entity",
+      status: 422,
+      detail: original,
+      instance: "/services",
+      statusCode: 422,
+      message: original,
+      error: "Unprocessable Entity",
+      code: "INVALID",
+    }), { status: 422, headers: { "content-type": "application/problem+json; charset=utf-8" } }));
+
+    const response = await fetchBackend(backendRequest(), "/services", undefined, { method: "POST" });
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body).toMatchObject({ message: copy, detail: copy, code: "INVALID", statusCode: 422, status: 422, title: "Unprocessable Entity" });
+    expect(JSON.stringify(body)).not.toContain("M4");
+  });
+
+  it("leaves a problem+json error without internal terms untouched", async () => {
+    const payload = {
+      type: "about:blank",
+      title: "Unprocessable Entity",
+      status: 422,
+      detail: "La fecha es obligatoria.",
+      instance: "/services",
+      statusCode: 422,
+      message: "La fecha es obligatoria.",
+      error: "Unprocessable Entity",
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 422,
+      headers: { "content-type": "application/problem+json" },
+    }));
+
+    const response = await fetchBackend(backendRequest(), "/services", undefined, { method: "POST" });
+
+    expect(await response.json()).toEqual(payload);
+  });
+
+  it.each(["application/json", "application/problem+json"])(
+    "shows a Spanish message for a 429 delivered as %s and keeps Retry-After",
+    async (contentType) => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+        statusCode: 429,
+        message: "ThrottlerException: Too Many Requests",
+        detail: "ThrottlerException: Too Many Requests",
+        error: "Too Many Requests",
+      }), { status: 429, headers: { "content-type": contentType, "retry-after": "12" } }));
+
+      const response = await fetchBackend(backendRequest(), "/services", undefined, { method: "GET" });
+      const body = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("retry-after")).toBe("12");
+      expect(body).toMatchObject({
+        statusCode: 429,
+        message: "Hay demasiados pedidos en curso. Espere unos segundos e intente de nuevo.",
+        detail: "Hay demasiados pedidos en curso. Espere unos segundos e intente de nuevo.",
+      });
+      expect(JSON.stringify(body)).not.toContain("Throttler");
+    },
+  );
+});
+
+describe("isJsonMediaType", () => {
+  it.each(["application/json", "application/json; charset=utf-8", "application/problem+json", "Application/Problem+JSON; charset=UTF-8"])(
+    "accepts %s",
+    (contentType) => {
+      expect(isJsonMediaType(contentType)).toBe(true);
+    },
+  );
+
+  it.each(["text/html", "application/xml", "text/plain; charset=utf-8", "application/jsonp", "application/vnd.api+json", "application/problem+xml", "", null, undefined])(
+    "rejects %s",
+    (contentType) => {
+      expect(isJsonMediaType(contentType)).toBe(false);
+    },
+  );
 });
 
 describe("fetchBackend availability", () => {
