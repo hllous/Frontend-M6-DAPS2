@@ -76,4 +76,25 @@ describe("integration monitor mock handlers", () => {
       expect.objectContaining({ entityType: "CONTAINER", entityId: "550e8400-e29b-41d4-a716-446655440001" }),
     ]);
   });
+
+  it("lists the received events, newest first and without payload, and lets an auditor read them (#875)", async () => {
+    const response = await call("/api/events/inbox", { cookie: auditorCookie });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.meta.total).toBe(3);
+    expect(body.data.map((event: { eventType: string }) => event.eventType)).toEqual(["workOrderCompleted", "streetClosureApproved", "ticketUpdated"]);
+    expect(body.data[0]).not.toHaveProperty("payload");
+  });
+
+  it("filters the received events by state and sender, and rejects an inverted date range (#875)", async () => {
+    const failed = await (await call("/api/events/inbox?status=failed")).json();
+    expect(failed.data).toEqual([expect.objectContaining({ eventType: "streetClosureApproved", sourceModule: "transito" })]);
+
+    const bySender = await (await call("/api/events/inbox?sourceModule=tickets")).json();
+    expect(bySender.data).toEqual([expect.objectContaining({ eventType: "ticketUpdated", status: "pending" })]);
+
+    const inverted = await call("/api/events/inbox?from=2026-11-06&to=2026-11-01");
+    expect(inverted.status).toBe(400);
+  });
 });

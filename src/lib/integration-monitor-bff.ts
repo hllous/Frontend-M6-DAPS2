@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { errorResponse, forwardResponse } from "@/lib/bff-route";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
-import { auditQuerySchema, outboxQuerySchema } from "@/lib/integration-monitor";
+import { auditQuerySchema, inboxQuerySchema, outboxQuerySchema } from "@/lib/integration-monitor";
 
 export function noStore<T extends NextResponse>(response: T): T {
   response.headers.set("Cache-Control", "no-store, private, max-age=0");
@@ -19,6 +19,19 @@ export function parseOutboxQuery(url: URL) {
   return outboxQuerySchema.safeParse({
     status: params.get("status") ?? undefined,
     eventType: params.get("eventType") ?? undefined,
+    from: params.get("from") ?? undefined,
+    to: params.get("to") ?? undefined,
+    page: pageParam(params),
+    pageSize: pageSizeParam(params),
+  });
+}
+
+export function parseInboxQuery(url: URL) {
+  const params = url.searchParams;
+  return inboxQuerySchema.safeParse({
+    status: params.get("status") ?? undefined,
+    eventType: params.get("eventType") ?? undefined,
+    sourceModule: params.get("sourceModule") ?? undefined,
     from: params.get("from") ?? undefined,
     to: params.get("to") ?? undefined,
     page: pageParam(params),

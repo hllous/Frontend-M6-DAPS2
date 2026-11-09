@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { fetchBackend, pathId } from "./bff-backend";
+import { fetchBackend, isJsonMediaType, pathId } from "./bff-backend";
 import { getScenario, type Capability, type OperationalScenario } from "./scenarios";
 
 import { bffPathForResponse } from "./bff-response-path";
@@ -225,7 +225,7 @@ export function mapSessionError(error: unknown, path: string, fallbackMessage: s
 export function forwardResponse(response: Response, path = bffPathForResponse(response) ?? ""): NextResponse {
   const contentType = response.headers.get("content-type");
   const bodyless = [204, 205, 304].includes(response.status);
-  if (!bodyless && contentType !== null && contentType.split(";")[0].trim().toLowerCase() !== "application/json") {
+  if (!bodyless && contentType !== null && !isJsonMediaType(contentType)) {
     void response.body?.cancel().catch(() => undefined);
     const errorStatus = response.status >= 200 && response.status < 300 ? 502 : response.status;
     const error = errorResponse(errorStatus, "El sistema devolvió una respuesta que no se pudo leer. Reintente en unos segundos.", path);

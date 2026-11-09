@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
@@ -137,5 +137,55 @@ describe("IntegrationMonitor", () => {
     expect(within(auditorTable).getByText("Otra acción")).toBeVisible();
     expect(within(auditorTable).queryByText(/ARCHIVE_RECORD/)).not.toBeInTheDocument();
     expect(within(auditorTable).queryByText(/PAUSED_BY_CITY/)).not.toBeInTheDocument();
+  });
+
+  it("shows the area that acted, not a user id, when the actor is the system (#875)", async () => {
+    const { container } = render(<IntegrationMonitor canManage initialTab="activity" />);
+
+    const table = await screen.findByRole("table", { name: "Registro de actividad" });
+    expect(within(table).getByText("Sistema · Obras Públicas")).toBeVisible();
+    expect(within(table).queryByText("system:m3")).not.toBeInTheDocument();
+    expectNoInternalJargon(container, { allowTechnicalIds: true });
+  });
+
+  it("lists the events received from other areas with their sender, state and error (#875)", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<IntegrationMonitor canManage={false} initialTab="events" />);
+
+    await user.click(await screen.findByRole("tab", { name: "Eventos recibidos" }));
+    const table = await screen.findByRole("table", { name: "Eventos recibidos" });
+    expect(within(table).getByText("workOrderCompleted")).toBeVisible();
+    expect(within(table).getByText("Obras Públicas")).toBeVisible();
+    expect(within(table).getByText("Tránsito")).toBeVisible();
+    expect(within(table).getByText("closureRequestId inexistente")).toBeVisible();
+    expect(within(table).getByLabelText("Estado: Procesado")).toBeVisible();
+    expect(within(table).getByLabelText("Estado: Fallido")).toBeVisible();
+    expect(within(table).getByLabelText("Estado: En curso")).toBeVisible();
+    expectNoInternalJargon(container, { allowTechnicalIds: true });
+  });
+
+  it("filters the received events by state and explains an empty result (#875)", async () => {
+    const user = userEvent.setup();
+    render(<IntegrationMonitor canManage={false} initialTab="received" />);
+
+    expect(await screen.findByRole("table", { name: "Eventos recibidos" })).toBeVisible();
+    await user.click(screen.getByRole("combobox", { name: "Estado de eventos recibidos" }));
+    await user.click(await screen.findByRole("option", { name: "Fallido" }));
+    await user.click(screen.getByRole("button", { name: "Aplicar filtros de recibidos" }));
+
+    await waitFor(() => expect(screen.queryByText("workOrderCompleted")).not.toBeInTheDocument());
+    expect(within(screen.getByRole("table", { name: "Eventos recibidos" })).getByText("streetClosureApproved")).toBeVisible();
+
+    await user.type(screen.getByRole("textbox", { name: "Tipo de evento" }), "noExiste");
+    await user.click(screen.getByRole("button", { name: "Aplicar filtros de recibidos" }));
+    expect(await screen.findByText("No hay eventos recibidos con esos filtros")).toBeVisible();
+  });
+
+  it("shows a recoverable error when the received events cannot be loaded (#875)", async () => {
+    server.use(http.get("*/api/events/inbox", () => HttpResponse.json({ message: "Servicio no disponible." }, { status: 503 })));
+    render(<IntegrationMonitor canManage={false} initialTab="received" />);
+
+    expect(await screen.findByText("No se pudieron cargar los eventos recibidos")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Actualizar recibidos" })).toBeEnabled();
   });
 });
