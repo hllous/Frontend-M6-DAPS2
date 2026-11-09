@@ -15,7 +15,7 @@ import { LoadingRegion } from "@/components/ui/loading-region";
 import { cn } from "@/lib/utils";
 import { argentinaDay, formatArgentinaCalendarDate, todayInArgentina } from "@/lib/argentina-date";
 import { containersAdapter, CONTAINER_TYPE_LABELS } from "@/lib/containers";
-import { reportLabel } from "@/lib/display-ids";
+import { reportLabel, reportNumber } from "@/lib/display-ids";
 import {
   environmentalReportsAdapter,
   ENVIRONMENTAL_REPORT_TYPE_LABELS,
@@ -124,7 +124,7 @@ const workGroups: WorkGroupDefinition[] = [
           return {
             id: report.id,
             href: `/app?destination=environment&detail=${encodeURIComponent(report.id)}`,
-            title: report.publicId ? `${reportLabel(report)} · ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}${report.address ? ` · ${report.address}` : ""}` : reportLabel(report),
+            title: reportNumber(report) ? `${reportLabel(report)} · ${ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]}${report.address ? ` · ${report.address}` : ""}` : reportLabel(report),
             detail: since
               ? `Ingresó el ${formatArgentinaCalendarDate(since)} · ${waitingLabel(since, today)}`
               : "Sin fecha de ingreso",

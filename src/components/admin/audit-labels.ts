@@ -1,5 +1,6 @@
 import { CONTAINER_STATUS_LABELS } from "@/lib/containers";
 import { ENVIRONMENTAL_REPORT_STATUS_LABELS } from "@/lib/environmental-reports";
+import { SANCTION_DECISION_LABELS } from "@/lib/sanction-outcomes";
 import type { AuditEntry } from "@/lib/integration-monitor";
 import { REPAIR_REQUEST_STATUS_LABEL } from "@/lib/repair-requests";
 import { STATUS_LABEL as SERVICE_STATUS_LABELS } from "@/lib/services";
@@ -47,6 +48,13 @@ const ACTION_LABELS: Record<string, string> = {
   RELOCATE: "Reubicó",
   CONFIRM_RELOCATION: "Confirmó la reubicación",
   REMOVE: "Retiró",
+  REACTIVATE: "Reactivó",
+  REOPEN: "Reabrió",
+  PRIORITY_CHANGE: "Cambió la prioridad",
+  INFORMATION_PROVIDED: "Recibió información",
+  ESCALATION_CHANGE: "Cambió la escalación",
+  CANCEL_INFORMATION_REQUEST: "Canceló la solicitud de información",
+  RECORD_OUTCOME: "Registró la resolución",
 };
 
 const CATALOG_STATUS_LABELS: Record<string, string> = { ACTIVE: "Activo", INACTIVE: "Inactivo" };
@@ -78,6 +86,7 @@ const STATUS_LABELS_BY_ENTITY: Partial<Record<AuditEntityType, Record<string, st
   ZONE: CATALOG_STATUS_LABELS,
   VEHICLE: CATALOG_STATUS_LABELS,
   ROUTE: CATALOG_STATUS_LABELS,
+  SANCTION_OUTCOME: SANCTION_DECISION_LABELS,
 };
 
 function lookup(labels: Record<string, string> | undefined, key: string): string | undefined {
