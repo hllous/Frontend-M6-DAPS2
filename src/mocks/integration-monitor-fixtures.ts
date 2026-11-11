@@ -133,7 +133,19 @@ const initialAudit: AuditEntry[] = [
     actorRoles: ["M6_ADMIN"],
     note: null,
     occurredAt: "2026-10-27T10:00:00.000Z",
+  },  {
+    id: "650e8400-e29b-41d4-a716-446655440050",
+    entityType: "INBOX_EVENT",
+    entityId: "550e8400-e29b-41d4-a716-446655440051",
+    action: "READ",
+    fromStatus: null,
+    toStatus: null,
+    actorUserId: "42",
+    actorRoles: ["M6_ADMIN"],
+    note: null,
+    occurredAt: "2026-10-26T10:00:00.000Z",
   },
+
   {
     id: "650e8400-e29b-41d4-a716-446655440050",
     entityType: "REPAIR_REQUEST",

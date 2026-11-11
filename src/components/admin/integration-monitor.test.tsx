@@ -122,6 +122,14 @@ describe("IntegrationMonitor", () => {
     expect(within(table).queryByText(/Acción registrada/)).not.toBeInTheDocument();
   });
 
+  it("shows an inbox event READ row with its Spanish labels", async () => {
+    render(<IntegrationMonitor canManage initialTab="activity" />);
+
+    const table = await screen.findByRole("table", { name: "Registro de actividad" });
+    expect(within(table).getByText("Consultó el dato")).toBeVisible();
+    expect(within(table).getByRole("link", { name: /Ver actividad de Evento recibido 550e8400-e29b-41d4-a716-446655440051/ })).toBeVisible();
+  });
+
   it("falls back to a Spanish label for unknown values and shows the raw code only to administrators", async () => {
     const { unmount } = render(<IntegrationMonitor canManage initialTab="activity" />);
 
