@@ -13,6 +13,7 @@ export const UNKNOWN_STATUS_LABEL = "Otro estado";
 /** Valores de `action` que escribe hoy el Backend en el registro de auditoría. */
 const ACTION_LABELS: Record<string, string> = {
   CREATE: "Creó el registro",
+  READ: "Consultó el dato",
   UPDATE: "Modificó el registro",
   ACTIVATE: "Activó el registro",
   DEACTIVATE: "Desactivó el registro",
@@ -87,6 +88,7 @@ const STATUS_LABELS_BY_ENTITY: Partial<Record<AuditEntityType, Record<string, st
   VEHICLE: CATALOG_STATUS_LABELS,
   ROUTE: CATALOG_STATUS_LABELS,
   SANCTION_OUTCOME: SANCTION_DECISION_LABELS,
+  INBOX_EVENT: {},
 };
 
 function lookup(labels: Record<string, string> | undefined, key: string): string | undefined {

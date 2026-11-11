@@ -108,6 +108,7 @@ const entityLabels: Record<AuditEntityType, string> = {
   VEHICLE: "Vehículo",
   ROUTE: "Recorrido",
   SANCTION_OUTCOME: "Resolución de Faltas",
+  INBOX_EVENT: "Evento recibido",
 };
 
 const roleLabels: Record<M6Role, string> = {
