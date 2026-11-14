@@ -1,4 +1,5 @@
 "use client";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -37,7 +38,7 @@ import {
 } from "@/lib/trees";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { RISK_LEVEL_LABELS, treeSurveysAdapter, type TreeSurveysPage } from "@/lib/tree-surveys";
-import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
+import { zoneLabel, type Zone } from "@/lib/zones";
 import { TreeSurveyPanel } from "./tree-survey-panel";
 import { TreeInterventionRequestDialog } from "./tree-interventions-panel";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
@@ -166,8 +167,8 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
 
   useEffect(() => {
     let isCurrent = true;
-    void zonesAdapter.list({ pageSize: 100 }).then((page) => {
-      if (isCurrent) setZones(page.zones);
+    void loadReferenceCatalog("zones").then((zones) => {
+      if (isCurrent) setZones(zones);
     }).catch(() => undefined).finally(() => {
       if (isCurrent) setZonesLoaded(true);
     });

@@ -1,4 +1,5 @@
 "use client";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import { errorMessage } from "@/lib/error-message";
 
 import {
@@ -59,7 +60,6 @@ import { createServiceOrdinals, sortServices } from "./service-sorting";
 import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { servicesMobileBreakpoint } from "@/lib/services-layout";
-import { zonesAdapter } from "@/lib/zones";
 import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import styles from "./services-workspace.module.css";
 import { ServicesFilterBar } from "./services-filter-bar";
@@ -969,8 +969,8 @@ export function ServicesWorkspace({
   const [zoneCatalog, setZoneCatalog] = useState<ZoneGroup[] | null>(null);
   useEffect(() => {
     let isCurrent = true;
-    zonesAdapter.list({ active: true, page: 1, pageSize: 100 })
-      .then((page) => { if (isCurrent) setZoneCatalog(buildZoneGroups(page.zones)); })
+    loadReferenceCatalog("zones", { active: true })
+      .then((zones) => { if (isCurrent) setZoneCatalog(buildZoneGroups(zones)); })
       .catch(() => { if (isCurrent) setZoneCatalog([]); });
     return () => { isCurrent = false; };
   }, []);

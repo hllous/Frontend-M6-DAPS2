@@ -1,4 +1,5 @@
 "use client";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import { cn } from "@/lib/utils";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
@@ -81,9 +82,9 @@ import {
 import { establishmentDirectoryAdapter, type Establishment } from "@/lib/establishment-directory";
 import { OVERRIDE_NOTE_MAX, OVERRIDE_NOTE_MIN, ServiceRequestError, servicesAdapter, type Service } from "@/lib/services";
 import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
-import { crewsAdapter, type Crew } from "@/lib/crews";
+import { type Crew } from "@/lib/crews";
 import { ENVIRONMENTAL_INSPECTION_SERVICE_TYPE_RULE, resolveServiceType } from "@/lib/service-types";
-import { zonesAdapter, type Zone } from "@/lib/zones";
+import { type Zone } from "@/lib/zones";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
 import { getEnvironmentalReportClosure, SANCTION_DECISION_LABELS, type EnvironmentalReportClosure } from "@/lib/sanction-outcomes";
 import type { OperationalScenario } from "@/lib/scenarios";
@@ -1005,15 +1006,13 @@ function InspectionSchedulingDialog({ open, mode, initial, onOpenChange, onSubmi
 
   useEffect(() => {
     let active = true;
-    zonesAdapter
-      .list({ active: true, pageSize: 100 })
-      .then((page) => { if (active) setZones(page.zones.filter((zone) => zone.active)); })
+    loadReferenceCatalog("zones", { active: true })
+      .then((zones) => { if (active) setZones(zones.filter((zone) => zone.active)); })
       .catch(() => undefined);
     resolveServiceType(ENVIRONMENTAL_INSPECTION_SERVICE_TYPE_RULE).then((type) => { if (active) setServiceTypeCode(type.code); }).catch(() => undefined);
     // Cuadrillas reales: el alta del servicio exige un UUID de cuadrilla, no los ids de CREW_CATALOG.
-    crewsAdapter
-      .list({ active: true, pageSize: 100 })
-      .then((page) => { if (active) setCrews(page.crews); })
+    loadReferenceCatalog("crews", { active: true })
+      .then((crews) => { if (active) setCrews(crews); })
       .catch(() => undefined);
     return () => { active = false; };
   }, []);
