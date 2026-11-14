@@ -578,15 +578,15 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     const card1054 = page.locator('li[data-service-id="SVC-1054"]');
     const confirmation1054 = await startService(page, card1054);
 
-    // Backend 409 error is surfaced in UI alert (inside the out-of-hours confirmation too)
-    const alert = card1054.getByRole("alert");
-    await expect(alert).toBeVisible();
-    await expect(alert).toHaveText(/El tipo de servicio requiere un vehículo operativo asignado para iniciar/i);
+    // Backend 409 error is surfaced inside the out-of-hours confirmation, then stays on the card
     if (confirmation1054) {
       await expect(confirmation1054.getByRole("alert")).toHaveText(/vehículo operativo/i);
       await confirmation1054.getByRole("button", { name: "Cancelar" }).click();
       await expect(confirmation1054).toBeHidden();
     }
+    const alert = card1054.getByRole("alert");
+    await expect(alert).toBeVisible();
+    await expect(alert).toHaveText(/El tipo de servicio requiere un vehículo operativo asignado para iniciar/i);
 
     // 3. Crew Leader successfully starts scheduled service with vehicle (SVC-1096 —
     // SVC-1050 now carries #117's baseline pending StreetClosureRequest and is used

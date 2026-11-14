@@ -44,7 +44,12 @@ test.describe("StreetClosure dependency gate", () => {
 
     const card = page.locator('li[data-service-id="SVC-1097"]');
     await expect(card).toBeVisible();
-    await startService(page, card);
+    const confirmation = await startService(page, card);
+    if (confirmation) {
+      await expect(confirmation.getByRole("alert")).toContainText(/corte de calle.*pendiente/i);
+      await confirmation.getByRole("button", { name: "Cancelar" }).click();
+      await expect(confirmation).toBeHidden();
+    }
 
     await expect(card.getByRole("alert")).toContainText(/corte de calle.*pendiente/i);
     await expect(card.getByText("Programado")).toBeVisible();
