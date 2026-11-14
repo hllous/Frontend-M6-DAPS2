@@ -1,4 +1,5 @@
 "use client";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import {
@@ -63,7 +64,7 @@ import {
   RouteRequestError,
   routesAdapter,
 } from "@/lib/routes";
-import { type Zone, zonesAdapter } from "@/lib/zones";
+import { type Zone } from "@/lib/zones";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
@@ -163,9 +164,9 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     let isCurrent = true;
     async function loadZones() {
       try {
-        const page = await zonesAdapter.list({ active: true, pageSize: 100 });
+        const zones = await loadReferenceCatalog("zones", { active: true });
         if (isCurrent) {
-          setAvailableZones(page.zones);
+          setAvailableZones(zones);
         }
       } catch {
         // Non-blocking fallback

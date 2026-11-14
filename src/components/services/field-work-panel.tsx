@@ -1,9 +1,10 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CloudOff, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { formatCalendarDay } from "@/lib/argentina-date";
+import { formatCalendarDay, todayInArgentina } from "@/lib/argentina-date";
+import { loadAllPages } from "@/lib/reference-catalog";
 import { CreateRepairRequestDialog } from "./create-repair-request-dialog";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { repairRequestsAdapter, type RepairRequest } from "@/lib/repair-requests";
@@ -11,6 +12,7 @@ import {
   checkServiceWindowTiming,
   servicesAdapter,
   type Service,
+  type ServiceStatus,
 } from "@/lib/services";
 import { filterServiceFixtures } from "@/lib/services-fixtures";
 import {
@@ -28,6 +30,33 @@ import { ServiceDetail } from "./service-detail";
 import { StatusBadge } from "./status-badge";
 import { SuspendServiceDialog } from "./suspend-service-dialog";
 
+const PAGE_SIZE = 20;
+const TERMINAL_STATUSES: ReadonlySet<ServiceStatus> = new Set(["COMPLETED", "PARTIALLY_COMPLETED", "CANCELLED"]);
+
+/**
+ * Orden de My Work por urgencia: En curso, Suspendido, Reprogramado, Programado de hoy (o atrasado), Programado
+ * futuro y, al final, los terminados. Lo pendiente va por fecha ascendente; lo terminado, lo más reciente primero.
+ */
+function urgencyRank(service: Service, today: string): number {
+  switch (service.status) {
+    case "IN_PROGRESS": return 0;
+    case "SUSPENDED": return 1;
+    case "RESCHEDULED": return 2;
+    case "SCHEDULED": return service.scheduledDate.slice(0, 10) <= today ? 3 : 4;
+    default: return 5;
+  }
+}
+
+function sortByUrgency(services: readonly Service[], today = todayInArgentina()): Service[] {
+  const when = (service: Service) => `${service.scheduledDate.slice(0, 10)} ${service.windowFrom ?? ""}`;
+  return [...services].sort((left, right) => {
+    const rank = urgencyRank(left, today) - urgencyRank(right, today);
+    if (rank !== 0) return rank;
+    const order = when(left).localeCompare(when(right));
+    return TERMINAL_STATUSES.has(left.status) ? -order : order;
+  });
+}
+
 export function FieldWorkPanel({
   scenario,
 }: {
@@ -43,6 +72,7 @@ export function FieldWorkPanel({
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dropped, setDropped] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [startErrors, setStartErrors] = useState<Record<string, string>>({});
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
@@ -63,10 +93,15 @@ export function FieldWorkPanel({
     async function load() {
       if (!crewId) return;
       try {
-        const page = await servicesAdapter.list({ crewId, pageSize: 50 });
+        // Todos los Services de la Crew, no la primera página: My Work nunca recorta en silencio.
+        let droppedRecords = 0;
+        const all = await loadAllPages((page, pageSize) => servicesAdapter.list({ crewId, page, pageSize }).then((result) => {
+          droppedRecords += result.dropped ?? 0;
+          return { items: result.services, totalPages: result.totalPages };
+        }));
         if (isCurrent) {
-          setServices(page.services);
-          setDropped(page.dropped ?? 0);
+          setServices(all);
+          setDropped(droppedRecords);
           setLoadError(null);
         }
       } catch {
@@ -155,6 +190,8 @@ export function FieldWorkPanel({
     setServices((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     setSuspendingServiceId(null);
   };
+
+  const orderedServices = useMemo(() => sortByUrgency(services), [services]);
 
   const selectedService = selectedDetailId
     ? services.find((s) => s.id === selectedDetailId) ?? null
@@ -284,8 +321,12 @@ export function FieldWorkPanel({
           Sin servicios asignados.
         </div>
       ) : crewId ? (
-        <ol className="m-0 flex list-none flex-col gap-3 p-0">
-          {services.map((service, index) => {
+        <>
+        <p className="m-0 text-sm text-[var(--color-text-secondary)]" aria-live="polite">
+          {services.length === 1 ? "1 servicio asignado" : `${services.length} servicios asignados`}
+        </p>
+        <ol aria-labelledby="work-title" className="m-0 flex list-none flex-col gap-3 p-0">
+          {orderedServices.slice(0, visibleCount).map((service, index) => {
             const windowTiming = checkServiceWindowTiming(service);
             const isOutside =
               service.status === "SCHEDULED" && windowTiming.isOutside;
@@ -391,6 +432,17 @@ export function FieldWorkPanel({
             );
           })}
         </ol>
+        {orderedServices.length > visibleCount ? (
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              Mostrando {visibleCount} de {orderedServices.length}
+            </span>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}>
+              Ver más servicios
+            </Button>
+          </div>
+        ) : null}
+        </>
       ) : null}
 
       {!mayExecuteService && <p className={styles.permissionNote}>Solo consulta</p>}

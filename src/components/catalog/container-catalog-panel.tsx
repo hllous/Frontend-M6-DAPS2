@@ -14,6 +14,7 @@ import {
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   ArchiveX,
@@ -86,7 +87,8 @@ import {
 } from "@/lib/containers";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { servicesAdapter, type Service } from "@/lib/services";
-import { zonesAdapter, type Zone } from "@/lib/zones";
+import { useReferenceCatalog } from "@/lib/use-reference-catalog";
+import { CatalogPager } from "./catalog-pager";
 import { ConfirmRelocationDialog } from "./confirm-relocation-dialog";
 import { EmptyContainerDialog } from "./empty-container-dialog";
 import { ReportDamageDialog } from "./report-damage-dialog";
@@ -104,7 +106,7 @@ import {
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; containers: Container[] };
+  | { status: "ready"; containers: Container[]; total: number; totalPages: number };
 
 type ContainerForm = {
   code: string;
@@ -175,6 +177,7 @@ function StatusBadge({ status }: { status: ContainerStatus }) {
 const CONT_HEAD = "h-auto whitespace-normal px-4 py-3 font-bold text-inherit";
 const CONT_CELL = "h-auto whitespace-normal px-4 py-3";
 const NO_CONTAINERS: Container[] = [];
+const PAGE_SIZE = 20;
 
 export function ContainerCatalogPanel({
   scenario,
@@ -188,19 +191,30 @@ export function ContainerCatalogPanel({
   const canEmpty = scenario.capabilities.includes("container:empty");
 
   const [state, setState] = useState<LoadState>({ status: "loading" });
-  const [zones, setZones] = useState<Zone[]>([]);
+  const zoneCatalog = useReferenceCatalog("zones");
+  const zones = zoneCatalog.items;
   const [requestVersion, setRequestVersion] = useState(0);
 
-  // Filters
-  const [statusFilter, setStatusFilter] = useState<ContainerStatus | "all">(() => {
-    // `?status=OVERFLOWED` (p. ej. desde el tablero) abre la lista ya filtrada.
-    const requested = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("status");
-    const parsed = containerStatusSchema.safeParse(requested);
-    return parsed.success ? parsed.data : "all";
-  });
-  const [typeFilter, setTypeFilter] = useState<ContainerType | "all">("all");
-  const [zoneFilter, setZoneFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  // Filtros y página viven en la URL (`?status=OVERFLOWED` llega desde el tablero); cambiar un filtro vuelve a la página 1.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const parsedStatus = containerStatusSchema.safeParse(searchParams.get("status"));
+  const statusFilter: ContainerStatus | "all" = parsedStatus.success ? parsedStatus.data : "all";
+  const parsedType = containerTypeSchema.safeParse(searchParams.get("type"));
+  const typeFilter: ContainerType | "all" = parsedType.success ? parsedType.data : "all";
+  const zoneFilter = searchParams.get("zone") ?? "all";
+  const search = searchParams.get("q") ?? "";
+  const page = Math.max(1, Math.floor(Number(searchParams.get("page"))) || 1);
+  const setParams = (changes: Record<string, string | null>, resetPage = true) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (resetPage) next.delete("page");
+    for (const [key, value] of Object.entries(changes)) {
+      if (value && value !== "all") next.set(key, value); else next.delete(key);
+    }
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  };
 
   // Modals
   const [formOpen, setFormOpen] = useState(false);
@@ -315,32 +329,20 @@ export function ContainerCatalogPanel({
       containerType: typeFilter === "all" ? undefined : typeFilter,
       zoneId: zoneFilter === "all" ? undefined : zoneFilter,
       search: search.trim() || undefined,
-      pageSize: 100,
+      page,
+      pageSize: PAGE_SIZE,
     }),
-    [statusFilter, typeFilter, zoneFilter, search],
+    [statusFilter, typeFilter, zoneFilter, search, page],
   );
-
-  useEffect(() => {
-    let isCurrent = true;
-    void zonesAdapter
-      .list()
-      .then((page) => {
-        if (isCurrent) setZones(page.zones);
-      })
-      .catch(() => undefined);
-    return () => {
-      isCurrent = false;
-    };
-  }, []);
 
   useEffect(() => {
     let isCurrent = true;
     async function requestContainers() {
       setState({ status: "loading" });
       try {
-        const page = await containersAdapter.list(query);
+        const result = await containersAdapter.list(query);
         if (isCurrent)
-          setState({ status: "ready", containers: page.containers });
+          setState({ status: "ready", containers: result.containers, total: result.total, totalPages: result.totalPages });
       } catch (caught) {
         if (isCurrent) {
           setState({
@@ -517,7 +519,7 @@ export function ContainerCatalogPanel({
         <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
       </Button>); } },
     { id: "type", header: "Tipo", accessorFn: (c) => c.containerType, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => CONTAINER_TYPE_LABELS[row.original.containerType] },
-    { id: "zone", header: "Zona", accessorFn: (c) => c.zoneId, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => zones.find((z) => z.id === row.original.zoneId)?.name ?? row.original.zoneId },
+    { id: "zone", header: "Zona", accessorFn: (c) => c.zoneId, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => zoneCatalog.lookup(row.original.zoneId) ?? <Skeleton aria-hidden="true" className="inline-block h-4 w-24 align-middle" /> },
     { id: "address", header: "Dirección", accessorFn: (c) => c.address, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => row.original.address ?? "—" },
     { id: "capacity", header: "Capacidad", accessorFn: (c) => c.capacityLiters, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => `${row.original.capacityLiters.toLocaleString("es-AR")} L` },
     { id: "status", header: "Estado", accessorFn: (c) => c.status, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => <StatusBadge status={row.original.status} /> },
@@ -572,7 +574,7 @@ export function ContainerCatalogPanel({
             placeholder="Código o dirección…"
             value={search}
             maxLength={MAX_SEARCH_LENGTH}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setParams({ q: e.target.value })}
           />
         </Field>
         <Field>
@@ -581,7 +583,7 @@ export function ContainerCatalogPanel({
             items={{ all: "Todos los estados", ...CONTAINER_STATUS_LABELS }}
             value={statusFilter}
             onValueChange={(value) =>
-              setStatusFilter((value ?? "") as ContainerStatus | "all")
+              setParams({ status: value ? String(value) : null })
             }
           >
             <SelectTrigger id="container-status-filter">
@@ -607,7 +609,7 @@ export function ContainerCatalogPanel({
             items={{ all: "Todos los tipos", ...CONTAINER_TYPE_LABELS }}
             value={typeFilter}
             onValueChange={(value) =>
-              setTypeFilter((value ?? "") as ContainerType | "all")
+              setParams({ type: value ? String(value) : null })
             }
           >
             <SelectTrigger id="container-type-filter">
@@ -635,7 +637,7 @@ export function ContainerCatalogPanel({
               ),
             }}
             value={zoneFilter}
-            onValueChange={(value) => setZoneFilter(value ?? "")}
+            onValueChange={(value) => setParams({ zone: value ? String(value) : null })}
           >
             <SelectTrigger id="container-zone-filter">
               <SelectValue />
@@ -697,6 +699,17 @@ export function ContainerCatalogPanel({
           ><TableCaption className="sr-only">Inventario de contenedores registrados</TableCaption></DataTable>
         </div>
       )}
+
+      {state.status === "ready" ? (
+        <CatalogPager
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={state.total}
+          totalPages={state.totalPages}
+          onPageChange={(next) => setParams({ page: String(next) }, false)}
+          label="Paginación de contenedores"
+        />
+      ) : null}
 
       {/* Create / Edit Dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
@@ -978,9 +991,9 @@ export function ContainerCatalogPanel({
                   Zona operativa
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
-                  {zones.find((z) => z.id === detailContainer.zoneId)
-                    ? zones.find((z) => z.id === detailContainer.zoneId)!.name
-                    : detailContainer.zoneId}
+                  {zoneCatalog.lookup(detailContainer.zoneId) ?? (
+                    <Skeleton aria-hidden="true" className="inline-block h-4 w-24 align-middle" />
+                  )}
                 </dd>
               </div>
 

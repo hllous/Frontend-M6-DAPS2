@@ -230,8 +230,8 @@ describe("FieldWorkPanel component", () => {
     const user = userEvent.setup();
     render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
 
-    const detailButtons = await screen.findAllByRole("button", { name: "Abrir" });
-    await user.click(detailButtons[0]);
+    const sweeping = (await screen.findByText("Barrido mecánico — Bulevar Costero")).closest("li")!;
+    await user.click(within(sweeping).getByRole("button", { name: "Abrir" }));
 
     expect(await screen.findByRole("heading", { name: "Derivaciones" })).toBeVisible();
     expect(screen.getByText("Derivación a Obras Públicas")).toBeVisible();
@@ -292,9 +292,9 @@ describe("FieldWorkPanel component", () => {
     expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
     expect(screen.getByText("Solo consulta")).toBeVisible();
 
-    // Click "Abrir" on the first service
-    const detailButtons = await screen.findAllByRole("button", { name: "Abrir" });
-    await user.click(detailButtons[0]);
+    // Open SVC-1050 by its title: the in-progress SVC-1060 is listed first
+    const sweeping = (await screen.findByText("Barrido mecánico — Bulevar Costero")).closest("li")!;
+    await user.click(within(sweeping).getByRole("button", { name: "Abrir" }));
 
     // Detail view opens
     expect(screen.getByRole("region", { name: /Detalle completo de Barrido mecánico — Bulevar Costero/i })).toBeVisible();
@@ -436,8 +436,8 @@ describe("FieldWorkPanel component", () => {
     });
 
     const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
-    // SVC-1060 is the third item rendered
-    await user.click(detailButtons[2]);
+    // SVC-1060 is in progress, so My Work lists it first
+    await user.click(detailButtons[0]);
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
 
@@ -526,7 +526,7 @@ describe("FieldWorkPanel component", () => {
     });
 
     const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
-    await user.click(detailButtons[2]);
+    await user.click(detailButtons[0]);
 
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
     const dialog = await screen.findByRole("dialog");
@@ -579,7 +579,7 @@ describe("FieldWorkPanel component", () => {
     });
 
     const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
-    await user.click(detailButtons[2]);
+    await user.click(detailButtons[0]);
 
     expect(screen.queryByRole("button", { name: "Suspender servicio" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reanudar servicio" })).not.toBeInTheDocument();

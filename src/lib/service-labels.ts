@@ -1,7 +1,5 @@
-import { crewsAdapter } from "./crews";
-import { serviceTypesAdapter, type ServiceTypeCategory } from "./service-types";
-import { zonesAdapter } from "./zones";
-import { vehiclesAdapter } from "./vehicles";
+import { loadReferenceCatalog } from "./reference-catalog";
+import type { ServiceTypeCategory } from "./service-types";
 
 /**
  * El backend no devuelve un título de servicio ni nombres de zona o de cuadrilla:
@@ -9,7 +7,7 @@ import { vehiclesAdapter } from "./vehicles";
  * todos UUID. El título es
  * presentación, no dominio, así que se compone en el frontend con los catálogos.
  *
- * Los mapas se piden una vez por carga de página y se memorizan: un listado de
+ * Los mapas se piden una vez por carga de página (el catálogo completo, todas sus páginas) y se memorizan: un listado de
  * 20 servicios no puede disparar 20 consultas de catálogo. Si el catálogo falla, se
  * devuelve un mapa vacío en lugar de propagar el error: un nombre que falta degrada
  * la etiqueta, no tiene que tirar abajo la pantalla de servicios.
@@ -25,21 +23,17 @@ let catalogoPendiente: Promise<Catalogo> | null = null;
 
 async function cargarCatalogo(): Promise<Catalogo> {
   const [serviceTypes, zones, crews, vehicles] = await Promise.all([
-    serviceTypesAdapter
-      .list({ pageSize: 100 })
-      .then((page) => new Map(page.serviceTypes.map((item) => [item.id, { name: item.name, category: item.category }])))
+    loadReferenceCatalog("serviceTypes")
+      .then((items) => new Map(items.map((item) => [item.id, { name: item.name, category: item.category }])))
       .catch(() => new Map<string, { name: string; category: ServiceTypeCategory }>()),
-    zonesAdapter
-      .list({ pageSize: 100 })
-      .then((page) => new Map(page.zones.map((zone) => [zone.id, zone.name])))
+    loadReferenceCatalog("zones")
+      .then((items) => new Map(items.map((zone) => [zone.id, zone.name])))
       .catch(() => new Map<string, string>()),
-    crewsAdapter
-      .list({ pageSize: 100 })
-      .then((page) => new Map(page.crews.map((crew) => [crew.id, crew.name])))
+    loadReferenceCatalog("crews")
+      .then((items) => new Map(items.map((crew) => [crew.id, crew.name])))
       .catch(() => new Map<string, string>()),
-    vehiclesAdapter
-      .list({ pageSize: 100 })
-      .then((page) => new Map(page.vehicles.map((vehicle) => [vehicle.id, vehicle.plate])))
+    loadReferenceCatalog("vehicles")
+      .then((items) => new Map(items.map((vehicle) => [vehicle.id, vehicle.plate])))
       .catch(() => new Map<string, string>()),
   ]);
   return { serviceTypes, zones, crews, vehicles };

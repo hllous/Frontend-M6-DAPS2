@@ -1,4 +1,5 @@
 "use client";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
 
 import { useEffect, useId, useMemo, useState } from "react";
@@ -27,10 +28,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
 import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_MAX, type CreateServiceInput, type Service, type ServiceMode, type ServiceOrigin } from "@/lib/services";
 import { routesAdapter, type Route } from "@/lib/routes";
-import { serviceTypesAdapter, type ServiceType, type ServiceTypeCategory } from "@/lib/service-types";
+import { type ServiceType, type ServiceTypeCategory } from "@/lib/service-types";
 import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
-import { crewsAdapter, type Crew } from "@/lib/crews";
-import { zonesAdapter, type Zone } from "@/lib/zones";
+import { type Crew } from "@/lib/crews";
+import { type Zone } from "@/lib/zones";
 import { containersAdapter } from "@/lib/containers";
 import { treesAdapter } from "@/lib/trees";
 import { greenSpacesAdapter } from "@/lib/green-spaces";
@@ -213,14 +214,14 @@ export function ScheduleServiceDialog({
     if (!open) return;
     let cancelled = false;
     Promise.all([
-      serviceTypesAdapter.list({ active: true, pageSize: 100 }),
-      routesAdapter.list({ active: true, pageSize: 100 }),
-      zonesAdapter.list({ active: true, pageSize: 100 }),
+      loadReferenceCatalog("serviceTypes", { active: true }),
+      loadReferenceCatalog("routes", { active: true }),
+      loadReferenceCatalog("zones", { active: true }),
       // La cuadrilla es opcional: si su listado falla, el resto del formulario sigue funcionando.
-      crewsAdapter.list({ active: true, pageSize: 100 }).then((page) => ({ crews: page.crews, failed: false })).catch(() => ({ crews: [] as Crew[], failed: true })),
+      loadReferenceCatalog("crews", { active: true }).then((crews) => ({ crews, failed: false })).catch(() => ({ crews: [] as Crew[], failed: true })),
     ])
       .then(([types, routeList, zoneList, crewList]) => {
-        if (!cancelled) setCatalogs({ status: "ready", serviceTypes: types.serviceTypes.filter((t) => t.active), routes: routeList.routes, zones: zoneList.zones, crews: crewList.crews, crewsFailed: crewList.failed });
+        if (!cancelled) setCatalogs({ status: "ready", serviceTypes: types.filter((t) => t.active), routes: routeList, zones: zoneList, crews: crewList.crews, crewsFailed: crewList.failed });
       })
       .catch(() => {
         if (!cancelled) setCatalogs({ status: "error" });

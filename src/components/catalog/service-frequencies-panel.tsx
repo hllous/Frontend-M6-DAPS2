@@ -1,4 +1,5 @@
 "use client";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
@@ -33,8 +34,8 @@ import {
   FieldLegend,
 } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { routesAdapter, type Route } from "@/lib/routes";
-import { serviceTypesAdapter, type ServiceType } from "@/lib/service-types";
+import { type Route } from "@/lib/routes";
+import { type ServiceType } from "@/lib/service-types";
 import type { OperationalScenario } from "@/lib/scenarios";
 import {
   serviceFrequenciesAdapter,
@@ -173,15 +174,15 @@ export function ServiceFrequenciesPanel({
   useEffect(() => {
     let isCurrent = true;
     Promise.all([
-      serviceTypesAdapter.list({ active: true, mode: "ROUTE", pageSize: 100 }),
-      routesAdapter.list({ active: true, pageSize: 100 }),
+      loadReferenceCatalog("serviceTypes", { active: true, mode: "ROUTE" }),
+      loadReferenceCatalog("routes", { active: true }),
     ])
-      .then(([serviceTypePage, routePage]) => {
+      .then(([serviceTypes, routes]) => {
         if (!isCurrent) return;
         setServiceTypes(
-          serviceTypePage.serviceTypes.filter((item) => item.mode === "ROUTE"),
+          serviceTypes.filter((item) => item.mode === "ROUTE"),
         );
-        setRoutes(routePage.routes);
+        setRoutes(routes);
       })
       .catch((error: unknown) => {
         if (isCurrent)

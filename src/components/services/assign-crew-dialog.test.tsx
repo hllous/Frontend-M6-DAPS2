@@ -124,6 +124,35 @@ function renderDialog(props: { allServices?: Service[]; onAssigned?: (s: Service
 }
 
 describe("AssignCrewDialog", () => {
+  it("preselects the Service crew by name when it is beyond the first page of crews", async () => {
+    const assigned = { ...service, crewId: OTHER_CREW_ID, crewName: null };
+    const crew = (id: string, name: string) => ({ id, name, crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true });
+    server.use(
+      http.get("*/api/crews", ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get("page") ?? "1");
+        return HttpResponse.json({
+          data: page === 1 ? [crew(CREW_ID, "Cuadrilla Belgrano — Recolección")] : [crew(OTHER_CREW_ID, "Cuadrilla Palermo — Recolección")],
+          meta: { total: 2, page, pageSize: 1, totalPages: 2 },
+        });
+      }),
+      http.get("*/api/vehicles", () => HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 0 } })),
+      http.get("*/api/service-types/:id", () => HttpResponse.json(serviceTypeBody(false))),
+    );
+    render(<AssignCrewDialog open onOpenChange={vi.fn()} service={assigned} allServices={[]} onAssigned={vi.fn()} />);
+    const combo = await screen.findByRole("combobox", { name: /Cuadrilla asignada/ });
+    await waitFor(() => expect(combo).toHaveTextContent("Cuadrilla Palermo — Recolección"));
+    expect(combo).not.toHaveTextContent(OTHER_CREW_ID);
+  });
+
+  it("starts with an empty crew when the Service crew cannot be resolved, never a raw id", async () => {
+    realResources({ requiresVehicle: false });
+    const unknown = "11111111-2222-4333-8444-555555555555";
+    render(<AssignCrewDialog open onOpenChange={vi.fn()} service={{ ...service, crewId: unknown, crewName: null }} allServices={[]} onAssigned={vi.fn()} />);
+    const combo = await screen.findByRole("combobox", { name: /Cuadrilla asignada/ });
+    await waitFor(() => expect(combo).toHaveTextContent("Seleccione una cuadrilla…"));
+    expect(combo).not.toHaveTextContent(unknown);
+  });
+
   it("lists real crews and vehicles and sends their UUIDs for a type that requires a vehicle", async () => {
     realResources();
     const bodies = captureAssign();
