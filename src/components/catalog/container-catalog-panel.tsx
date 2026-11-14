@@ -106,7 +106,8 @@ import {
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; containers: Container[]; total: number; totalPages: number };
+  // `refreshing`: llega otra página o filtro; las filas actuales siguen montadas (mismas claves) hasta que responde.
+  | { status: "ready"; containers: Container[]; total: number; totalPages: number; refreshing?: boolean };
 
 type ContainerForm = {
   code: string;
@@ -178,6 +179,7 @@ const CONT_HEAD = "h-auto whitespace-normal px-4 py-3 font-bold text-inherit";
 const CONT_CELL = "h-auto whitespace-normal px-4 py-3";
 const NO_CONTAINERS: Container[] = [];
 const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export function ContainerCatalogPanel({
   scenario,
@@ -215,6 +217,29 @@ export function ContainerCatalogPanel({
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
+  const setParamsRef = useRef(setParams);
+  useEffect(() => { setParamsRef.current = setParams; });
+
+  // La búsqueda se escribe en un borrador local y llega a la URL al pausar el tipeo: cada tecla no navega ni pide
+  // la lista de nuevo. Si la URL cambia por otro lado (por ejemplo, volver atrás), el borrador la sigue.
+  const [searchDraft, setSearchDraft] = useState(search);
+  const [requestedSearch, setRequestedSearch] = useState(search);
+  const [urlSearch, setUrlSearch] = useState(search);
+  if (search !== urlSearch) {
+    setUrlSearch(search);
+    if (search !== requestedSearch) {
+      setRequestedSearch(search);
+      setSearchDraft(search);
+    }
+  }
+  useEffect(() => {
+    if (searchDraft === requestedSearch) return;
+    const timer = window.setTimeout(() => {
+      setRequestedSearch(searchDraft);
+      setParamsRef.current({ q: searchDraft });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchDraft, requestedSearch]);
 
   // Modals
   const [formOpen, setFormOpen] = useState(false);
@@ -338,7 +363,7 @@ export function ContainerCatalogPanel({
   useEffect(() => {
     let isCurrent = true;
     async function requestContainers() {
-      setState({ status: "loading" });
+      setState((previous) => (previous.status === "ready" ? { ...previous, refreshing: true } : { status: "loading" }));
       try {
         const result = await containersAdapter.list(query);
         if (isCurrent)
@@ -572,9 +597,9 @@ export function ContainerCatalogPanel({
             id="container-search-filter"
             type="search"
             placeholder="Código o dirección…"
-            value={search}
+            value={searchDraft}
             maxLength={MAX_SEARCH_LENGTH}
-            onChange={(e) => setParams({ q: e.target.value })}
+            onChange={(e) => setSearchDraft(e.target.value)}
           />
         </Field>
         <Field>
@@ -688,7 +713,7 @@ export function ContainerCatalogPanel({
       )}
 
       {state.status === "ready" && state.containers.length > 0 && (
-        <div className={styles.tableWrap}>
+        <div className={styles.tableWrap} aria-busy={state.refreshing || undefined}>
           <DataTable
             table={containerTable}
             container={false}

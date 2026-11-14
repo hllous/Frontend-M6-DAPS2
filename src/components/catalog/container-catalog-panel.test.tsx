@@ -116,6 +116,37 @@ describe("Container references and pagination beyond the first page", () => {
     expect(new URLSearchParams(window.location.search).get("q")).toBe("Calle");
   });
 
+  it("keeps the same row mounted while a new search loads, so a click during typing is not lost", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-001/ });
+    await user.type(screen.getByLabelText("Buscar contenedor"), "CONT-001");
+    expect(await screen.findByText("Mostrando 1–1 de 1")).toBeVisible();
+    expect(row).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /CONT-001/ })).toBe(row);
+  });
+
+  it("asks for the filtered list once per pause in typing and keeps every typed character", async () => {
+    const searches: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/containers" && url.searchParams.has("search")) searches.push(url.searchParams.get("search")!);
+    });
+    try {
+      const user = userEvent.setup({ delay: null });
+      render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      await screen.findByRole("row", { name: /CONT-001/ });
+      const input = screen.getByLabelText("Buscar contenedor");
+      await user.type(input, "Calle 1");
+      expect(input).toHaveValue("Calle 1");
+      await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("Calle 1"));
+      expect(await screen.findByText(/^Mostrando 1–\d+ de \d+$/)).toBeVisible();
+      expect(searches).toEqual(["Calle 1"]);
+    } finally {
+      server.events.removeAllListeners();
+    }
+  });
+
   it("shows readable text, never the id, when a zone does not exist", async () => {
     addContainerFixture({ id: "cont-orphan", code: "CONT-HUERFANO", containerType: "HOUSEHOLD", zoneId: "zone-inexistente", address: null, lat: null, lng: null, capacityLiters: 1100, status: "ACTIVE" });
     window.history.replaceState(null, "", "/app/catalog/containers?q=HUERFANO");
@@ -276,8 +307,8 @@ describe("ContainerCatalogPanel", () => {
 
     // Filter by type
     await chooseCatalogOption(user, screen.getByLabelText("Tipo de contenedor"), "Materiales reciclables");
-    expect(await screen.findByText("CONT-002")).toBeVisible();
-    expect(screen.queryByText("CONT-001")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("CONT-001")).not.toBeInTheDocument());
+    expect(screen.getByText("CONT-002")).toBeVisible();
 
     // Filter by status
     await chooseCatalogOption(user, screen.getByLabelText("Estado"), "Desbordado");
@@ -293,9 +324,10 @@ describe("ContainerCatalogPanel", () => {
     await chooseCatalogOption(user, screen.getByLabelText("Zona"), /^Todos(?: los (?:tipos|estados))?$|^Todas las zonas$/);
 
     // Search filter
+    // La lista anterior sigue visible mientras llega la búsqueda: se espera a que se vaya CONT-001.
     await user.type(screen.getByLabelText("Buscar contenedor"), "Santa Fe");
-    expect(await screen.findByText("CONT-002")).toBeVisible();
-    expect(screen.queryByText("CONT-001")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("CONT-001")).not.toBeInTheDocument());
+    expect(screen.getByText("CONT-002")).toBeVisible();
   });
 
   it("opens the Container named by ?detail= in the URL", async () => {
