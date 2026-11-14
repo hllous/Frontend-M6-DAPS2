@@ -433,6 +433,28 @@ describe("FieldWorkPanel component", () => {
     // Backend error stays inside the confirmation, which remains open to retry or cancel
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("El tipo de servicio requiere un vehículo operativo asignado para iniciar.");
     expect(within(dialog).getByRole("button", { name: "Iniciar igual" })).toBeEnabled();
+
+    // The card does not repeat the error while the confirmation shows it; it keeps it after closing.
+    const card = screen.getByText("Reparación de contenedor CT-0112").closest("li")!;
+    expect(within(card).queryByText(/vehículo operativo/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(card).getByRole("alert")).toHaveTextContent("El tipo de servicio requiere un vehículo operativo asignado para iniciar.");
+  });
+
+  it("el detalle no repite en la página el error que muestra la confirmación", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+    await waitFor(() => expect(screen.getByText("Reparación de contenedor CT-0112")).toBeVisible());
+    const card = screen.getByText("Reparación de contenedor CT-0112").closest("li")!;
+    await user.click(within(card).getByRole("button", { name: "Abrir" }));
+    const detail = await screen.findByRole("region", { name: /Detalle completo de/ });
+    const dialog = await confirmOutOfHoursStart(user, within(detail).getByRole("button", { name: "Iniciar servicio" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("vehículo operativo");
+    expect(within(detail).queryByText(/vehículo operativo/)).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByText(/vehículo operativo/)).toBeVisible();
   });
 
   describe("Iniciar servicio según la franja (#910)", () => {
@@ -502,8 +524,12 @@ describe("FieldWorkPanel component", () => {
       const calls = recordStarts();
       const user = userEvent.setup();
       render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
-      await user.click((await screen.findAllByRole("button", { name: "Abrir" }))[0]);
-      const start = await screen.findByRole("button", { name: "Iniciar servicio" });
+      await waitFor(() => expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible());
+      const card = screen.getByText("Barrido mecánico — Bulevar Costero").closest("li");
+      if (!card) throw new Error("SVC-1050 must be listed for this test.");
+      await user.click(within(card).getByRole("button", { name: "Abrir" }));
+      const detail = await screen.findByRole("region", { name: /Detalle completo de/ });
+      const start = await within(detail).findByRole("button", { name: "Iniciar servicio" });
       expect(start).toHaveAttribute("aria-haspopup", "dialog");
       await user.click(start);
       const dialog = await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });

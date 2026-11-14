@@ -47,6 +47,8 @@ interface ConfirmActionDialogProps {
   errorFallback?: string;
   /** Overrides where focus goes on close (default: the trigger). */
   finalFocus?: React.ComponentProps<typeof DialogContent>["finalFocus"];
+  /** Notified when the dialog opens or closes, e.g. to avoid repeating its error elsewhere. */
+  onOpenChange?: (open: boolean) => void;
 }
 
 function ConfirmActionDialog({
@@ -60,6 +62,7 @@ function ConfirmActionDialog({
   onConfirm,
   errorFallback = "No se pudo completar la acción. Intente nuevamente.",
   finalFocus,
+  onOpenChange,
 }: ConfirmActionDialogProps) {
   const [open, setOpen] = React.useState(false);
   const [pending, setPending] = React.useState(false);
@@ -70,6 +73,7 @@ function ConfirmActionDialog({
     if (submitting.current) return;
     if (next) setError(null);
     setOpen(next);
+    onOpenChange?.(next);
   }
 
   async function confirm() {
@@ -86,7 +90,10 @@ function ConfirmActionDialog({
     submitting.current = false;
     setPending(false);
     if (failure) setError(failure);
-    else setOpen(false);
+    else {
+      setOpen(false);
+      onOpenChange?.(false);
+    }
   }
 
   const hasBody = Boolean(notice || children || error);

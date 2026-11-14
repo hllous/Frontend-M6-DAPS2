@@ -76,6 +76,8 @@ export function FieldWorkPanel({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [startErrors, setStartErrors] = useState<Record<string, string>>({});
+  // While the out-of-hours confirmation is open it shows the start error itself (#910).
+  const [confirmingStartId, setConfirmingStartId] = useState<string | null>(null);
   const [suspendingServiceId, setSuspendingServiceId] = useState<string | null>(null);
   const [resumingId, setResumingId] = useState<string | null>(null);
   const [resumeErrors, setResumeErrors] = useState<Record<string, string>>({});
@@ -334,7 +336,7 @@ export function FieldWorkPanel({
             const windowTiming = checkServiceWindowTiming(service);
             const isOutside =
               service.status === "SCHEDULED" && windowTiming.isOutside;
-            const error = startErrors[service.id];
+            const error = confirmingStartId === service.id ? undefined : startErrors[service.id];
             const draftPending = Boolean(getFieldDraft(service.id, "start"));
 
             return (
@@ -418,6 +420,7 @@ export function FieldWorkPanel({
                     <StartServiceButton
                       service={service}
                       onStart={handleStartService}
+                      onConfirmationOpenChange={(open) => setConfirmingStartId(open ? service.id : null)}
                       isStarting={startingId === service.id}
                       draftPending={draftPending}
                       className="gap-1.5 text-xs font-semibold"

@@ -21,6 +21,7 @@ export function StartServiceButton({
   isStarting,
   draftPending,
   className,
+  onConfirmationOpenChange,
 }: {
   service: Service;
   /** Resolves to an error message when the start failed, or null/undefined otherwise. */
@@ -28,6 +29,8 @@ export function StartServiceButton({
   isStarting: boolean;
   draftPending: boolean;
   className?: string;
+  /** Lets the caller hide its own start error while the confirmation shows it. */
+  onConfirmationOpenChange?: (open: boolean) => void;
 }) {
   const label = isStarting ? "Iniciando..." : draftPending ? "Reenviar" : "Iniciar servicio";
   const isOutside = checkServiceWindowTiming(service).isOutside;
@@ -55,6 +58,7 @@ export function StartServiceButton({
       confirmLabel="Iniciar igual"
       onConfirm={async () => (await onStart(service)) ?? null}
       errorFallback="No se pudo registrar el inicio del servicio."
+      onOpenChange={onConfirmationOpenChange}
     >
       <Alert variant="warning" role="note">
         <AlertTriangle aria-hidden />

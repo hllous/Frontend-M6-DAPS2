@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -109,6 +110,8 @@ export function ServiceDetail({
   backLabel?: string;
 }) {
   const windowTiming = checkServiceWindowTiming(service);
+  // While the out-of-hours confirmation is open it shows the start error itself (#910).
+  const [confirmingStart, setConfirmingStart] = useState(false);
   const isEnvironmentalInspectionService = service.origin === "INSPECTION" && service.serviceTypeCategory === "ENVIRONMENTAL_CONTROL";
   // Sólo consulta = quien mira no puede cambiar el estado del servicio. Oficina no lo
   // ejecuta, pero lo reprograma, lo cancela o le asigna cuadrilla.
@@ -133,6 +136,7 @@ export function ServiceDetail({
               onStart={onStartService}
               isStarting={isStarting}
               draftPending={startDraftPending}
+              onConfirmationOpenChange={setConfirmingStart}
               className="gap-1.5 text-xs font-semibold"
             />
           )}
@@ -425,7 +429,7 @@ export function ServiceDetail({
             </Alert>
           )}
 
-          {startError && (
+          {startError && !confirmingStart && (
             <Alert
               variant="danger"
               role="alert"
