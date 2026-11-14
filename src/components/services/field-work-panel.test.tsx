@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { FieldWorkPanel } from "./field-work-panel";
 import { scenarios } from "@/lib/scenarios";
 import { resetServiceFixtures } from "@/lib/services-fixtures";
+import { todayInArgentina } from "@/lib/argentina-date";
 import { expectNoInternalJargon } from "@/test/no-internal-jargon";
 
 const server = setupServer(
@@ -225,6 +226,13 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+async function confirmOutOfHoursStart(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement) {
+  await user.click(trigger);
+  const dialog = await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });
+  await user.click(within(dialog).getByRole("button", { name: "Iniciar igual" }));
+  return dialog;
+}
+
 describe("FieldWorkPanel component", () => {
   it("lets Field view the referrals of an assigned Service but not create them (Operations and Admin do)", async () => {
     const user = userEvent.setup();
@@ -324,8 +332,8 @@ describe("FieldWorkPanel component", () => {
     const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
     expect(startButtons[0]).toBeEnabled();
 
-    // Crew Leader starts the service
-    await user.click(startButtons[0]);
+    // Crew Leader starts the service, confirming the out-of-hours warning
+    await confirmOutOfHoursStart(user, startButtons[0]);
 
     // Transitions to IN_PROGRESS (SVC-1060 is already IN_PROGRESS in the fixture, so at least 2 now)
     await waitFor(() => {
@@ -384,7 +392,7 @@ describe("FieldWorkPanel component", () => {
     });
 
     const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
-    await user.click(startButtons[0]);
+    await confirmOutOfHoursStart(user, startButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByText(/Sin enviar \(sin conexión\)/i)).toBeVisible();
@@ -420,11 +428,116 @@ describe("FieldWorkPanel component", () => {
     // Find the start button for SVC-1054
     const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
     // Click start on SVC-1054 (second scheduled item)
-    await user.click(startButtons[1]);
+    const dialog = await confirmOutOfHoursStart(user, startButtons[1]);
 
-    // Backend error is surfaced in role="alert"
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("El tipo de servicio requiere un vehículo operativo asignado para iniciar.");
+    // Backend error stays inside the confirmation, which remains open to retry or cancel
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("El tipo de servicio requiere un vehículo operativo asignado para iniciar.");
+    expect(within(dialog).getByRole("button", { name: "Iniciar igual" })).toBeEnabled();
+
+    // The card does not repeat the error while the confirmation shows it; it keeps it after closing.
+    const card = screen.getByText("Reparación de contenedor CT-0112").closest("li")!;
+    expect(within(card).queryByText(/vehículo operativo/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(card).getByRole("alert")).toHaveTextContent("El tipo de servicio requiere un vehículo operativo asignado para iniciar.");
+  });
+
+  it("el detalle no repite en la página el error que muestra la confirmación", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+    await waitFor(() => expect(screen.getByText("Reparación de contenedor CT-0112")).toBeVisible());
+    const card = screen.getByText("Reparación de contenedor CT-0112").closest("li")!;
+    await user.click(within(card).getByRole("button", { name: "Abrir" }));
+    const detail = await screen.findByRole("region", { name: /Detalle completo de/ });
+    const dialog = await confirmOutOfHoursStart(user, within(detail).getByRole("button", { name: "Iniciar servicio" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("vehículo operativo");
+    expect(within(detail).queryByText(/vehículo operativo/)).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByText(/vehículo operativo/)).toBeVisible();
+  });
+
+  describe("Iniciar servicio según la franja (#910)", () => {
+    function recordStarts() {
+      const calls: string[] = [];
+      server.use(http.post("*/api/services/:serviceId/start", ({ request }) => { calls.push(request.url); }));
+      return calls;
+    }
+
+    it("dentro de la franja inicia con un toque, sin diálogo", async () => {
+      const today = todayInArgentina();
+      server.use(http.get("*/api/services", () => HttpResponse.json({
+        data: [{
+          id: "SVC-1050", serviceTypeId: "st-street-cleaning", serviceTypeName: "Barrido mecánico", title: "Barrido mecánico — Bulevar Costero",
+          mode: "ROUTE", status: "SCHEDULED", origin: "PLANNED", zoneIds: ["zone-3"], zoneNames: ["Zona Centro"], scheduledDate: today,
+          windowFrom: "00:00", windowTo: "23:59", crewId: "crew-b", crewName: "Cuadrilla B · Fernández", vehicleId: "veh-102", vehiclePlate: "AE 456 FG", history: [],
+        }],
+        meta: { total: 1, page: 1, pageSize: 50, totalPages: 1 },
+      })));
+      const calls = recordStarts();
+      const user = userEvent.setup();
+      render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+      await waitFor(() => expect(screen.getAllByRole("button", { name: "Iniciar servicio" })).toHaveLength(1));
+      expect(screen.queryByText(/Fuera del horario/i)).not.toBeInTheDocument();
+
+      const start = screen.getByRole("button", { name: "Iniciar servicio" });
+      expect(start).not.toHaveAttribute("aria-haspopup");
+      await user.click(start);
+
+      await waitFor(() => expect(calls).toHaveLength(1));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("fuera de la franja advierte con la franja programada y solo envía al confirmar", async () => {
+      const calls = recordStarts();
+      const user = userEvent.setup();
+      render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+      await waitFor(() => expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible());
+      const start = screen.getAllByRole("button", { name: "Iniciar servicio" })[0];
+      expect(start).toHaveAttribute("aria-haspopup", "dialog");
+
+      await user.click(start);
+      const dialog = await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });
+      expect(within(dialog).getByText(/Franja programada: 05\/09\/2026, de 08:00 a 12:00/)).toBeVisible();
+      expect(calls).toHaveLength(0);
+
+      await user.click(within(dialog).getByRole("button", { name: "Iniciar igual" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(calls).toHaveLength(1);
+    });
+
+    it("fuera de la franja, cancelar con Escape no envía nada y devuelve el foco", async () => {
+      const calls = recordStarts();
+      const user = userEvent.setup();
+      render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+      await waitFor(() => expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible());
+      const start = screen.getAllByRole("button", { name: "Iniciar servicio" })[0];
+      await user.click(start);
+      await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(calls).toHaveLength(0);
+      await waitFor(() => expect(start).toHaveFocus());
+    });
+
+    it("el detalle también confirma fuera de la franja", async () => {
+      const calls = recordStarts();
+      const user = userEvent.setup();
+      render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+      await waitFor(() => expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible());
+      const card = screen.getByText("Barrido mecánico — Bulevar Costero").closest("li");
+      if (!card) throw new Error("SVC-1050 must be listed for this test.");
+      await user.click(within(card).getByRole("button", { name: "Abrir" }));
+      const detail = await screen.findByRole("region", { name: /Detalle completo de/ });
+      const start = await within(detail).findByRole("button", { name: "Iniciar servicio" });
+      expect(start).toHaveAttribute("aria-haspopup", "dialog");
+      await user.click(start);
+      const dialog = await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });
+      expect(calls).toHaveLength(0);
+      await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(calls).toHaveLength(0);
+    });
   });
 
   it("allows Crew Leader to suspend an in-progress service with a reason and note, then resume it clearing the reason", async () => {
@@ -439,6 +552,7 @@ describe("FieldWorkPanel component", () => {
     // SVC-1060 is in progress, so My Work lists it first
     await user.click(detailButtons[0]);
 
+    expect(screen.getByRole("button", { name: "Suspender servicio" })).toHaveAttribute("aria-haspopup", "dialog");
     await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
 
     expect(

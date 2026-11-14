@@ -510,7 +510,9 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-003")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-003/ });
-    await clickContainerAction(user, row, "Retirar contenedor");
+    const removeDetail = await openContainerDetail(user, row);
+    expect(within(removeDetail).getByRole("button", { name: "Retirar contenedor" })).toHaveAttribute("aria-haspopup", "dialog");
+    await user.click(within(removeDetail).getByRole("button", { name: "Retirar contenedor" }));
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /Retirar contenedor CONT-003/ })).toBeVisible();

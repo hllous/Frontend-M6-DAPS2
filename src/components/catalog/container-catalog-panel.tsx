@@ -1343,6 +1343,7 @@ export function ContainerCatalogPanel({
                     type="button"
                     variant="destructive"
                     className="w-full justify-start"
+                    aria-haspopup="dialog"
                     disabled={servicesStatus !== "ready" || Boolean(detailInFlight)}
                     onClick={() => {
                       const target = detailContainer;

@@ -825,7 +825,7 @@ export function ServicesWorkspace({
       ? streetClosureDependencyState
       : { serviceId: null, dependency: null, error: null };
 
-  const handleStartService = useCallback(async (service: Service) => {
+  const handleStartService = useCallback(async (service: Service): Promise<string | null> => {
     setStartingId(service.id);
     setStartErrors((prev) => ({ ...prev, [service.id]: "" }));
     try {
@@ -837,12 +837,14 @@ export function ServicesWorkspace({
           services: prev.services.map((s) => (s.id === updated.id ? updated : s)),
         };
       });
+      return null;
     } catch (cause) {
       const msg =
         cause instanceof ServiceRequestError
           ? cause.message
           : "No se pudo registrar el inicio del servicio.";
       setStartErrors((prev) => ({ ...prev, [service.id]: msg }));
+      return msg;
     } finally {
       setStartingId((current) => (current === service.id ? null : current));
     }

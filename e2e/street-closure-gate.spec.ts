@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { startService } from "./support/start-service";
 
 const closureInput = (sourceId: string) => ({
   reason: "El Servicio necesita reducir la circulación durante el operativo.",
@@ -43,7 +44,12 @@ test.describe("StreetClosure dependency gate", () => {
 
     const card = page.locator('li[data-service-id="SVC-1097"]');
     await expect(card).toBeVisible();
-    await card.getByRole("button", { name: "Iniciar servicio" }).click();
+    const confirmation = await startService(page, card);
+    if (confirmation) {
+      await expect(confirmation.getByRole("alert")).toContainText(/corte de calle.*pendiente/i);
+      await confirmation.getByRole("button", { name: "Cancelar" }).click();
+      await expect(confirmation).toBeHidden();
+    }
 
     await expect(card.getByRole("alert")).toContainText(/corte de calle.*pendiente/i);
     await expect(card.getByText("Programado")).toBeVisible();

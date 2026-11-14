@@ -102,6 +102,7 @@ describe("RouteCatalogPanel component", () => {
     server.use(http.get("/api/routes/:id/references", () => HttpResponse.json({ message: "No disponible" }, { status: 503 })));
     const user = userEvent.setup();
     render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByTestId("deactivate-route-route-1")).toHaveAttribute("aria-haspopup", "dialog");
     await user.click(await screen.findByTestId("deactivate-route-route-1"));
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByText("No se pudo verificar si el recorrido está en uso.")).toBeVisible();

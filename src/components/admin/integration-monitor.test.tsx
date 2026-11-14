@@ -49,6 +49,7 @@ describe("IntegrationMonitor", () => {
     await user.click((await screen.findAllByRole("button", { name: "Ver detalle de containerDamaged" }))[0]);
     const detail = await screen.findByRole("dialog", { name: "Detalle del evento" });
     expect(within(detail).getByText(/"severity": "HIGH"/)).toBeVisible();
+    expect(within(detail).getByRole("button", { name: "Reintentar evento" })).toHaveAttribute("aria-haspopup", "dialog");
     await user.click(within(detail).getByRole("button", { name: "Reintentar evento" }));
 
     const confirmation = await screen.findByRole("dialog", { name: "Confirmar reintento" });
@@ -87,6 +88,7 @@ describe("IntegrationMonitor", () => {
     const user = userEvent.setup();
     render(<IntegrationMonitor canManage initialTab="events" />);
 
+    expect(await screen.findByRole("button", { name: "Reintentar eventos fallidos" })).toHaveAttribute("aria-haspopup", "dialog");
     await user.click(await screen.findByRole("button", { name: "Reintentar eventos fallidos" }));
     const confirmation = await screen.findByRole("dialog", { name: "Reintentar eventos fallidos" });
     await user.clear(within(confirmation).getByRole("spinbutton", { name: "Límite de reintentos" }));

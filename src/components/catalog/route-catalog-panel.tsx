@@ -632,6 +632,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
                             onClick={() => handleOpenDeactivate(route)}
                             className="h-8 max-[760px]:h-10 px-2 text-xs text-destructive hover:bg-destructive/10"
                             aria-label="Desactivar recorrido"
+                            aria-haspopup="dialog"
                             data-testid={`deactivate-route-${route.id}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />

@@ -11,10 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CompactPager } from "@/components/ui/compact-pager";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -278,8 +279,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [activeAction, setActiveAction] = useState<"submit" | "authorize" | "reject" | "schedule" | "retry-link" | null>(null);
-  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [activeAction, setActiveAction] = useState<"submit" | "schedule" | "retry-link" | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState(emptySchedule);
   const [scheduleFieldErrors, setScheduleFieldErrors] = useState<ScheduleField[]>([]);
@@ -404,7 +404,23 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const treeById = (id: string) => linkedTree(id) ?? undefined;
   const [crewConflict, setCrewConflict] = useState(false);
   const [overrideNote, setOverrideNote] = useState("");
-  const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
+  // #910: autorizar y rechazar se confirman; el error queda dentro del diálogo de confirmación.
+  const decide = async (action: "authorize" | "reject"): Promise<string | null> => {
+    if (!detail) return null;
+    try {
+      const updated = action === "authorize" ? await treeInterventionsAdapter.authorize(detail.id) : await treeInterventionsAdapter.reject(detail.id);
+      setDetail(updated);
+      setActionError(null);
+      setScheduleOpen(false);
+      setRequestVersion((version) => version + 1);
+      setDuplicateService(null);
+      setNotice(action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
+      return null;
+    } catch (caught) {
+      return errorMessage(caught, "No se pudo actualizar la intervención.");
+    }
+  };
+  const runAction = async (action: "submit" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
     if (!detail) return;
     setActionError(null); setActiveAction(action);
     try {
@@ -449,17 +465,12 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         return;
       }
 
-      const updated = action === "submit"
-        ? await treeInterventionsAdapter.submitForAuthorization(detail.id)
-        : action === "authorize"
-          ? await treeInterventionsAdapter.authorize(detail.id)
-          : await treeInterventionsAdapter.reject(detail.id);
+      const updated = await treeInterventionsAdapter.submitForAuthorization(detail.id);
       setDetail(updated);
       setScheduleOpen(false);
       setRequestVersion((version) => version + 1);
       setDuplicateService(null);
-      setNotice(action === "submit" ? "Extracción enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
-      if (action === "reject") setRejectConfirmOpen(false);
+      setNotice("Extracción enviada a autorización.");
     } catch (caught) {
       if (action === "schedule" && caught instanceof ServiceRequestError && caught.status === 409 && asksForOverrideNote(caught.message)) { setCrewConflict(true); return; }
       setActionError(errorMessage(caught, "No se pudo actualizar la intervención."));
@@ -606,7 +617,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           }}
         />
       ) : null}
-      <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); setRejectConfirmOpen(false); } }}>
+      <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle></DialogHeader>
           {detailLoading ? <LoadingRegion label="Detalle de la intervención"><DetailFieldsSkeleton fieldCount={6} /></LoadingRegion> : null}
@@ -690,6 +701,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                   </form>
                 ) : null}
                 {detail.status === "REJECTED" && canRequest ? <p className="text-sm text-muted-foreground">Extracción rechazada. Puede crear otra solicitud.</p> : null}
+                {canAuthorize && detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED" ? <p className="text-sm text-muted-foreground">Una poda Solicitada se autoriza directamente. Solo la extracción pasa por Pendiente de autorización, donde se puede rechazar.</p> : null}
               </div>
             </>
           ) : null}
@@ -701,18 +713,32 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
               {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
               {detail.status === "REJECTED" && canRequest ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => { setDetail(null); openRequest({ initialTreeIds: detail.treeIds, initialType: detail.interventionType, initialAddress: detail.address ?? undefined, initialRequiresStreetClosure: detail.requiresStreetClosure, initialPriority: detail.priority ?? undefined, initialJustification: detail.justification ?? "" }); }}>Crear nueva solicitud</Button> : null}
               {((canAuthorizeRemoval && detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (canAuthorize && detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <>
-                {detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}
-                <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>
+                {detail.interventionType === "REMOVAL" ? (
+                  <ConfirmActionDialog
+                    trigger={<Button type="button" variant="destructive" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button>}
+                    title="Confirmar rechazo"
+                    description="La extracción quedará rechazada. No se puede deshacer."
+                    confirmLabel="Confirmar rechazo de intervención"
+                    tone="destructive"
+                    onConfirm={() => decide("reject")}
+                  />
+                ) : null}
+                <ConfirmActionDialog
+                  trigger={<Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null}><CheckCircle2 data-icon="inline-start" aria-hidden />Autorizar intervención</Button>}
+                  title="Autorizar intervención"
+                  description="La intervención pasa a Autorizada y queda lista para programar su servicio."
+                  confirmLabel="Autorizar intervención"
+                  onConfirm={() => decide("authorize")}
+                >
+                  <dl className="grid gap-3 text-sm">
+                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{detail.treeIds.length > 1 ? "Árboles" : "Árbol"}</dt><dd className="mt-0.5">{detail.treeIds.map((id) => { const tree = linkedTree(id); return tree ? treeReferenceName(tree) : REFERENCE_UNAVAILABLE.trees; }).join(", ")}</dd></div>
+                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de intervención</dt><dd className="mt-0.5">{TREE_INTERVENTION_LABELS[detail.interventionType]}</dd></div>
+                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Motivo</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div>
+                  </dl>
+                </ConfirmActionDialog>
               </> : null}
             </> : null}
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={rejectConfirmOpen} onOpenChange={(open) => { if (!activeAction) setRejectConfirmOpen(open); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar rechazo</DialogTitle><DialogDescription>La extracción quedará rechazada. No se puede deshacer.</DialogDescription></DialogHeader>
-          {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
-          <DialogFooter><Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(false)}>Conservar solicitud</Button><Button type="button" variant="destructive" disabled={activeAction !== null} aria-busy={activeAction === "reject"} onClick={() => void runAction("reject")}>{activeAction === "reject" ? "Rechazando intervención…" : "Confirmar rechazo de intervención"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </section>
