@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { errorMessage as getErrorMessage } from "@/lib/error-message";
+import { cn } from "@/lib/utils";
 
 /**
  * Confirmation before a one-click write (#910): same title/effect/verb/"Cancelar" pattern everywhere.
@@ -90,6 +91,8 @@ function ConfirmActionDialog({
     else setOpen(false);
   }
 
+  const hasBody = Boolean(notice || children || error);
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={trigger} />
@@ -98,22 +101,25 @@ function ConfirmActionDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="text-sm">{description}</DialogDescription>
         </DialogHeader>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain py-4">
-          {notice ? (
-            <Alert variant="info" role="note">
-              <Send aria-hidden />
-              <AlertDescription>{notice}</AlertDescription>
-            </Alert>
-          ) : null}
-          {children}
-          {error ? (
-            <Alert variant="danger">
-              <AlertCircle aria-hidden />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : null}
-        </div>
-        <DialogFooter className="flex-col-reverse items-stretch sm:flex-row sm:items-center [&>button]:whitespace-normal">
+        {hasBody ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain py-4">
+            {notice ? (
+              <Alert variant="info" role="note">
+                <Send aria-hidden />
+                <AlertDescription>{notice}</AlertDescription>
+              </Alert>
+            ) : null}
+            {children}
+            {error ? (
+              <Alert variant="danger">
+                <AlertCircle aria-hidden />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
+          </div>
+        ) : null}
+        {/* Without a body the header separator is enough; a second line would double it. */}
+        <DialogFooter className={cn("flex-col-reverse items-stretch sm:flex-row sm:items-center [&>button]:whitespace-normal", !hasBody && "border-t-0")}>
           <DialogClose render={<Button type="button" variant="outline" disabled={pending} />}>
             Cancelar
           </DialogClose>
