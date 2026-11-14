@@ -31,6 +31,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import Link from "next/link";
 import { serviceSourceHref } from "@/lib/referrals";
 import { reportLabel, reportNumber } from "@/lib/display-ids";
@@ -615,6 +616,29 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         : [];
   const actions = allActions.filter(({ action }) => scenario.capabilities.includes(action === "close" ? "environmentalReport:close" : "environmentalReport:review") && !(infoPending && (action === "forward" || action === "dismiss" || action === "close")));
 
+  // #910: Iniciar revisión y Cerrar expediente confirman; con reclamo vinculado avisan el efecto en M2 (mismo dato que "Reclamo: …").
+  const linkedClaim = claimId && isOffice ? (report.publicId ? `el reclamo ${report.publicId}` : "un reclamo ciudadano") : null;
+  function transitionConfirmation(action: Action) {
+    if (action === "close") {
+      return {
+        title: `Cerrar expediente ${reportLabel(report)}`,
+        description: `Está en ${ENVIRONMENTAL_REPORT_STATUS_LABELS[report.status]}. El cierre es definitivo: no se puede reabrir desde la aplicación.`,
+        notice: linkedClaim ? `Tiene vinculado ${linkedClaim}: al cerrar, se le notifica al vecino.` : undefined,
+        confirmLabel: "Cerrar expediente",
+        pendingLabel: "Cerrando…",
+        tone: "destructive" as const,
+      };
+    }
+    return {
+      title: `Iniciar revisión del expediente ${reportLabel(report)}`,
+      description: `El expediente deja ${ENVIRONMENTAL_REPORT_STATUS_LABELS.RECEIVED} y pasa a ${ENVIRONMENTAL_REPORT_STATUS_LABELS.UNDER_REVIEW}.`,
+      notice: linkedClaim ? `Tiene vinculado ${linkedClaim}: el reclamo pasa a en revisión y el vecino lo ve.` : undefined,
+      confirmLabel: "Iniciar revisión",
+      pendingLabel: "Iniciando…",
+      tone: "default" as const,
+    };
+  }
+
   async function handleRequestInformation(input: RequestInformationInput): Promise<string | null> {
     try {
       onReportUpdated(await environmentalReportsAdapter.requestInformation(report.id, input));
@@ -747,7 +771,12 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
           <div><h1 ref={reportTitleRef} tabIndex={-1} className="text-2xl font-bold tracking-tight text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 sm:text-[28px]">Expediente {reportLabel(report)}</h1><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · actualizado {formatDate(report.updatedAt)}</p></div>
           <StatusBadge status={report.status} />
         </div>
-        {isOffice && (actions.length > 0 || canRequestInfo || infoPending || canSchedule || canReprogram || canReinspect || orphanInspection) && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Acciones</h2>{(orphanInspection || canReinspect) && <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{orphanInspection ? "Falta fecha y cuadrilla." : "La anterior fue inconclusa. Programe otra."}</p>}<div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${tone ?? ""}`} onClick={() => { if (action === "forward" || action === "dismiss") setPendingDecision(action); else void onAction(action, report); }}><Icon data-icon="inline-start" aria-hidden />{label}</Button>)}{canRequestInfo && <Button variant="outline" className="gap-2" onClick={() => setRequestInfoOpen(true)}><MessageCircleQuestion data-icon="inline-start" aria-hidden />Pedir información al vecino</Button>}{orphanInspection && <Button className="gap-2" onClick={() => { setScheduleMode("service"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />Programar servicio</Button>}{(canSchedule || canReinspect) && <Button className="gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button variant="outline" className="gap-2" onClick={() => setRescheduleStep(activeService?.status === "RESCHEDULED" ? "confirm" : "reason")}><RefreshCw data-icon="inline-start" aria-hidden />{activeService?.status === "RESCHEDULED" ? "Confirmar nueva fecha" : "Reprogramar inspección"}</Button>}</div>{infoPending && <InformationRequestPending report={report} />}</section>}
+        {isOffice && (actions.length > 0 || canRequestInfo || infoPending || canSchedule || canReprogram || canReinspect || orphanInspection) && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Acciones</h2>{(orphanInspection || canReinspect) && <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{orphanInspection ? "Falta fecha y cuadrilla." : "La anterior fue inconclusa. Programe otra."}</p>}<div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => {
+          const opensDecision = action === "forward" || action === "dismiss";
+          const button = <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${tone ?? ""}`} {...(opensDecision ? { "aria-haspopup": "dialog" as const, onClick: () => setPendingDecision(action) } : {})}><Icon data-icon="inline-start" aria-hidden />{label}</Button>;
+          if (opensDecision) return button;
+          return <ConfirmActionDialog key={action} trigger={button} finalFocus={dialogFinalFocus} {...transitionConfirmation(action)} onConfirm={async () => { const error = await onAction(action, report); if (error === null) focusTitleAfterDialogRef.current = true; return error; }} />;
+        })}{canRequestInfo && <Button aria-haspopup="dialog" variant="outline" className="gap-2" onClick={() => setRequestInfoOpen(true)}><MessageCircleQuestion data-icon="inline-start" aria-hidden />Pedir información al vecino</Button>}{orphanInspection && <Button aria-haspopup="dialog" className="gap-2" onClick={() => { setScheduleMode("service"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />Programar servicio</Button>}{(canSchedule || canReinspect) && <Button aria-haspopup="dialog" className="gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button aria-haspopup="dialog" variant="outline" className="gap-2" onClick={() => setRescheduleStep(activeService?.status === "RESCHEDULED" ? "confirm" : "reason")}><RefreshCw data-icon="inline-start" aria-hidden />{activeService?.status === "RESCHEDULED" ? "Confirmar nueva fecha" : "Reprogramar inspección"}</Button>}</div>{infoPending && <InformationRequestPending report={report} />}</section>}
         {scheduleError && <Alert variant="danger">{scheduleError}</Alert>}
         {canViewViolationNotice && completedViolationInspection && <ViolationNoticePanel inspection={completedViolationInspection} notice={violationNotice} loading={noticeLoading} error={noticeError} showIssue={showNoticeIssuance} canIssue={canSubmitNotice} hasEvidence={hasInspectionEvidence} onIssue={() => setIssueNoticeOpen(true)} />}
         <section className={hasClaimData ? "grid gap-5 lg:grid-cols-[1.3fr_0.7fr]" : "grid gap-5"}><div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 sm:p-5"><h2 className="text-sm font-bold text-[var(--color-text)]">Datos</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2"><DataField label="Ubicación" value={reportAddress(report)} /><DataField label="Hallazgo" value={reportDetails(report)} wide /><DataField label="Prioridad" value={report.priority === null ? "—" : ENVIRONMENTAL_REPORT_PRIORITY_LABELS[report.priority]} /><DataField label="Creado" value={formatDate(report.createdAt)} /><DataField label="Última actualización" value={formatDate(report.updatedAt)} /></dl></div>{hasClaimData && <div className="rounded-2xl border border-[var(--color-border)] p-4 sm:p-5">{report.escalated && <p className="rounded-xl border border-[var(--color-warning-line)] bg-[var(--color-warning-fill)] p-3 text-sm font-semibold text-[var(--color-warning)]">Escalado</p>}{report.citizenResponse && isOffice && <p className={`${report.escalated ? "mt-4 " : ""}text-sm text-[var(--color-text)]`}>{report.citizenResponse}</p>}{claimId && isOffice && <p className={`${report.escalated || report.citizenResponse ? "mt-4 " : ""}text-sm text-[var(--color-text-secondary)]`}>Reclamo: <span className="font-semibold tabular-nums text-[var(--color-text)]">{claimId}</span></p>}</div>}</section>
