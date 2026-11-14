@@ -31,6 +31,7 @@ import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
   Dialog,
   DialogContent,
@@ -401,13 +402,14 @@ export function CrewCatalogPanel({
       );
     }
   }
-  async function removeMember(userId: string) {
-    if (!selected) return;
+  async function removeMember(userId: string): Promise<string | null> {
+    if (!selected) return null;
     try {
       setSelected(await crewsAdapter.removeMember(selected.id, userId));
       notifySuccess("Integrante quitado.");
+      return null;
     } catch (caught) {
-      setMemberError(errorMessage(caught, "No se pudo quitar el integrante."));
+      return errorMessage(caught, "No se pudo quitar el integrante.");
     }
   }
   function deactivate(crew: Crew) {
@@ -908,16 +910,25 @@ export function CrewCatalogPanel({
                     >
                       {userName(member.userId, member.displayName)}
                       {canManage ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Quitar a ${userName(member.userId, member.displayName)}`}
-                          onClick={() => void removeMember(member.userId)}
-                        >
-                          <UserMinus data-icon="inline-start" aria-hidden />
-                          Quitar
-                        </Button>
+                        <ConfirmActionDialog
+                          trigger={
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              aria-label={`Quitar a ${userName(member.userId, member.displayName)}`}
+                            >
+                              <UserMinus data-icon="inline-start" aria-hidden />
+                              Quitar
+                            </Button>
+                          }
+                          title={`Quitar a ${userName(member.userId, member.displayName)}`}
+                          description={`${userName(member.userId, member.displayName)} deja de integrar ${selected.name}. Para volver a sumarlo, agréguelo de nuevo.`}
+                          confirmLabel="Quitar integrante"
+                          pendingLabel="Quitando…"
+                          tone="destructive"
+                          onConfirm={() => removeMember(member.userId)}
+                        />
                       ) : null}
                     </li>
                   ))}
