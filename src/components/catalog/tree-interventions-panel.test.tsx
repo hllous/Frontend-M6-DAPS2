@@ -21,6 +21,13 @@ async function chooseSelectOption(user: ReturnType<typeof userEvent.setup>, trig
   if (trigger.getAttribute("aria-expanded") === "true") await user.keyboard("{Escape}");
 }
 
+async function confirmAuthorization(user: ReturnType<typeof userEvent.setup>, detail: HTMLElement) {
+  await user.click(within(detail).getByRole("button", { name: "Autorizar intervención" }));
+  const confirmation = await screen.findByRole("dialog", { name: "Autorizar intervención" });
+  await user.click(within(confirmation).getByRole("button", { name: "Autorizar intervención" }));
+  return confirmation;
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
   resetTreeInterventionFixtures();
@@ -230,7 +237,7 @@ describe("TreeInterventionsPanel", () => {
     await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
     const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
 
-    await user.click(within(detail).getByRole("button", { name: "Autorizar intervención" }));
+    await confirmAuthorization(user, detail);
 
     expect(await within(detail).findByText("Autorizada")).toBeVisible();
     expect(within(detail).getByText("Nombre no disponible")).toBeVisible();
@@ -245,7 +252,7 @@ describe("TreeInterventionsPanel", () => {
     await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
     const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
 
-    await user.click(within(detail).getByRole("button", { name: "Autorizar intervención" }));
+    await confirmAuthorization(user, detail);
     expect(await within(detail).findByRole("button", { name: "Programar servicio" })).toBeVisible();
     await user.click(within(detail).getByRole("button", { name: "Programar servicio" }));
 
@@ -610,10 +617,67 @@ describe("TreeInterventionsPanel", () => {
     const request = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
     await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
     const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
-    await user.click(within(detail).getByRole("button", { name: "Autorizar intervención" }));
+    const confirmation = await confirmAuthorization(user, detail);
 
-    expect(await within(detail).findByRole("alert")).toHaveTextContent("ya fue autorizada");
+    expect(await within(confirmation).findByRole("alert")).toHaveTextContent("ya fue autorizada");
+    expect(within(confirmation).getByRole("button", { name: "Autorizar intervención" })).toBeEnabled();
     expect(within(detail).getByText("Solicitada")).toBeVisible();
+  });
+
+  describe("confirmación de Autorizar intervención (#910)", () => {
+    function recordAuthorizations() {
+      const calls: string[] = [];
+      server.use(http.post("*/api/tree-interventions/:interventionId/authorize", ({ request }) => { calls.push(request.url); }));
+      return calls;
+    }
+
+    async function openPruning(user: ReturnType<typeof userEvent.setup>) {
+      render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+      const request = await screen.findByRole("article", { name: /intervention-1|Poda de seguridad/i });
+      await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+      return screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    }
+
+    it("muestra árbol, tipo y motivo, y solo envía al confirmar", async () => {
+      const calls = recordAuthorizations();
+      const user = userEvent.setup();
+      const detail = await openPruning(user);
+      const trigger = await within(detail).findByRole("button", { name: "Autorizar intervención" });
+      expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+
+      await user.click(trigger);
+      const confirmation = await screen.findByRole("dialog", { name: "Autorizar intervención" });
+      expect(within(confirmation).getByText(/ARB-00443/)).toBeVisible();
+      expect(within(confirmation).getByText("Poda de seguridad")).toBeVisible();
+      expect(within(confirmation).getByText("Relevamiento 06/09/2026 (survey-2).")).toBeVisible();
+      expect(calls).toHaveLength(0);
+
+      await user.click(within(confirmation).getByRole("button", { name: "Autorizar intervención" }));
+      expect(await within(detail).findByText("Autorizada")).toBeVisible();
+      expect(calls).toHaveLength(1);
+    });
+
+    it("al cancelar con Escape no envía nada y devuelve el foco al botón", async () => {
+      const calls = recordAuthorizations();
+      const user = userEvent.setup();
+      const detail = await openPruning(user);
+      const trigger = await within(detail).findByRole("button", { name: "Autorizar intervención" });
+      await user.click(trigger);
+      await screen.findByRole("dialog", { name: "Autorizar intervención" });
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Autorizar intervención" })).not.toBeInTheDocument());
+      expect(screen.getByRole("dialog", { name: /Detalle de la intervención/ })).toBeVisible();
+      expect(calls).toHaveLength(0);
+      await waitFor(() => expect(trigger).toHaveFocus());
+    });
+
+    it("explica por qué una poda Solicitada no ofrece Rechazar", async () => {
+      const user = userEvent.setup();
+      const detail = await openPruning(user);
+      await within(detail).findByRole("button", { name: "Autorizar intervención" });
+      expect(within(detail).queryByRole("button", { name: "Rechazar intervención" })).not.toBeInTheDocument();
+      expect(within(detail).getByText(/Una poda Solicitada se autoriza directamente/)).toBeVisible();
+    });
   });
 
   it("lets Operations submit a requested removal for authorization", async () => {
