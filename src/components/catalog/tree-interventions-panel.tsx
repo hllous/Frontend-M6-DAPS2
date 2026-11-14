@@ -731,7 +731,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                   onConfirm={() => decide("authorize")}
                 >
                   <dl className="grid gap-3 text-sm">
-                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{detail.treeIds.length > 1 ? "Árboles" : "Árbol"}</dt><dd className="mt-0.5">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => tree ? treeName(tree) : detail.treeIds[index]).join(", ")}</dd></div>
+                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{detail.treeIds.length > 1 ? "Árboles" : "Árbol"}</dt><dd className="mt-0.5">{detail.treeIds.map((id) => { const tree = linkedTree(id); return tree ? treeReferenceName(tree) : REFERENCE_UNAVAILABLE.trees; }).join(", ")}</dd></div>
                     <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de intervención</dt><dd className="mt-0.5">{TREE_INTERVENTION_LABELS[detail.interventionType]}</dd></div>
                     <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Motivo</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div>
                   </dl>
