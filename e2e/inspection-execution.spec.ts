@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { startService } from "./support/start-service";
 import { chooseCalendarDay, chooseFieldOption, setFieldTime } from "./support/services-608-controls";
 
 test.describe.serial("Environmental inspection execution #134", () => {
@@ -24,7 +25,7 @@ test.describe.serial("Environmental inspection execution #134", () => {
 
     const serviceCard = page.locator('[data-service-id="SVC-1112"]');
     await expect(serviceCard).toBeVisible();
-    await serviceCard.getByRole("button", { name: "Iniciar servicio" }).click();
+    await startService(page, serviceCard);
     await expect(serviceCard.getByText("En curso")).toBeVisible();
     await serviceCard.getByRole("button", { name: "Abrir" }).click();
 

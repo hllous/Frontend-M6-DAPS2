@@ -12,7 +12,6 @@ import {
   CloudOff,
   FileText,
   Pause,
-  Play,
   PlayCircle,
   Siren,
   Truck,
@@ -31,6 +30,7 @@ import {
 import { formatArgentinaCalendarDate, formatArgentinaNumericDateTime } from "@/lib/argentina-date";
 import { checkServiceWindowTiming, type Service } from "@/lib/services";
 import type { StreetClosureDependency, StreetClosureRequest } from "@/lib/street-closure-requests";
+import { StartServiceButton } from "./start-service-button";
 import { StatusBadge } from "./status-badge";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
 import { InspectionExecutionPanel } from "./inspection-execution-panel";
@@ -81,7 +81,7 @@ export function ServiceDetail({
   service: Service;
   onBack: () => void;
   onAssignCrew?: (service: Service) => void;
-  onStartService?: (service: Service) => void | Promise<void>;
+  onStartService?: (service: Service) => void | Promise<string | null | void>;
   onSuspendService?: (service: Service) => void;
   onResumeService?: (service: Service) => void | Promise<void>;
   onReschedule?: (service: Service) => void;
@@ -128,23 +128,19 @@ export function ServiceDetail({
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-3">
           {canStartService && onStartService && service.status === "SCHEDULED" && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => onStartService(service)}
-              disabled={isStarting}
+            <StartServiceButton
+              service={service}
+              onStart={onStartService}
+              isStarting={isStarting}
+              draftPending={startDraftPending}
               className="gap-1.5 text-xs font-semibold"
-            >
-              <Play className="h-3.5 w-3.5" aria-hidden />
-              <span>
-                {isStarting ? "Iniciando..." : startDraftPending ? "Reenviar" : "Iniciar servicio"}
-              </span>
-            </Button>
+            />
           )}
           {canStartService && onSuspendService && service.status === "IN_PROGRESS" && (
             <Button
               variant="outline"
               size="sm"
+              aria-haspopup="dialog"
               onClick={() => onSuspendService(service)}
               className="gap-1.5 text-xs font-semibold text-[var(--color-warning)] border-[var(--color-warning-line)] hover:bg-[var(--color-warning-fill)]/40"
             >

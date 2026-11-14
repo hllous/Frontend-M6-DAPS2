@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CloudOff, Play } from "lucide-react";
+import { AlertTriangle, CloudOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { formatCalendarDay, todayInArgentina } from "@/lib/argentina-date";
@@ -27,6 +27,7 @@ import styles from "@/components/shell/app-shell.module.css";
 import { DraftConflictDialog } from "./draft-conflict-view";
 import { DroppedRecordsAlert } from "@/components/ui/dropped-records-alert";
 import { ServiceDetail } from "./service-detail";
+import { StartServiceButton } from "./start-service-button";
 import { StatusBadge } from "./status-badge";
 import { SuspendServiceDialog } from "./suspend-service-dialog";
 
@@ -125,7 +126,7 @@ export function FieldWorkPanel({
     actionType: Extract<FieldDraftActionType, "start" | "resume">;
     submit: () => Promise<Service>;
     onError: (message: string) => void;
-  }) {
+  }): Promise<string | null> {
     const existingDraft = getFieldDraft<null>(service.id, actionType);
     const outcome = existingDraft
       ? await retryFieldDraft({ draft: existingDraft, submit })
@@ -142,21 +143,24 @@ export function FieldWorkPanel({
       });
     } else if (outcome.kind === "error") {
       onError(outcome.message);
+      return outcome.message;
     }
     // "draft-saved" / "still-offline": no error surfaced — the pending-draft
     // indicator (read from storage on the next render) takes over instead.
+    return null;
   }
 
-  const handleStartService = async (service: Service) => {
+  const handleStartService = async (service: Service): Promise<string | null> => {
     setStartingId(service.id);
     setStartErrors((prev) => ({ ...prev, [service.id]: "" }));
-    await runFieldAction({
+    const failure = await runFieldAction({
       service,
       actionType: "start",
       submit: () => servicesAdapter.start(service.id),
       onError: (msg) => setStartErrors((prev) => ({ ...prev, [service.id]: msg })),
     });
     setStartingId(null);
+    return failure;
   };
 
   const handleResumeService = async (service: Service) => {
@@ -411,21 +415,13 @@ export function FieldWorkPanel({
                   </Button>
 
                   {mayExecuteService && service.status === "SCHEDULED" ? (
-                    <Button
-                      size="sm"
-                      onClick={() => handleStartService(service)}
-                      disabled={startingId === service.id}
+                    <StartServiceButton
+                      service={service}
+                      onStart={handleStartService}
+                      isStarting={startingId === service.id}
+                      draftPending={draftPending}
                       className="gap-1.5 text-xs font-semibold"
-                    >
-                      <Play className="h-3.5 w-3.5" data-icon="inline-start" aria-hidden />
-                      <span>
-                        {startingId === service.id
-                          ? "Iniciando..."
-                          : draftPending
-                          ? "Reenviar"
-                          : "Iniciar servicio"}
-                      </span>
-                    </Button>
+                    />
                   ) : null}
                 </div>
               </li>

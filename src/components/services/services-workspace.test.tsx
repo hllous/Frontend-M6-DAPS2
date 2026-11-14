@@ -13,6 +13,7 @@ import {
   updateStreetClosureRequestFixture,
 } from "@/lib/street-closure-request-fixtures";
 import { resetServiceFixtures, resetZoneResultFixtures, serviceFixtures, updateServiceFixture } from "@/lib/services-fixtures";
+import { todayInArgentina } from "@/lib/argentina-date";
 import { servicesAdapter } from "@/lib/services";
 import { operationalMapAdapter } from "@/lib/operational-map";
 import { operationalZonesAdapter } from "@/lib/operational-zones";
@@ -566,6 +567,8 @@ describe("ServicesWorkspace component", () => {
 
   it("disables service start while pending and only sends one request on a double click", async () => {
     resetServiceFixtures();
+    // Inside its window, so the start stays one tap (#910).
+    updateServiceFixture("SVC-1096", { scheduledDate: todayInArgentina(), windowFrom: "00:00", windowTo: "23:59" });
     let startCalls = 0;
     let releaseStart!: () => void;
     const responseGate = new Promise<void>((resolve) => {
@@ -601,6 +604,8 @@ describe("ServicesWorkspace component", () => {
 
   it("shows a backend start error and clears it after a successful retry", async () => {
     resetServiceFixtures();
+    // Inside its window, so the start stays one tap (#910).
+    updateServiceFixture("SVC-1096", { scheduledDate: todayInArgentina(), windowFrom: "00:00", windowTo: "23:59" });
     let startCalls = 0;
     const errorMessage = "No se puede iniciar el servicio: falta asignar una cuadrilla.";
     server.use(http.post("*/api/services/SVC-1096/start", () => {
@@ -636,6 +641,8 @@ describe("ServicesWorkspace component", () => {
 
   it("clears the previous service start error when a different service is opened", async () => {
     resetServiceFixtures();
+    // Inside its window, so the start stays one tap (#910).
+    updateServiceFixture("SVC-1096", { scheduledDate: todayInArgentina(), windowFrom: "00:00", windowTo: "23:59" });
     const errorMessage = "No se puede iniciar el servicio: falta asignar una cuadrilla.";
     server.use(http.post("*/api/services/SVC-1096/start", () => HttpResponse.json(
       {
