@@ -113,7 +113,6 @@ function formFor(props: RequestDialogProps): RequestForm {
   };
 }
 
-const treeName = treeReferenceName;
 
 function dateTimeLabel(value?: string | null) {
   return value ? new Intl.DateTimeFormat("es-AR", {
@@ -149,7 +148,7 @@ function writeUnsynced(interventionId: string, serviceId: string | null) {
 
 function treeTargetRef(trees: Tree[], treeIds: string[]) {
   return (trees.length ? trees : treeIds.map((id) => ({ id, surveyCode: id, species: "Árbol", address: null } as Tree)))
-    .map((tree) => treeName(tree))
+    .map((tree) => treeReferenceName(tree))
     .join("; ");
 }
 
@@ -210,7 +209,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
             <Field data-invalid={fieldHasError("treeIds")}>
               <FieldLabel htmlFor="intervention-trees">Árboles a intervenir <span aria-hidden="true">*</span></FieldLabel>
               <Select
-                items={Object.fromEntries(props.trees.map((tree) => [tree.id, `${treeName(tree)} · ${tree.address ?? "Sin dirección"}`]))}
+                items={Object.fromEntries(props.trees.map((tree) => [tree.id, `${treeReferenceName(tree)} · ${tree.address ?? "Sin dirección"}`]))}
                 multiple
                 value={form.treeIds}
                 onValueChange={(value) => {
@@ -222,7 +221,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
                 <SelectTrigger id="intervention-trees" aria-label="Árboles a intervenir" aria-required="true" aria-invalid={fieldHasError("treeIds")} aria-describedby={fieldHasError("treeIds") ? "intervention-trees-error" : undefined}>
                   <SelectValue placeholder="Seleccione uno o más árboles" />
                 </SelectTrigger>
-                <SelectContent><SelectGroup>{props.trees.map((tree) => <SelectItem key={tree.id} value={tree.id}>{treeName(tree)} · {tree.address ?? "Sin dirección"}</SelectItem>)}</SelectGroup></SelectContent>
+                <SelectContent><SelectGroup>{props.trees.map((tree) => <SelectItem key={tree.id} value={tree.id}>{treeReferenceName(tree)} · {tree.address ?? "Sin dirección"}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
               
               {fieldHasError("treeIds") ? <FieldError id="intervention-trees-error">{formError}</FieldError> : null}
@@ -400,7 +399,9 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     ...(detail && !detail.trees ? detail.treeIds : []),
   ], [state, detail]);
   const treeReferences = useTreeReferences(shownTreeIds);
-  const treeById = (id: string) => detail?.trees?.find((tree) => tree.id === id) ?? treeReferences.lookup(id) ?? undefined;
+  /** Árbol vinculado: el embebido en el detalle o el resuelto por id; `null` mientras carga, `undefined` si no existe. */
+  const linkedTree = (id: string) => detail?.trees?.find((tree) => tree.id === id) ?? treeReferences.lookup(id);
+  const treeById = (id: string) => linkedTree(id) ?? undefined;
   const [crewConflict, setCrewConflict] = useState(false);
   const [overrideNote, setOverrideNote] = useState("");
   const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
@@ -610,7 +611,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle></DialogHeader>
           {detailLoading ? <LoadingRegion label="Detalle de la intervención"><DetailFieldsSkeleton fieldCount={6} /></LoadingRegion> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
-          {detail && !detailLoading && !detailError ? <div className="flex shrink-0 flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{detail.treeIds.map((id) => { const tree = detail.trees?.find((candidate) => candidate.id === id) ?? treeReferences.lookup(id); return <Item key={id} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : tree === null ? <Skeleton data-slot="tree-name-skeleton" aria-hidden="true" className="h-4 w-40" /> : <span className="text-muted-foreground">{REFERENCE_UNAVAILABLE.trees}</span>}</Item>; })}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
+          {detail && !detailLoading && !detailError ? <div className="flex shrink-0 flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{detail.treeIds.map((id) => { const tree = linkedTree(id); return <Item key={id} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeReferenceName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : tree === null ? <Skeleton aria-hidden="true" className="h-4 w-40" /> : <span className="text-muted-foreground">{REFERENCE_UNAVAILABLE.trees}</span>}</Item>; })}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
             <>
               {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}

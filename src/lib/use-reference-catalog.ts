@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   loadReferenceCatalog,
@@ -28,17 +28,18 @@ type CatalogState<T> = { key: string; status: "ready" | "error"; items: T[] } | 
  * cada celda, detalle y combo de esa pantalla.
  */
 export function useReferenceCatalog<K extends ReferenceKind>(kind: K, query?: ReferenceQuery<K>): ReferenceCatalog<ReferenceItem<K>> {
-  const key = `${kind}:${JSON.stringify(query ?? {})}`;
+  const queryKey = JSON.stringify(query ?? {});
+  const key = `${kind}:${queryKey}`;
   const [state, setState] = useState<CatalogState<ReferenceItem<K>>>(null);
 
   useEffect(() => {
     let isCurrent = true;
-    const parsedQuery = JSON.parse(key.slice(kind.length + 1)) as ReferenceQuery<K>;
-    loadReferenceCatalog(kind, parsedQuery)
+    // La query llega como objeto literal en cada render: se compara por su forma serializada.
+    loadReferenceCatalog(kind, JSON.parse(queryKey) as ReferenceQuery<K>)
       .then((items) => { if (isCurrent) setState({ key, status: "ready", items }); })
       .catch(() => { if (isCurrent) setState({ key, status: "error", items: [] }); });
     return () => { isCurrent = false; };
-  }, [key, kind]);
+  }, [key, kind, queryKey]);
 
   const current = state?.key === key ? state : null;
   const items = useMemo(() => current?.items ?? [], [current]);
@@ -56,25 +57,31 @@ export type TreeReferences = {
   lookup: (id: string) => Tree | null | undefined;
 };
 
-/** Resuelve por id solo los árboles que la pantalla muestra; los ya resueltos no se vuelven a pedir. */
+/** Resuelve por id solo los árboles que la pantalla muestra; cada id se pide una sola vez por montaje. */
 export function useTreeReferences(ids: readonly string[]): TreeReferences {
   const [resolved, setResolved] = useState<ReadonlyMap<string, Tree | undefined>>(() => new Map());
-  const idsKey = [...new Set(ids)].sort().join(",");
+  const requested = useRef(new Set<string>());
+  const mounted = useRef(true);
+  const idsKey = JSON.stringify([...new Set(ids)].sort());
 
   useEffect(() => {
-    const missing = idsKey ? idsKey.split(",").filter((id) => !resolved.has(id)) : [];
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  useEffect(() => {
+    const missing = (JSON.parse(idsKey) as string[]).filter((id) => !requested.current.has(id));
     if (missing.length === 0) return;
-    let isCurrent = true;
+    for (const id of missing) requested.current.add(id);
     void loadTreeReferences(missing).catch(() => new Map<string, Tree>()).then((found) => {
-      if (!isCurrent) return;
+      if (!mounted.current) return;
       setResolved((previous) => {
         const next = new Map(previous);
         for (const id of missing) next.set(id, found.get(id));
         return next;
       });
     });
-    return () => { isCurrent = false; };
-  }, [idsKey, resolved]);
+  }, [idsKey]);
 
   const lookup = useCallback((id: string) => (resolved.has(id) ? resolved.get(id) : null), [resolved]);
   return { lookup };

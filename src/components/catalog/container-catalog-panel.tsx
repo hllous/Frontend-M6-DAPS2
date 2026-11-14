@@ -519,7 +519,7 @@ export function ContainerCatalogPanel({
         <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
       </Button>); } },
     { id: "type", header: "Tipo", accessorFn: (c) => c.containerType, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => CONTAINER_TYPE_LABELS[row.original.containerType] },
-    { id: "zone", header: "Zona", accessorFn: (c) => c.zoneId, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => zoneCatalog.lookup(row.original.zoneId) ?? <Skeleton data-slot="zone-name-skeleton" aria-hidden="true" className="inline-block h-4 w-24 align-middle" /> },
+    { id: "zone", header: "Zona", accessorFn: (c) => c.zoneId, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => zoneCatalog.lookup(row.original.zoneId) ?? <Skeleton aria-hidden="true" className="inline-block h-4 w-24 align-middle" /> },
     { id: "address", header: "Dirección", accessorFn: (c) => c.address, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => row.original.address ?? "—" },
     { id: "capacity", header: "Capacidad", accessorFn: (c) => c.capacityLiters, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => `${row.original.capacityLiters.toLocaleString("es-AR")} L` },
     { id: "status", header: "Estado", accessorFn: (c) => c.status, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => <StatusBadge status={row.original.status} /> },
@@ -992,7 +992,7 @@ export function ContainerCatalogPanel({
                 </dt>
                 <dd className="mt-0.5 font-medium text-foreground">
                   {zoneCatalog.lookup(detailContainer.zoneId) ?? (
-                    <Skeleton data-slot="zone-name-skeleton" aria-hidden="true" className="inline-block h-4 w-24 align-middle" />
+                    <Skeleton aria-hidden="true" className="inline-block h-4 w-24 align-middle" />
                   )}
                 </dd>
               </div>
