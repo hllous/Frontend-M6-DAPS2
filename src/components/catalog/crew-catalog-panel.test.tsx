@@ -8,6 +8,7 @@ import { scenarios } from "@/lib/scenarios";
 import { crewsAdapter } from "@/lib/crews";
 import { crewZoneAssignmentsAdapter } from "@/lib/crew-zone-assignments";
 import { crewFixtures, resetCrewFixtures } from "@/lib/crew-fixtures";
+import { zoneFixtures } from "@/lib/zones-fixtures";
 import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { CrewCatalogPanel } from "./crew-catalog-panel";
 
@@ -278,13 +279,41 @@ describe("nombres de referencias de cuadrilla", () => {
   });
 });
 
+describe("zonas de cuadrilla fuera de la primera página de zonas", () => {
+  it("muestra el nombre de la zona en la tabla, el detalle y el combo de edición", async () => {
+    const lastZone = zoneFixtures[zoneFixtures.length - 1]!;
+    expect(zoneFixtures.length).toBeGreaterThan(20);
+    const crew = crewFixtures.find((item) => item.id === "crew-a")!;
+    crew.homeZoneId = lastZone.id;
+    crew.effectiveZoneId = lastZone.id;
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    const row = await screen.findByRole("row", { name: /Cuadrilla A/ });
+    expect(await within(row).findByText(lastZone.name)).toBeVisible();
+    expect(within(row).queryByText(lastZone.id)).not.toBeInTheDocument();
+
+    await user.click(within(row).getByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const home = within(sheet).getByText("Zona base").closest("div")!;
+    expect(within(home).getByText(lastZone.name)).toBeVisible();
+    const effective = within(sheet).getByText("Zona vigente hoy").closest("div")!;
+    expect(within(effective).getByText(lastZone.name)).toBeVisible();
+    expect(within(sheet).queryByText(lastZone.id)).not.toBeInTheDocument();
+
+    await user.click(within(sheet).getByRole("button", { name: "Editar" }));
+    const form = await screen.findByRole("dialog", { name: /Editar cuadrilla/ });
+    expect(within(form).getByRole("combobox", { name: "Zona base" })).toHaveTextContent(lastZone.name);
+  });
+});
+
 describe("especialidad y zona de cuadrilla", () => {
   async function pick(user: ReturnType<typeof userEvent.setup>, name: string | RegExp, option: string) {
     await user.click(screen.getByRole("combobox", { name }));
     await user.click(await screen.findByRole("option", { name: option }));
   }
 
-  it("muestra especialidad y zona vigente en la tabla, con el identificador de zonas desconocidas", async () => {
+  it("muestra especialidad y zona vigente en la tabla, con un texto legible para zonas desconocidas", async () => {
     crewFixtures.find((crew) => crew.id === "crew-d")!.effectiveZoneId = "zone-inexistente";
     render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const table = await screen.findByRole("table");
@@ -295,7 +324,8 @@ describe("especialidad y zona de cuadrilla", () => {
     expect(await within(a).findByText("Belgrano")).toBeVisible();
     const d = screen.getByRole("row", { name: /Cuadrilla D/ });
     expect(within(d).getByText("Sin especialidad")).toBeVisible();
-    expect(within(d).getByText("zone-inexistente")).toBeVisible();
+    expect(await within(d).findByText("Zona no disponible")).toBeVisible();
+    expect(within(d).queryByText("zone-inexistente")).not.toBeInTheDocument();
     expect(within(screen.getByRole("row", { name: /Cuadrilla E/ })).getByText("Sin zona")).toBeVisible();
   });
 
