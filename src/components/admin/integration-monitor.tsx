@@ -493,6 +493,7 @@ export function IntegrationMonitor({
                   variant="default"
                   size="sm"
                   aria-label="Reintentar eventos fallidos"
+                  aria-haspopup="dialog"
                   disabled={failedCount === null || failedCount === 0 || savingRetry}
                   onClick={beginBulkRetry}
                 >
@@ -781,7 +782,7 @@ export function IntegrationMonitor({
                       <div><dt className="text-sm font-medium">Identificador de entidad</dt><dd className="break-all text-sm tabular-nums">{eventDetail.aggregateId}</dd></div>
                     </dl>
                     {eventDetail.status === "FAILED" && canManage ? (
-                      <Button type="button" onClick={beginSingleRetry}>Reintentar evento</Button>
+                      <Button type="button" aria-haspopup="dialog" onClick={beginSingleRetry}>Reintentar evento</Button>
                     ) : null}
                     <section aria-labelledby="event-payload-title" className="flex flex-col gap-2">
                       <h2 id="event-payload-title" className="text-base font-semibold">Contenido enviado</h2>

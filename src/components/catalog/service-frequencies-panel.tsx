@@ -815,6 +815,7 @@ export function ServiceFrequenciesPanel({
                       type="button"
                       variant="destructive"
                       className="w-full justify-start"
+                      aria-haspopup="dialog"
                       onClick={() => {
                         const item = selectedItem;
                         setSelectedItem(null);

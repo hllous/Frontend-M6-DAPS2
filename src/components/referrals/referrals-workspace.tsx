@@ -693,6 +693,7 @@ function ReferralRecoveryPanel({
             type="button"
             variant="outline"
             className="border-[var(--color-border-strong)] bg-[var(--color-surface)] font-semibold text-[var(--color-action)] hover:bg-[var(--color-surface)]"
+            aria-haspopup="dialog"
             onClick={() => setActiveAction(action)}
           >
             <ShieldCheck className="h-4 w-4" aria-hidden />
