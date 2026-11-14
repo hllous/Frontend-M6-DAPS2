@@ -719,7 +719,6 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                     title="Confirmar rechazo"
                     description="La extracción quedará rechazada. No se puede deshacer."
                     confirmLabel="Confirmar rechazo de intervención"
-                    pendingLabel="Rechazando intervención…"
                     tone="destructive"
                     onConfirm={() => decide("reject")}
                   />
@@ -729,7 +728,6 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                   title="Autorizar intervención"
                   description="La intervención pasa a Autorizada y queda lista para programar su servicio."
                   confirmLabel="Autorizar intervención"
-                  pendingLabel="Autorizando intervención…"
                   onConfirm={() => decide("authorize")}
                 >
                   <dl className="grid gap-3 text-sm">

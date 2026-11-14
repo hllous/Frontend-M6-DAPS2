@@ -903,35 +903,37 @@ export function CrewCatalogPanel({
                   aria-label="Integrantes de la cuadrilla"
                   className="flex flex-col gap-2"
                 >
-                  {selected.members.map((member) => (
-                    <li
-                      key={member.userId}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      {userName(member.userId, member.displayName)}
-                      {canManage ? (
-                        <ConfirmActionDialog
-                          trigger={
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              aria-label={`Quitar a ${userName(member.userId, member.displayName)}`}
-                            >
-                              <UserMinus data-icon="inline-start" aria-hidden />
-                              Quitar
-                            </Button>
-                          }
-                          title={`Quitar a ${userName(member.userId, member.displayName)}`}
-                          description={`${userName(member.userId, member.displayName)} deja de integrar ${selected.name}. Para volver a sumarlo, agréguelo de nuevo.`}
-                          confirmLabel="Quitar integrante"
-                          pendingLabel="Quitando…"
-                          tone="destructive"
-                          onConfirm={() => removeMember(member.userId)}
-                        />
-                      ) : null}
-                    </li>
-                  ))}
+                  {selected.members.map((member) => {
+                    const memberName = userName(member.userId, member.displayName);
+                    return (
+                      <li
+                        key={member.userId}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        {memberName}
+                        {canManage ? (
+                          <ConfirmActionDialog
+                            trigger={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`Quitar a ${memberName}`}
+                              >
+                                <UserMinus data-icon="inline-start" aria-hidden />
+                                Quitar
+                              </Button>
+                            }
+                            title={`Quitar a ${memberName}`}
+                            description={`${memberName} deja de integrar ${selected.name}. Para volver a sumarlo, agréguelo de nuevo.`}
+                            confirmLabel="Quitar integrante"
+                            tone="destructive"
+                            onConfirm={() => removeMember(member.userId)}
+                          />
+                        ) : null}
+                      </li>
+                    );
+                  })}
                 </ul>
                 {canManage ? (
                   <form

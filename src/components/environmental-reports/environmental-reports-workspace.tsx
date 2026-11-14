@@ -607,12 +607,12 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
     const sourceService = inspectionServices[inspection.id];
     return scenario.actor.kind === "FIELD" && Boolean(sourceService?.crewId && sourceService.crewId === scenario.actor.crewId);
   };
-  const allActions: { action: Action; label: string; icon: typeof Check; tone?: string }[] = report.status === "RECEIVED"
+  const allActions: { action: Action; label: string; icon: typeof Check; toneClass?: string }[] = report.status === "RECEIVED"
     ? [{ action: "start-review", label: "Iniciar revisión", icon: Search }]
     : report.status === "UNDER_REVIEW"
-      ? [{ action: "forward", label: "Derivar expediente", icon: Forward }, { action: "dismiss", label: "Desestimar expediente", icon: X, tone: "text-[var(--color-danger)]" }]
+      ? [{ action: "forward", label: "Derivar expediente", icon: Forward }, { action: "dismiss", label: "Desestimar expediente", icon: X, toneClass: "text-[var(--color-danger)]" }]
       : ["FORWARDED", "DISMISSED", "NO_VIOLATION", "SANCTIONED"].includes(report.status)
-        ? [{ action: "close", label: "Cerrar expediente", icon: Check, tone: "text-[var(--color-danger)]" }]
+        ? [{ action: "close", label: "Cerrar expediente", icon: Check, toneClass: "text-[var(--color-danger)]" }]
         : [];
   const actions = allActions.filter(({ action }) => scenario.capabilities.includes(action === "close" ? "environmentalReport:close" : "environmentalReport:review") && !(infoPending && (action === "forward" || action === "dismiss" || action === "close")));
 
@@ -625,7 +625,6 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         description: `Está en ${ENVIRONMENTAL_REPORT_STATUS_LABELS[report.status]}. El cierre es definitivo: no se puede reabrir desde la aplicación.`,
         notice: linkedClaim ? `Tiene vinculado ${linkedClaim}: al cerrar, se le notifica al vecino.` : undefined,
         confirmLabel: "Cerrar expediente",
-        pendingLabel: "Cerrando…",
         tone: "destructive" as const,
       };
     }
@@ -634,7 +633,6 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
       description: `El expediente deja ${ENVIRONMENTAL_REPORT_STATUS_LABELS.RECEIVED} y pasa a ${ENVIRONMENTAL_REPORT_STATUS_LABELS.UNDER_REVIEW}.`,
       notice: linkedClaim ? `Tiene vinculado ${linkedClaim}: el reclamo pasa a en revisión y el vecino lo ve.` : undefined,
       confirmLabel: "Iniciar revisión",
-      pendingLabel: "Iniciando…",
       tone: "default" as const,
     };
   }
@@ -771,9 +769,9 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
           <div><h1 ref={reportTitleRef} tabIndex={-1} className="text-2xl font-bold tracking-tight text-[var(--color-text)] outline-none focus-visible:ring-3 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 sm:text-[28px]">Expediente {reportLabel(report)}</h1><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{ENVIRONMENTAL_REPORT_TYPE_LABELS[report.reportType]} · actualizado {formatDate(report.updatedAt)}</p></div>
           <StatusBadge status={report.status} />
         </div>
-        {isOffice && (actions.length > 0 || canRequestInfo || infoPending || canSchedule || canReprogram || canReinspect || orphanInspection) && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Acciones</h2>{(orphanInspection || canReinspect) && <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{orphanInspection ? "Falta fecha y cuadrilla." : "La anterior fue inconclusa. Programe otra."}</p>}<div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, tone }) => {
+        {isOffice && (actions.length > 0 || canRequestInfo || infoPending || canSchedule || canReprogram || canReinspect || orphanInspection) && <section className="rounded-2xl border border-[var(--color-action)] bg-[var(--color-info-fill)] p-4 sm:p-5" aria-labelledby="report-actions-title"><h2 id="report-actions-title" className="text-sm font-bold text-[var(--color-text)]">Acciones</h2>{(orphanInspection || canReinspect) && <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{orphanInspection ? "Falta fecha y cuadrilla." : "La anterior fue inconclusa. Programe otra."}</p>}<div className="mt-4 flex flex-wrap gap-2">{actions.map(({ action, label, icon: Icon, toneClass }) => {
           const opensDecision = action === "forward" || action === "dismiss";
-          const button = <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${tone ?? ""}`} {...(opensDecision ? { "aria-haspopup": "dialog" as const, onClick: () => setPendingDecision(action) } : {})}><Icon data-icon="inline-start" aria-hidden />{label}</Button>;
+          const button = <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${toneClass ?? ""}`} {...(opensDecision ? { "aria-haspopup": "dialog" as const, onClick: () => setPendingDecision(action) } : {})}><Icon data-icon="inline-start" aria-hidden />{label}</Button>;
           if (opensDecision) return button;
           return <ConfirmActionDialog key={action} trigger={button} finalFocus={dialogFinalFocus} {...transitionConfirmation(action)} onConfirm={async () => { const error = await onAction(action, report); if (error === null) focusTitleAfterDialogRef.current = true; return error; }} />;
         })}{canRequestInfo && <Button aria-haspopup="dialog" variant="outline" className="gap-2" onClick={() => setRequestInfoOpen(true)}><MessageCircleQuestion data-icon="inline-start" aria-hidden />Pedir información al vecino</Button>}{orphanInspection && <Button aria-haspopup="dialog" className="gap-2" onClick={() => { setScheduleMode("service"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />Programar servicio</Button>}{(canSchedule || canReinspect) && <Button aria-haspopup="dialog" className="gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button aria-haspopup="dialog" variant="outline" className="gap-2" onClick={() => setRescheduleStep(activeService?.status === "RESCHEDULED" ? "confirm" : "reason")}><RefreshCw data-icon="inline-start" aria-hidden />{activeService?.status === "RESCHEDULED" ? "Confirmar nueva fecha" : "Reprogramar inspección"}</Button>}</div>{infoPending && <InformationRequestPending report={report} />}</section>}

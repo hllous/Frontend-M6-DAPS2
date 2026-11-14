@@ -32,27 +32,27 @@ export function StartServiceButton({
   const label = isStarting ? "Iniciando..." : draftPending ? "Reenviar" : "Iniciar servicio";
   const isOutside = checkServiceWindowTiming(service).isOutside;
 
-  if (!isOutside || draftPending) {
-    return (
-      <Button size="sm" onClick={() => void onStart(service)} disabled={isStarting} className={className}>
-        <Play data-icon="inline-start" aria-hidden />
-        <span>{label}</span>
-      </Button>
-    );
-  }
+  const asksConfirmation = isOutside && !draftPending;
+  const button = (
+    <Button
+      size="sm"
+      disabled={isStarting}
+      className={className}
+      {...(asksConfirmation ? {} : { onClick: () => void onStart(service) })}
+    >
+      <Play data-icon="inline-start" aria-hidden />
+      <span>{label}</span>
+    </Button>
+  );
+
+  if (!asksConfirmation) return button;
 
   return (
     <ConfirmActionDialog
-      trigger={
-        <Button size="sm" disabled={isStarting} className={className}>
-          <Play data-icon="inline-start" aria-hidden />
-          <span>{label}</span>
-        </Button>
-      }
+      trigger={button}
       title="Iniciar servicio fuera de horario"
       description={`${service.title} está fuera de su franja. Confirme que corresponde iniciarlo ahora.`}
       confirmLabel="Iniciar igual"
-      pendingLabel="Iniciando…"
       onConfirm={async () => (await onStart(service)) ?? null}
       errorFallback="No se pudo registrar el inicio del servicio."
     >

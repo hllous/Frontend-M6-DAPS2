@@ -17,6 +17,16 @@ Applies to dialogs, sheets, drawers, popovers, dropdowns and tooltips:
 
 `eslint-suppressions.json` entries for raw tables belong to [#520](https://github.com/hllous/Frontend-M6-DAPS2/issues/520), and entries for loading states (skeletons) to [#525](https://github.com/hllous/Frontend-M6-DAPS2/issues/525). Leave them to those tickets rather than fixing them in unrelated work.
 
+## Confirmation composition
+
+[`ConfirmActionDialog`](../../src/components/ui/confirm-action-dialog.tsx) is the project composition for confirming a one-click write, specified in [#910](https://github.com/hllous/Frontend-M6-DAPS2/issues/910). It is built on the existing shadcn Dialog with Button, Alert and Spinner; `AlertDialog` is not installed.
+
+- Pass the button as `trigger`. It renders through DialogTrigger, so it announces `aria-haspopup="dialog"` and gets focus back on Cancelar, Escape or the X. Pass `finalFocus` only when the trigger disappears after success.
+- Copy follows one vocabulary: `title` names the action, `description` states the effect, `confirmLabel` is the verb, and the cancel button is always "Cancelar". Use `tone="destructive"` for irreversible or destructive actions. `notice` states an effect outside M6, such as a citizen notified through M2.
+- `onConfirm` resolves to an error message (or throws) on failure; the dialog stays open with the error. While it runs, the confirm button keeps its label, shows a spinner, and the dialog cannot be closed or resubmitted.
+- #910 extends confirmation beyond irreversible effects to Iniciar revisión, Autorizar intervención, Quitar integrante and Iniciar servicio outside its window. Iniciar servicio inside its window stays one tap ([ADR-0001](../adr/0001-no-offline-queue-for-field-service-actions.md)).
+- A trigger that opens a controlled dialog without DialogTrigger declares `aria-haspopup="dialog"` itself.
+
 ## Location picker composition
 
 [`LocationPickerDialog`](../../src/components/ui/location-picker-dialog.tsx) and [`LocationPicker`](../../src/components/ui/location-picker.tsx) are the custom composition approved by the PO in [#692](https://github.com/hllous/Frontend-M6-DAPS2/issues/692), implemented in [#694](https://github.com/hllous/Frontend-M6-DAPS2/issues/694). Controls use shadcn Button, Field and Input; the overlay uses Dialog. Leaflet has no shadcn equivalent and is dynamically imported without SSR, using the existing maps' OSM tiles, attribution and city center.

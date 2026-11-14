@@ -23,7 +23,8 @@ import { cn } from "@/lib/utils";
  * Confirmation before a one-click write (#910): same title/effect/verb/"Cancelar" pattern everywhere.
  * The trigger goes through DialogTrigger, so it announces `aria-haspopup="dialog"` and gets focus back
  * on close. The action runs only on confirm; while it runs the dialog cannot be closed or resubmitted,
- * and a failure keeps the dialog open with the error.
+ * the confirm button keeps its label and shows a spinner (DESIGN.md), and a failure keeps the dialog
+ * open with the error.
  */
 interface ConfirmActionDialogProps {
   /** Button that opens the dialog. */
@@ -38,8 +39,6 @@ interface ConfirmActionDialogProps {
   children?: React.ReactNode;
   /** Confirm verb, e.g. "Cerrar expediente". */
   confirmLabel: string;
-  /** Label while sending, e.g. "Cerrando…". */
-  pendingLabel: string;
   /** `destructive` for irreversible or destructive actions. */
   tone?: "default" | "destructive";
   /** Resolves to an error message (or throws) when the action failed; null/undefined on success. */
@@ -57,7 +56,6 @@ function ConfirmActionDialog({
   notice,
   children,
   confirmLabel,
-  pendingLabel,
   tone = "default",
   onConfirm,
   errorFallback = "No se pudo completar la acción. Intente nuevamente.",
@@ -131,7 +129,7 @@ function ConfirmActionDialog({
             onClick={() => void confirm()}
           >
             {pending ? <Spinner data-icon="inline-start" aria-hidden /> : null}
-            {pending ? pendingLabel : confirmLabel}
+            {confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
