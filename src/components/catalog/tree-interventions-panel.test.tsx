@@ -5,7 +5,8 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
-import { resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { addTreeInterventionFixture, resetTreeInterventionFixtures, updateTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
+import { addTreeFixture } from "@/lib/tree-fixtures";
 import { resetServiceFixtures, serviceFixtures } from "@/lib/services-fixtures";
 import { scenarios } from "@/lib/scenarios";
 import { servicesAdapter } from "@/lib/services";
@@ -33,6 +34,34 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("TreeInterventionsPanel", () => {
+  it("resolves linked trees by survey code beyond the first 100 active trees and in any state", async () => {
+    for (let index = 1; index <= 120; index += 1) {
+      addTreeFixture({ id: `tree-extra-${index}`, surveyCode: `ARB-9${String(index).padStart(4, "0")}`, zoneId: "zone-1", species: "Fresno", address: `Calle ${index}`, lat: null, lng: null, heightM: null, diameterCm: null, active: true, lastSurvey: null });
+    }
+    // El backend manda los árboles como ids ([{ treeId }]), sin la ficha embebida.
+    addTreeInterventionFixture({ id: "intervention-remote", interventionType: "TREATMENT", treeIds: ["tree-extra-120", "tree-3"], address: "Calle 120", requiresStreetClosure: false, priority: "LOW", status: "REJECTED", serviceId: null, justification: null, authorizedByUserId: null, authorizedAt: null });
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+
+    const request = await screen.findByRole("article", { name: "Tratamiento · ARB-90120, ARB-00444" });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(detail).findByText("ARB-90120 · Fresno")).toBeVisible();
+    expect(within(detail).getByText("ARB-00444 · Plátano")).toBeVisible();
+    expect(within(detail).queryByText("tree-extra-120")).not.toBeInTheDocument();
+  });
+
+  it("shows readable text, never the id, when a linked tree does not exist", async () => {
+    addTreeInterventionFixture({ id: "intervention-orphan", interventionType: "TREATMENT", treeIds: ["tree-inexistente"], address: "Sin datos", requiresStreetClosure: false, priority: "LOW", status: "REQUESTED", serviceId: null, justification: null, authorizedByUserId: null, authorizedAt: null });
+    const user = userEvent.setup();
+    render(<TreeInterventionsPanel scenario={scenarios.officeDutyQueue} />);
+    const request = await screen.findByRole("article", { name: /Tratamiento · Solicitada|Tratamiento$/ });
+    await user.click(within(request).getByRole("button", { name: "Ver detalle" }));
+    const detail = await screen.findByRole("dialog", { name: /Detalle de la intervención/ });
+    expect(await within(detail).findByText("Árbol no disponible")).toBeVisible();
+    expect(within(detail).queryByText("tree-inexistente")).not.toBeInTheDocument();
+  });
+
   it("opens a linked intervention outside the current page", async () => {
     window.history.replaceState(null, "", "/app/catalog/tree-interventions?detail=intervention-1");
     server.use(http.get("*/api/tree-interventions", () => HttpResponse.json({ data: [], meta: { page: 1, pageSize: 10, total: 0, totalPages: 0 } })));

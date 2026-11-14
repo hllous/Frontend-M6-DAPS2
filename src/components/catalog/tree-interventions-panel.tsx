@@ -31,12 +31,14 @@ import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_
 import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionPriority, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
 import { asksForOverrideNote } from "@/lib/crew-fit";
-import { crewsAdapter, type Crew } from "@/lib/crews";
-import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
+import type { Crew } from "@/lib/crews";
+import type { Vehicle } from "@/lib/vehicles";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { serviceSourceHref } from "@/lib/referrals";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
+import { loadReferenceCatalog, REFERENCE_UNAVAILABLE, treeReferenceName } from "@/lib/reference-catalog";
+import { useTreeReferences } from "@/lib/use-reference-catalog";
 
 export const TREE_INTERVENTION_LABELS: Record<TreeInterventionType, string> = {
   FORMATION_PRUNING: "Poda de formación",
@@ -111,9 +113,7 @@ function formFor(props: RequestDialogProps): RequestForm {
   };
 }
 
-function treeName(tree: Tree) {
-  return `${tree.surveyCode} · ${tree.species ?? "Especie no registrada"}`;
-}
+const treeName = treeReferenceName;
 
 function dateTimeLabel(value?: string | null) {
   return value ? new Intl.DateTimeFormat("es-AR", {
@@ -310,8 +310,8 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   useEffect(() => {
     if (!scheduleOpen) return;
     let current = true;
-    void Promise.all([crewsAdapter.list({ active: true, pageSize: 100 }), vehiclesAdapter.list({ active: true, pageSize: 100 })])
-      .then(([crewsPage, vehiclesPage]) => { if (current) setResources({ crews: crewsPage.crews, vehicles: vehiclesPage.vehicles }); })
+    void Promise.all([loadReferenceCatalog("crews", { active: true }), loadReferenceCatalog("vehicles", { active: true })])
+      .then(([crews, vehicles]) => { if (current) setResources({ crews, vehicles }); })
       .catch(() => { if (current) setResources("error"); });
     return () => { current = false; };
   }, [scheduleOpen]);
@@ -394,7 +394,13 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     if (intervention) void Promise.resolve().then(() => openDetail(intervention));
     else void treeInterventionsAdapter.get(initialDetailId).then(openDetail).catch(() => undefined);
   }, [state, initialDetailId, detail, openDetail]);
-  const treeById = (id: string) => trees.find((tree) => tree.id === id);
+  // Los árboles vinculados se resuelven por id (cualquier estado, sin depender de la primera página del censo).
+  const shownTreeIds = useMemo(() => [
+    ...(state.status === "ready" ? state.page.interventions.flatMap((intervention) => intervention.treeIds) : []),
+    ...(detail && !detail.trees ? detail.treeIds : []),
+  ], [state, detail]);
+  const treeReferences = useTreeReferences(shownTreeIds);
+  const treeById = (id: string) => detail?.trees?.find((tree) => tree.id === id) ?? treeReferences.lookup(id) ?? undefined;
   const [crewConflict, setCrewConflict] = useState(false);
   const [overrideNote, setOverrideNote] = useState("");
   const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
@@ -604,7 +610,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle></DialogHeader>
           {detailLoading ? <LoadingRegion label="Detalle de la intervención"><DetailFieldsSkeleton fieldCount={6} /></LoadingRegion> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
-          {detail && !detailLoading && !detailError ? <div className="flex shrink-0 flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <Item key={tree?.id ?? detail.treeIds[index]} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</Item>)}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
+          {detail && !detailLoading && !detailError ? <div className="flex shrink-0 flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{detail.treeIds.map((id) => { const tree = detail.trees?.find((candidate) => candidate.id === id) ?? treeReferences.lookup(id); return <Item key={id} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : tree === null ? <Skeleton data-slot="tree-name-skeleton" aria-hidden="true" className="h-4 w-40" /> : <span className="text-muted-foreground">{REFERENCE_UNAVAILABLE.trees}</span>}</Item>; })}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
             <>
               {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
