@@ -1,0 +1,28 @@
+name: Trivy debug
+on:
+  push:
+    branches: [infra/924-trivy-red-test]
+permissions:
+  contents: read
+jobs:
+  dbg:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514
+        with:
+          version: v0.70.0
+      - name: variantes
+        run: |
+          mkdir a b c
+          cp pnpm-lock.yaml a/
+          tail -n +2 pnpm-lock.yaml > b/pnpm-lock.yaml
+          python3 - <<'PY'
+          import re
+          s=open('pnpm-lock.yaml').read()
+          s=s.replace("    configDependencies: {}\n","")
+          s=re.sub(r"    packageManagerDependencies:\n      pnpm:\n        specifier: [^\n]*\n        version: [^\n]*\n","",s)
+          open('c/pnpm-lock.yaml','w').write(s)
+          PY
+          head -12 c/pnpm-lock.yaml
+          for d in a b c; do echo "=== $d"; trivy fs --scanners vuln --severity HIGH,CRITICAL --skip-db-update=false -f table $d 2>&1 | grep -E "Total|lodash|WARN|CVE-2021-23337|not found" | head -5; done
