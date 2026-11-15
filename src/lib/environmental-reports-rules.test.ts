@@ -96,7 +96,7 @@ describe("environmental reports adapter transport", () => {
     );
 
     await environmentalReportsAdapter.list({
-      status: ["RECEIVED", "IN_REVIEW"],
+      status: ["RECEIVED", "UNDER_REVIEW"],
       reportType: "AIR_POLLUTION" as never,
       priority: "HIGH" as never,
       publicId: "PUB-1",
@@ -106,7 +106,7 @@ describe("environmental reports adapter transport", () => {
       pageSize: 5,
     });
 
-    expect(params?.getAll("status")).toEqual(["RECEIVED", "IN_REVIEW"]);
+    expect(params?.getAll("status")).toEqual(["RECEIVED", "UNDER_REVIEW"]);
     expect(Object.fromEntries(params!.entries())).toMatchObject({
       reportType: "AIR_POLLUTION", priority: "HIGH", publicId: "PUB-1", ticketId: "T-1", search: "humo", page: "3", pageSize: "5",
     });

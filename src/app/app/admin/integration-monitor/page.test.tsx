@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-import { getScenario, scenarios } from "@/lib/scenarios";
+import { getScenario } from "@/lib/scenarios";
+import { createTestSession } from "@/test/session";
 import IntegrationMonitorPage from "./page";
 
 const mocks = vi.hoisted(() => ({
@@ -14,7 +15,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/server", () => ({ connection: async () => undefined }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
-vi.mock("@/lib/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/session", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/session")>()),
+  getSession: mocks.getSession,
+}));
 vi.mock("@/components/admin/integration-monitor", () => ({
   IntegrationMonitor: (props: Record<string, unknown>) => {
     mocks.monitor(props);
@@ -40,8 +44,8 @@ describe("IntegrationMonitorPage", () => {
   });
 
   it("shows a no-access message to a profile without the monitor capability", async () => {
-    mocks.getSession.mockResolvedValue(scenarios.fieldCrewLeader);
-    expect(getScenario(scenarios.fieldCrewLeader).capabilities).not.toContain("integrationMonitor:view");
+    mocks.getSession.mockResolvedValue(createTestSession("field-crew-leader-route"));
+    expect(getScenario("field-crew-leader-route").capabilities).not.toContain("integrationMonitor:view");
 
     await renderPage();
 
@@ -51,11 +55,11 @@ describe("IntegrationMonitorPage", () => {
   });
 
   describe("with the monitor capability", () => {
-    const withAccess = () => mocks.getSession.mockResolvedValue(scenarios.officeDutyQueue);
+    const withAccess = () => mocks.getSession.mockResolvedValue(createTestSession("office-duty-queue"));
 
     it("opens the events tab by default without filters", async () => {
       withAccess();
-      expect(getScenario(scenarios.officeDutyQueue).capabilities).toContain("integrationMonitor:view");
+      expect(getScenario("office-duty-queue").capabilities).toContain("integrationMonitor:view");
 
       await renderPage();
 
