@@ -10,10 +10,10 @@ const dayFormatter = new Intl.DateTimeFormat("en-CA", {
 
 // Argentina no tiene horario de verano: su hora es siempre UTC-3.
 const ARGENTINA_OFFSET = "-03:00";
-const ZONELESS_LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+const ZONELESS_LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 
 /**
- * Agrega `-03:00` a una fecha y hora local sin zona (`YYYY-MM-DDTHH:mm[:ss]`), para que el
+ * Agrega `-03:00` a una fecha y hora local sin zona (`YYYY-MM-DDTHH:mm[:ss[.sss]]`), para que el
  * backend no la lea en la zona de su servidor. Un valor con `Z` u offset, o que no sea una
  * fecha y hora local, se devuelve tal cual.
  */

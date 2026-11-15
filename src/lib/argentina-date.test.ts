@@ -100,6 +100,7 @@ describe("withArgentinaOffset", () => {
   it.each([
     ["2026-11-15T16:00", "2026-11-15T16:00-03:00"],
     ["2026-11-15T16:00:30", "2026-11-15T16:00:30-03:00"],
+    ["2026-11-15T16:00:30.250", "2026-11-15T16:00:30.250-03:00"],
   ])("reads the zoneless local time %s as Argentina time", (value, expected) => {
     expect(withArgentinaOffset(value)).toBe(expected);
   });
