@@ -19,8 +19,6 @@
 name: DAST (OWASP ZAP)
 
 on:
-  push:
-    branches: [infra/925-zap] # TEMPORAL: solo para la corrida de evidencia; se quita antes del merge
   workflow_dispatch:
   schedule:
     # Lunes 06:00 UTC (03:00 America/Buenos_Aires).
