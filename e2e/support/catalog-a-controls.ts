@@ -14,6 +14,24 @@ export async function openCatalogRowDetail(row: Locator) {
   return dialog;
 }
 
+/**
+ * Types into the container search box and waits until the filtered list has
+ * arrived and the table stops being busy. Until then the table still shows the
+ * previous page of rows, so asserting on or clicking a row can hit one that is
+ * about to move or disappear when the filtered result replaces it (#942).
+ */
+export async function searchCatalogContainers(page: Page, text: string) {
+  const filtered = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname === "/api/containers" &&
+      new URL(response.url()).searchParams.get("search") === text,
+  );
+  await page.getByLabel("Buscar contenedor").fill(text);
+  await filtered;
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+}
+
 export async function clickCatalogRowAction(
   row: Locator,
   action: string | RegExp,

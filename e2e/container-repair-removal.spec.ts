@@ -3,6 +3,7 @@ import {
   clickCatalogRowAction,
   expectCatalogAMutation,
   openCatalogRowDetail,
+  searchCatalogContainers,
 } from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 
@@ -31,13 +32,13 @@ test.describe("Office container repair and removal dispatch #122", () => {
     // The catalog's default page only shows the first page of results, and other
     // e2e specs permanently add containers of their own — search to make sure the
     // new row is found regardless of how many containers now precede it.
-    await page.getByLabel("Buscar contenedor").fill(code);
+    await searchCatalogContainers(page, code);
     const row = page.locator("tr", { hasText: code });
     await expect(row).toBeVisible();
     await expect(createDialog).not.toBeVisible();
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
-    await page.getByLabel("Buscar contenedor").fill(code);
+    await searchCatalogContainers(page, code);
     await clickCatalogRowAction(row, "Reportar daño");
     const damageDialog = page.getByRole("dialog");
     await chooseCatalogAOption(page, damageDialog, "Tipo de daño", "Estructural");
@@ -45,7 +46,7 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/catalog/containers");
-    await page.getByLabel("Buscar contenedor").fill(code);
+    await searchCatalogContainers(page, code);
     await expect(row.getByText("Dañado")).toBeVisible();
 
     await clickCatalogRowAction(row, "Iniciar reparación");
@@ -88,13 +89,13 @@ test.describe("Office container repair and removal dispatch #122", () => {
     // e2e specs (including this file's own prior test) permanently add containers
     // of their own — search to make sure the new row is found regardless of how
     // many containers now precede it.
-    await page.getByLabel("Buscar contenedor").fill(code);
+    await searchCatalogContainers(page, code);
     const row = page.locator("tr", { hasText: code });
     await expect(row).toBeVisible();
     await expect(createDialog).not.toBeVisible();
     await loginViaApi(page, "field-crew-leader-route");
     await page.goto("/app/catalog/containers");
-    await page.getByLabel("Buscar contenedor").fill(code);
+    await searchCatalogContainers(page, code);
     await clickCatalogRowAction(row, "Reportar daño");
     const damageDialog = page.getByRole("dialog");
     await chooseCatalogAOption(page, damageDialog, "Tipo de daño", "Estructural");
@@ -102,7 +103,7 @@ test.describe("Office container repair and removal dispatch #122", () => {
     await expectCatalogAMutation(page, /\/report-damage$/, { damageType: "STRUCTURAL", severity: "HIGH", requiresPublicWorks: false }, () => damageDialog.getByRole("button", { name: "Confirmar daño" }).click());
     await loginViaApi(page, "office-duty-queue");
     await page.goto("/app/catalog/containers");
-    await page.getByLabel("Buscar contenedor").fill(code);
+    await searchCatalogContainers(page, code);
     await expect(row.getByText("Dañado")).toBeVisible();
 
     await clickCatalogRowAction(row, "Retirar contenedor");
