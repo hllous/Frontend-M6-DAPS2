@@ -1,6 +1,7 @@
 import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, requireCrewScope, FORBIDDEN_CODES } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
+import { withArgentinaOffset } from "@/lib/argentina-date";
 import { fetchBackend } from "@/lib/bff-backend";
 import {
   addStreetClosureRequestFixture,
@@ -81,8 +82,15 @@ export async function GET(request: Request) {
 
 // Backend's CreateStreetClosureRequestDto is strict (forbidNonWhitelisted): it names the
 // collection `sections` and has no `sourceModule`, so send exactly its wire shape.
-function toBackendCreateBody({ affectedSections, sourceModule: _sourceModule, ...rest }: CreateStreetClosureRequestInput) {
-  return { ...rest, sections: affectedSections };
+// The form sends a zoneless local window; Backend parses it with `new Date` on a UTC server,
+// so it gets the Argentina offset here (#917).
+function toBackendCreateBody({ affectedSections, sourceModule: _sourceModule, requestedFrom, requestedTo, ...rest }: CreateStreetClosureRequestInput) {
+  return {
+    ...rest,
+    requestedFrom: withArgentinaOffset(requestedFrom),
+    requestedTo: withArgentinaOffset(requestedTo),
+    sections: affectedSections,
+  };
 }
 
 export async function POST(request: Request) {
