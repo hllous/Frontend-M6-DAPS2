@@ -33,7 +33,7 @@ import { ZonePanel } from "./zone-panel";
 import { IndicatorVariation, type IndicatorVariationDirection, type IndicatorVariationProps } from "./indicator-variation";
 import { formatIndicatorNumber } from "./number-format";
 import { sectionTitleClass } from "./section-title";
-import { cn } from "@/lib/utils";
+import { cn, compareStrings } from "@/lib/utils";
 
 import styles from "./indicators-dashboard.module.css";
 
@@ -364,6 +364,8 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
       if (!current) return;
       const options = (entries: Iterable<[string, string]>) => [...entries].map(([id, label]) => ({ id, label }));
       setFilterCatalog({ zones: options(catalog.zones), serviceTypes: options([...catalog.serviceTypes].map(([id, type]) => [id, type.name])) });
+    }).catch(() => {
+      // Defensivo: si la carga rechaza, los filtros quedan con el catálogo vacío.
     });
     return () => { current = false; };
   }, [canView]);
@@ -375,7 +377,7 @@ export function IndicatorsDashboard({ scenario }: { scenario: OperationalScenari
 
   const freshness = useMemo(() => {
     const values = familyOrder.map((family) => familyStates[family].data?.freshness.updatedAt).filter((value): value is string => Boolean(value));
-    return values.sort().at(-1);
+    return values.sort(compareStrings).at(-1);
   }, [familyStates]);
   const FamilyIcon = familyMeta[selectedFamily].icon;
   const selectedFamilyState = familyStates[selectedFamily];
