@@ -5,7 +5,8 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
-import { resetContainerFixtures } from "@/lib/containers-fixtures";
+import { addContainerFixture, resetContainerFixtures } from "@/lib/containers-fixtures";
+import { zoneFixtures } from "@/lib/zones-fixtures";
 import { handlers } from "@/mocks/handlers";
 import { scenarios } from "@/lib/scenarios";
 import { containersAdapter, type ContainerStatus } from "@/lib/containers";
@@ -39,6 +40,122 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 afterAll(() => server.close());
+
+describe("Container references and pagination beyond the first page", () => {
+  const lastZone = () => zoneFixtures[zoneFixtures.length - 1]!;
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/app/catalog/containers");
+    for (let index = 1; index <= 120; index += 1) {
+      addContainerFixture({
+        id: `cont-extra-${index}`,
+        code: `CONT-X${String(index).padStart(3, "0")}`,
+        containerType: "HOUSEHOLD",
+        zoneId: lastZone().id,
+        address: `Calle ${index}`,
+        lat: null,
+        lng: null,
+        capacityLiters: 1100,
+        status: "ACTIVE",
+      });
+    }
+  });
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  it("shows zone names in the table and detail when the zone is beyond the first page of zones", async () => {
+    expect(zoneFixtures.length).toBeGreaterThan(20);
+    const user = userEvent.setup({ delay: null });
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-X001/ });
+    expect(await within(row).findByText(lastZone().name)).toBeVisible();
+    expect(within(row).queryByText(lastZone().id)).not.toBeInTheDocument();
+
+    const detail = await openContainerDetail(user, row);
+    expect(within(detail).getByText(lastZone().name)).toBeVisible();
+    expect(within(detail).queryByText(lastZone().id)).not.toBeInTheDocument();
+  });
+
+  it("offers every zone in the zone filter, ordered by commune", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("row", { name: /CONT-001/ });
+    await user.click(screen.getByLabelText("Zona"));
+    const options = await screen.findAllByRole("option");
+    expect(options).toHaveLength(zoneFixtures.length + 1);
+    const firstOptions = options.slice(1, 4).map((option) => option.textContent);
+    // Comuna 1 primero (alfabético dentro de la comuna), no el orden de alta de las zonas.
+    expect(firstOptions).toEqual([...firstOptions].sort((left, right) => left!.localeCompare(right!, "es")));
+    expect(options[1]).not.toHaveTextContent(zoneFixtures[0]!.name);
+    await user.click(screen.getByRole("option", { name: lastZone().name }));
+    expect(await screen.findByRole("row", { name: /CONT-X001/ })).toBeVisible();
+    expect(screen.queryByRole("row", { name: /CONT-001/ })).not.toBeInTheDocument();
+  });
+
+  it("paginates the whole inventory with its total and reaches the last container", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await screen.findByRole("row", { name: /CONT-001/ });
+    expect(screen.getByText("Mostrando 1–20 de 128")).toBeVisible();
+    while (!screen.queryByRole("row", { name: /CONT-X120/ })) {
+      const next = screen.getByRole("button", { name: "Página siguiente" });
+      expect(next).toBeEnabled();
+      await user.click(next);
+      await screen.findByText(/^Mostrando \d+–\d+ de 128$/);
+    }
+    expect(screen.getByText("Mostrando 121–128 de 128")).toBeVisible();
+    expect(screen.getByRole("status", { name: "Página 7 de 7" })).toBeVisible();
+  });
+
+  it("returns to the first page when a filter changes", async () => {
+    window.history.replaceState(null, "", "/app/catalog/containers?page=3");
+    const user = userEvent.setup({ delay: null });
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByText("Mostrando 41–60 de 128")).toBeVisible();
+    await user.type(screen.getByLabelText("Buscar contenedor"), "Calle");
+    expect(await screen.findByText("Mostrando 1–20 de 120")).toBeVisible();
+    expect(new URLSearchParams(window.location.search).get("page")).toBeNull();
+    expect(new URLSearchParams(window.location.search).get("q")).toBe("Calle");
+  });
+
+  it("keeps the same row mounted while a new search loads, so a click during typing is not lost", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-001/ });
+    await user.type(screen.getByLabelText("Buscar contenedor"), "CONT-001");
+    expect(await screen.findByText("Mostrando 1–1 de 1")).toBeVisible();
+    expect(row).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /CONT-001/ })).toBe(row);
+  });
+
+  it("asks for the filtered list once per pause in typing and keeps every typed character", async () => {
+    const searches: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/containers" && url.searchParams.has("search")) searches.push(url.searchParams.get("search")!);
+    });
+    try {
+      const user = userEvent.setup({ delay: null });
+      render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      await screen.findByRole("row", { name: /CONT-001/ });
+      const input = screen.getByLabelText("Buscar contenedor");
+      await user.type(input, "Calle 1");
+      expect(input).toHaveValue("Calle 1");
+      await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("Calle 1"));
+      expect(await screen.findByText(/^Mostrando 1–\d+ de \d+$/)).toBeVisible();
+      expect(searches).toEqual(["Calle 1"]);
+    } finally {
+      server.events.removeAllListeners();
+    }
+  });
+
+  it("shows readable text, never the id, when a zone does not exist", async () => {
+    addContainerFixture({ id: "cont-orphan", code: "CONT-HUERFANO", containerType: "HOUSEHOLD", zoneId: "zone-inexistente", address: null, lat: null, lng: null, capacityLiters: 1100, status: "ACTIVE" });
+    window.history.replaceState(null, "", "/app/catalog/containers?q=HUERFANO");
+    render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /CONT-HUERFANO/ });
+    expect(await within(row).findByText("Zona no disponible")).toBeVisible();
+    expect(within(row).queryByText("zone-inexistente")).not.toBeInTheDocument();
+  });
+});
 
 describe("Container list opened from a link", () => {
   afterEach(() => window.history.replaceState(null, "", "/"));
@@ -190,8 +307,8 @@ describe("ContainerCatalogPanel", () => {
 
     // Filter by type
     await chooseCatalogOption(user, screen.getByLabelText("Tipo de contenedor"), "Materiales reciclables");
-    expect(await screen.findByText("CONT-002")).toBeVisible();
-    expect(screen.queryByText("CONT-001")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("CONT-001")).not.toBeInTheDocument());
+    expect(screen.getByText("CONT-002")).toBeVisible();
 
     // Filter by status
     await chooseCatalogOption(user, screen.getByLabelText("Estado"), "Desbordado");
@@ -207,9 +324,10 @@ describe("ContainerCatalogPanel", () => {
     await chooseCatalogOption(user, screen.getByLabelText("Zona"), /^Todos(?: los (?:tipos|estados))?$|^Todas las zonas$/);
 
     // Search filter
+    // La lista anterior sigue visible mientras llega la búsqueda: se espera a que se vaya CONT-001.
     await user.type(screen.getByLabelText("Buscar contenedor"), "Santa Fe");
-    expect(await screen.findByText("CONT-002")).toBeVisible();
-    expect(screen.queryByText("CONT-001")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("CONT-001")).not.toBeInTheDocument());
+    expect(screen.getByText("CONT-002")).toBeVisible();
   });
 
   it("opens the Container named by ?detail= in the URL", async () => {
@@ -392,7 +510,9 @@ describe("ContainerCatalogPanel", () => {
 
     expect(await screen.findByText("CONT-003")).toBeVisible();
     const row = screen.getByRole("row", { name: /CONT-003/ });
-    await clickContainerAction(user, row, "Retirar contenedor");
+    const removeDetail = await openContainerDetail(user, row);
+    expect(within(removeDetail).getByRole("button", { name: "Retirar contenedor" })).toHaveAttribute("aria-haspopup", "dialog");
+    await user.click(within(removeDetail).getByRole("button", { name: "Retirar contenedor" }));
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /Retirar contenedor CONT-003/ })).toBeVisible();

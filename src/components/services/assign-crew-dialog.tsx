@@ -34,7 +34,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
 import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
-import { crewsAdapter, type Crew } from "@/lib/crews";
+import type { Crew } from "@/lib/crews";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import {
   checkAssignmentConflicts,
   OVERRIDE_NOTE_MAX,
@@ -44,7 +45,7 @@ import {
   type Service,
 } from "@/lib/services";
 import { serviceTypesAdapter } from "@/lib/service-types";
-import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
+import type { Vehicle } from "@/lib/vehicles";
 import { useRevealFirstError } from "./use-reveal-first-error";
 
 /** Valor del ítem que borra el vehículo elegido: el Select no tiene opción vacía. */
@@ -116,16 +117,19 @@ function AssignCrewForm({
   useEffect(() => {
     let active = true;
     Promise.all([
-      crewsAdapter.list({ active: true, pageSize: 100 }),
-      vehiclesAdapter.list({ active: true, pageSize: 100 }),
+      loadReferenceCatalog("crews", { active: true }),
+      loadReferenceCatalog("vehicles", { active: true }),
       serviceTypesAdapter.get(service.serviceTypeId),
     ])
-      .then(([crewsPage, vehiclesPage, type]) => {
+      .then(([crews, vehicles, type]) => {
         if (active) {
+          // Una Crew o un vehículo que no está en el catálogo no se preselecciona por id crudo: el combo arranca vacío.
+          setCrewId((current) => (crews.some((crew) => crew.id === current) ? current : ""));
+          setVehicleId((current) => (vehicles.some((vehicle) => vehicle.id === current) ? current : ""));
           setResources({
             status: "ready",
-            crews: crewsPage.crews,
-            vehicles: vehiclesPage.vehicles,
+            crews,
+            vehicles,
             requiresVehicle: type.requiresVehicle,
             code: type.code,
           });

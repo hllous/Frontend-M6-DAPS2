@@ -31,6 +31,7 @@ import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
   Dialog,
   DialogContent,
@@ -61,7 +62,7 @@ import {
 import { CrewRelocationDialog } from "@/components/catalog/crew-relocation-dialog";
 import { formatArgentinaCalendarDate, todayInArgentina } from "@/lib/argentina-date";
 import { crewZoneAssignmentsAdapter, type CrewZoneAssignment } from "@/lib/crew-zone-assignments";
-import { sortZonesByCommune, zonesAdapter, type Zone } from "@/lib/zones";
+import { useReferenceCatalog } from "@/lib/use-reference-catalog";
 import { m1IdentityAdapter, type M1IdentityReference } from "@/lib/m1-identity";
 
 import {
@@ -161,8 +162,8 @@ export function CrewCatalogPanel({
   const [shiftFilter, setShiftFilter] = useState<Shift | "all">("all");
   const [zoneFilter, setZoneFilter] = useState<string>("all");
   const [specialtyFilter, setSpecialtyFilter] = useState<CrewSpecialty | "all">("all");
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [zonesLoaded, setZonesLoaded] = useState(false);
+  const zoneCatalog = useReferenceCatalog("zones");
+  const zones = zoneCatalog.items;
   const [requestVersion, setRequestVersion] = useState(0);
   const [page, setPage] = useState(1);
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -210,21 +211,6 @@ export function CrewCatalogPanel({
         setOrganizations(nextOrganizations);
       }
     });
-    return () => {
-      current = false;
-    };
-  }, []);
-  useEffect(() => {
-    let current = true;
-    void zonesAdapter
-      .list()
-      .then((result) => {
-        if (current) setZones(sortZonesByCommune(result.zones));
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (current) setZonesLoaded(true);
-      });
     return () => {
       current = false;
     };
@@ -319,11 +305,9 @@ export function CrewCatalogPanel({
   const organizationName = (id: string | null, name: string | null) => id === null ? "Sin organización externa" : name?.trim() || `Organización sin nombre (id ${id})`;
   const zoneName = (id: string | null): ReactNode => {
     if (id === null) return "Sin zona";
-    const zone = zones.find((candidate) => candidate.id === id);
-    if (zone) return zone.name;
-    return zonesLoaded ? id : <Skeleton data-slot="zone-name-skeleton" aria-hidden="true" className="inline-block h-4 w-24 align-middle" />;
+    return zoneCatalog.lookup(id) ?? <Skeleton data-slot="zone-name-skeleton" aria-hidden="true" className="inline-block h-4 w-24 align-middle" />;
   };
-  const zoneItems = Object.fromEntries(zones.map((zone) => [zone.id, zone.name]));
+  const zoneItems: Record<string, string> = Object.fromEntries(zones.map((zone) => [zone.id, zone.name]));
   function openCreate() {
     setEditing(null);
     setForm({
@@ -418,13 +402,14 @@ export function CrewCatalogPanel({
       );
     }
   }
-  async function removeMember(userId: string) {
-    if (!selected) return;
+  async function removeMember(userId: string): Promise<string | null> {
+    if (!selected) return null;
     try {
       setSelected(await crewsAdapter.removeMember(selected.id, userId));
       notifySuccess("Integrante quitado.");
+      return null;
     } catch (caught) {
-      setMemberError(errorMessage(caught, "No se pudo quitar el integrante."));
+      return errorMessage(caught, "No se pudo quitar el integrante.");
     }
   }
   function deactivate(crew: Crew) {
@@ -918,26 +903,37 @@ export function CrewCatalogPanel({
                   aria-label="Integrantes de la cuadrilla"
                   className="flex flex-col gap-2"
                 >
-                  {selected.members.map((member) => (
-                    <li
-                      key={member.userId}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      {userName(member.userId, member.displayName)}
-                      {canManage ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Quitar a ${userName(member.userId, member.displayName)}`}
-                          onClick={() => void removeMember(member.userId)}
-                        >
-                          <UserMinus data-icon="inline-start" aria-hidden />
-                          Quitar
-                        </Button>
-                      ) : null}
-                    </li>
-                  ))}
+                  {selected.members.map((member) => {
+                    const memberName = userName(member.userId, member.displayName);
+                    return (
+                      <li
+                        key={member.userId}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        {memberName}
+                        {canManage ? (
+                          <ConfirmActionDialog
+                            trigger={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`Quitar a ${memberName}`}
+                              >
+                                <UserMinus data-icon="inline-start" aria-hidden />
+                                Quitar
+                              </Button>
+                            }
+                            title={`Quitar a ${memberName}`}
+                            description={`${memberName} deja de integrar ${selected.name}. Para volver a sumarlo, agréguelo de nuevo.`}
+                            confirmLabel="Quitar integrante"
+                            tone="destructive"
+                            onConfirm={() => removeMember(member.userId)}
+                          />
+                        ) : null}
+                      </li>
+                    );
+                  })}
                 </ul>
                 {canManage ? (
                   <form
@@ -1129,7 +1125,12 @@ export function CrewCatalogPanel({
               <Field>
                 <FieldLabel htmlFor="crew-home-zone-form">Zona base</FieldLabel>
                 <Select
-                  items={{ [NO_ZONE]: "Sin zona base", ...zoneItems }}
+                  items={{
+                    [NO_ZONE]: "Sin zona base",
+                    ...zoneItems,
+                    // Una Zone que ya no existe se muestra legible, nunca por su id.
+                    ...(form.homeZoneId && !zoneItems[form.homeZoneId] ? { [form.homeZoneId]: zoneCatalog.lookup(form.homeZoneId) ?? "Cargando zona…" } : {}),
+                  }}
                   value={form.homeZoneId || NO_ZONE}
                   onValueChange={(value) => {
                     if (value !== null) setForm({ ...form, homeZoneId: value === NO_ZONE ? "" : value });

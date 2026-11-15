@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { auditEntrySchema, inboxPageSchema, inboxQuerySchema, sourceModuleLabel, systemActorLabel } from "./integration-monitor";
+import { auditEntrySchema, auditPageSchema, auditQuerySchema, inboxPageSchema, inboxQuerySchema, sourceModuleLabel, systemActorLabel } from "./integration-monitor";
 
 describe("integration monitor labels (#875)", () => {
   it("names the area behind a system actor and leaves people alone", () => {
@@ -52,5 +52,22 @@ describe("integration monitor contract (#875)", () => {
       note: null,
       occurredAt: "2026-11-05T18:20:01.000Z",
     }).success).toBe(true);
+  });
+
+  it("accepts a READ audit row about an inbox event", () => {
+    const row = {
+      id: "650e8400-e29b-41d4-a716-446655440070",
+      entityType: "INBOX_EVENT",
+      entityId: "550e8400-e29b-41d4-a716-446655440071",
+      action: "READ",
+      fromStatus: null,
+      toStatus: null,
+      actorUserId: "user-admin",
+      actorRoles: ["M6_ADMIN"],
+      note: null,
+      occurredAt: "2026-11-11T12:00:00.000Z",
+    };
+    expect(auditPageSchema.safeParse({ data: [row], meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 } }).success).toBe(true);
+    expect(auditQuerySchema.safeParse({ entityType: "INBOX_EVENT" }).success).toBe(true);
   });
 });

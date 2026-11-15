@@ -21,6 +21,9 @@ test.describe("Crew membership management @smoke", () => {
     await expect(members).toContainText("Pedro Ruiz");
 
     await dialog.getByRole("button", { name: "Quitar a Pedro Ruiz" }).click();
+    const confirmation = page.getByRole("dialog", { name: "Quitar a Pedro Ruiz" });
+    await confirmation.getByRole("button", { name: "Quitar integrante" }).click();
+    await expect(confirmation).toBeHidden();
     await expect(members).not.toContainText("Pedro Ruiz");
   });
 });
