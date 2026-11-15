@@ -1,0 +1,130 @@
+# ──────────────────────────────────────────────────────────────
+# DAST — OWASP ZAP sobre el frontend M6 (#925, spec #922)
+# Corre a demanda y una vez por semana. NO se engancha al deploy de Vercel.
+#
+# - zap-baseline: escaneo PASIVO contra la URL de producción de Vercel
+#   (CSP, X-Frame-Options, HSTS, cookies). Nunca se lanza un ataque activo
+#   contra producción.
+# - zap-active: escaneo ACTIVO sin autenticar contra la app construida en el
+#   CI (`next build` + `next start`), con M1 falso y el Backend MSW cargados
+#   dentro del job. No toca Vercel ni el Backend real.
+#
+# Sin reglas ignoradas (no hay rules_file). Los reportes son artifacts; la
+# corrida final se archiva en docs/security/ (los artifacts vencen).
+# Limitación declarada: no hay escaneo activo autenticado del frontend; el
+# login pasa por M1 real y la superficie de datos la cubre el ZAP autenticado
+# del Backend (hllous/Backend-M6-DAPS2#659). Ver docs/security/zap.md.
+# ──────────────────────────────────────────────────────────────
+
+name: DAST (OWASP ZAP)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Lunes 06:00 UTC (03:00 America/Buenos_Aires).
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    name: zap baseline (Vercel)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # Variable de Actions ZAP_BASELINE_URL; si no existe, la URL canónica de producción
+      # de docs/operations/deploy.md.
+      TARGET_URL: ${{ vars.ZAP_BASELINE_URL || 'https://m6-ambiente-higiene.vercel.app' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: ZAP baseline scan (pasivo)
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: ${{ env.TARGET_URL }}
+          # -a: incluye también las reglas pasivas alfa. Sin rules_file: nada se ignora.
+          cmd_options: "-a"
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-baseline-report
+
+  zap-active:
+    name: zap active (build del CI)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      APP_PORT: "3000"
+      FAKE_M1_PORT: "3120"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      # Semillas para el spider: una sitemap.xml efímera (no se commitea) con cada página y cada
+      # ruta GET del BFF, derivadas del árbol de src/app. ZAP la lee sola, así que el escaneo
+      # recorre /app/*, /consulta/* y /api/*, no solo la home.
+      - name: Generate seed sitemap from the route tree
+        run: |
+          {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            { find src/app -name page.tsx; find src/app/api -name route.ts; } \
+              | sed -E 's#^src/app##; s#/(page\.tsx|route\.ts)$##' \
+              | grep -v '\[' | grep -v '^/prototype' | grep -v '^/api/mock' \
+              | sed -E 's#^$#/#' | sort -u \
+              | while read -r route; do echo "  <url><loc>http://localhost:${APP_PORT}${route}</loc></url>"; done
+            echo '</urlset>'
+          } > public/sitemap.xml
+          grep -c '<loc>' public/sitemap.xml
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_DISABLE_MSW: "true"
+
+      # `next start` fuerza NODE_ENV=production, y ahí la app solo arranca en real-m1
+      # (src/instrumentation.ts). Por eso el "mock" de esta instancia es M1 falso + Backend MSW
+      # de scripts/msw-real-m1-backend.mjs (solo GET /me), como en el e2e real-m1.
+      - name: Start fake M1 and the app
+        env:
+          M6_AUTH_MODE: real-m1
+          M1_BASE_URL: http://127.0.0.1:3120/api/v1/
+          M1_FAKE_ENABLED: "true"
+          M6_BACKEND_ORIGIN: http://m6-demo-backend.invalid
+          M6_REAL_M1_MOCK_BACKEND: "true"
+          NEXT_PUBLIC_DISABLE_MSW: "true"
+        run: |
+          export M6_SESSION_SECRET="$(openssl rand -base64 32)"
+          nohup node scripts/fake-m1.mjs > fake-m1.log 2>&1 &
+          NODE_OPTIONS="--import=./scripts/msw-real-m1-backend.mjs" \
+            nohup pnpm exec next start --port "${APP_PORT}" > next.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:${APP_PORT}/api/health" > /dev/null; then
+              echo "app up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "app did not start"; cat next.log fake-m1.log; exit 1
+
+      - name: ZAP full scan (activo, sin autenticar)
+        uses: zaproxy/action-full-scan@v0.13.0
+        with:
+          target: http://localhost:3000
+          # -j: spider AJAX además del tradicional (la app es de cliente). -a: reglas alfa.
+          # Sin rules_file: nada se ignora.
+          cmd_options: "-j -a"
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-active-report
+
+      - name: Server logs
+        if: ${{ always() }}
+        run: tail -n 50 next.log fake-m1.log || true
