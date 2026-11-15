@@ -132,8 +132,87 @@ jobs:
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
+      # Cobertura v8 sin umbrales (#923): cada shard deja un blob con resultados y datos de
+      # cobertura; el job unit-coverage los combina. No cambia qué tests corren ni sus
+      # aserciones. La instrumentación v8 vuelve más lentos los tests con jsdom y varios
+      # superaban el timeout de 5 s: se sube solo acá, con la bandera, no en la config.
       - name: Unit and component tests
-        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob --testTimeout=30000
+
+      - name: Upload Vitest blob report
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: .vitest/blob/
+          include-hidden-files: true
+          retention-days: 7
+
+  # Combina los blobs de los 4 shards en un solo lcov. Vive fuera del job agregador `test`
+  # y de la branch protection: solo mide, no decide si el PR se puede mergear.
+  unit-coverage:
+    name: unit coverage
+    needs: [changes, unit-shard]
+    if: ${{ !cancelled() && needs.unit-shard.result == 'success' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download Vitest blob reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: vitest-blob-*
+          merge-multiple: true
+          path: .vitest/blob
+
+      - name: Merge reports and build lcov
+        run: pnpm exec vitest run --merge-reports --coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-lcov
+          path: coverage/
+          retention-days: 7
+
+  # Análisis de SonarCloud con la cobertura combinada. El gate no bloquea todavía
+  # (sonar.qualitygate.wait=false) y el job no es un check requerido. Sin SONAR_TOKEN
+  # (PRs desde forks) los pasos se saltean y el job termina en verde. Proyecto y
+  # exclusiones en sonar-project.properties.
+  sonar:
+    name: sonar
+    needs: unit-coverage
+    if: ${{ !cancelled() && needs.unit-coverage.result == 'success' }}
+    runs-on: ubuntu-24.04
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Skip notice
+        if: ${{ env.SONAR_TOKEN == '' }}
+        run: echo "SONAR_TOKEN no está disponible; se omite el análisis de SonarCloud."
+
+      - name: Checkout
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-lcov
+          path: coverage
+
+      - name: SonarCloud scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=false
 
   test:
     name: test
