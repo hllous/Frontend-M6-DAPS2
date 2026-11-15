@@ -1,9 +1,9 @@
+import { findServiceFixture, serviceHistoryEntry } from "@/lib/bff-service-mock";
 import { authorize, backendMode, errorResponse, forwardResponse, requireCrewScope, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
-  serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
@@ -47,10 +47,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     const closureDependency = resolveStreetClosureDependency(
       streetClosureRequestFixtures.filter(
@@ -107,11 +105,7 @@ export async function POST(
       );
     }
 
-    const historyEntry = {
-      label: "En curso",
-      at: new Date().toISOString().slice(0, 16).replace("T", " "),
-      done: true,
-    };
+    const historyEntry = serviceHistoryEntry("En curso");
 
     const updated = updateServiceFixture(service.id, {
       status: "IN_PROGRESS",

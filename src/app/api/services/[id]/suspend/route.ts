@@ -1,9 +1,9 @@
+import { findServiceFixture, serviceHistoryEntry } from "@/lib/bff-service-mock";
 import { authorize, backendMode, errorResponse, forwardResponse, requireCrewScope, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
-  serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import {
@@ -54,10 +54,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId && service.crewId !== scenario.actor.crewId) {
       return errorResponse(403, "Solo la cuadrilla asignada al servicio puede suspenderlo.", path);
@@ -79,11 +77,7 @@ export async function POST(
       statusNote: statusNote ?? null,
       history: [
         ...service.history,
-        {
-          label: "Suspendido",
-          at: new Date().toISOString().slice(0, 16).replace("T", " "),
-          done: true,
-        },
+        serviceHistoryEntry("Suspendido"),
       ],
     });
 

@@ -1,8 +1,8 @@
+import { findServiceFixture } from "@/lib/bff-service-mock";
 import { backendMode, errorResponse, forwardResponse, requireCrewScope, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
-import { serviceFixtures } from "@/lib/services-fixtures";
 import { getScenario } from "@/lib/scenarios";
 import { getRequiredSession } from "@/lib/session";
 
@@ -30,10 +30,8 @@ export async function GET(
       return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId && service.crewId !== scenario.actor.crewId) {
       return errorResponse(403, "El servicio no pertenece a la cuadrilla asignada a este usuario.", path);

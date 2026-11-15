@@ -1,3 +1,4 @@
+import { findServiceFixture } from "@/lib/bff-service-mock";
 import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
@@ -5,7 +6,6 @@ import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   addZoneResultFixture,
   getZoneResultsByServiceId,
-  serviceFixtures,
 } from "@/lib/services-fixtures";
 import {
   recordZoneResultInputSchema,
@@ -41,10 +41,8 @@ export async function GET(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId) {
       if (service.crewId !== scenario.actor.crewId) {
@@ -98,10 +96,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId) {
       if (service.crewId !== scenario.actor.crewId) {

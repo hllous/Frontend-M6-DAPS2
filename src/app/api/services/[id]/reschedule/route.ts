@@ -1,9 +1,9 @@
+import { findServiceFixture, serviceHistoryEntry } from "@/lib/bff-service-mock";
 import { authorize, backendMode, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
-  serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { rescheduleServiceInputSchema, STATUS_LABEL } from "@/lib/services";
@@ -46,10 +46,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (service.status !== "SCHEDULED") {
       return errorResponse(
@@ -65,11 +63,7 @@ export async function POST(
       statusReason: input.reason,
       history: [
         ...service.history,
-        {
-          label: "A reprogramar",
-          at: new Date().toISOString().slice(0, 16).replace("T", " "),
-          done: true,
-        },
+        serviceHistoryEntry("A reprogramar"),
       ],
     });
 

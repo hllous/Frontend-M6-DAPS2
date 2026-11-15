@@ -1,3 +1,4 @@
+import { serviceHistoryEntry } from "@/lib/bff-service-mock";
 import { crewFit } from "@/lib/crew-fit";
 import { serviceTypeFixtures } from "@/lib/service-type-fixtures";
 import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError } from "@/lib/bff-route";
@@ -175,7 +176,7 @@ export async function POST(request: Request) {
       notes: input.notes ?? null,
       coordinates: { x: 50, y: 50 },
       attachments: [],
-      history: [{ label: "Programado", at: new Date().toISOString().slice(0, 16).replace("T", " "), done: true }],
+      history: [serviceHistoryEntry("Programado")],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
