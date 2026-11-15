@@ -1,8 +1,8 @@
 # ──────────────────────────────────────────────────────────────
 # Trivy — SCA, imagen y configuración del Frontend (#924, spec #922).
 #
-# Workflow propio para no tocar los shards de ci.yml. Tres pasadas: fs
-# (pnpm-lock.yaml + secretos), image (la imagen del Dockerfile) y config
+# Workflow propio para no tocar los shards de ci.yml. Pasadas: deps
+# (pnpm-lock.yaml), fs (secretos), image (la imagen del Dockerfile) y config
 # (Dockerfile). Cada una hace dos cosas:
 #   1. REPORTE: SARIF a Code Scanning con HIGH/CRITICAL, incluidas las que
 #      todavía no tienen fix (la cátedra pide "mitigación documentada", no
@@ -15,6 +15,12 @@
 # se trata con el protocolo de hallazgos de hllous/Backend-M6-DAPS2#656.
 # security-events: write solo en este job.
 # trivy-action va fijada por SHA del commit (tag v0.36.0).
+#
+# Por qué deps no usa `trivy fs` sobre el lockfile: Trivy 0.70 lee solo 15
+# paquetes de nuestro pnpm-lock.yaml (formato de pnpm 12) y deja pasar CVE
+# conocidas sin avisar (verificado con lodash@4.17.20, CVE-2021-23337). Se
+# genera un SBOM SPDX desde el lockfile con `pnpm sbom --prod` y se escanea
+# con `scan-type: sbom`; el CycloneDX 1.7 de pnpm no lo decodifica Trivy.
 # ──────────────────────────────────────────────────────────────
 
 name: Trivy
@@ -48,17 +54,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: SBOM de dependencias de producción (desde pnpm-lock.yaml)
+        run: pnpm sbom --sbom-format spdx --prod > sbom.spdx.json
+
       - name: Build de la imagen
         run: docker build -t m6-frontend:ci .
 
       # ── Reporte (SARIF, incluye las sin fix) ──
-      - name: Reporte fs (dependencias y secretos)
+      - name: Reporte deps (SBOM del lockfile)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: sbom.spdx.json
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
+          trivyignores: .trivyignore
+          format: sarif
+          output: trivy-deps.sarif
+          exit-code: '0'
+
+      - name: Reporte fs (secretos)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
-          scanners: vuln,secret
-          severity: HIGH,CRITICAL
+          scanners: secret
+          skip-dirs: .cache,node_modules
           limit-severities-for-sarif: true
           trivyignores: .trivyignore
           format: sarif
@@ -89,6 +114,13 @@ jobs:
           output: trivy-config.sarif
           exit-code: '0'
 
+      - name: Subir deps a Code Scanning
+        if: always() && env.CAN_UPLOAD == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-deps.sarif
+          category: trivy-deps
+
       - name: Subir fs a Code Scanning
         if: always() && env.CAN_UPLOAD == 'true'
         uses: github/codeql-action/upload-sarif@v4
@@ -111,15 +143,27 @@ jobs:
           category: trivy-config
 
       # ── Gate (HIGH/CRITICAL con fix) ──
-      - name: Gate fs
+      - name: Gate deps
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: sbom.spdx.json
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: table
+          exit-code: '1'
+
+      - name: Gate fs (secretos)
         if: always()
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
-          scanners: vuln,secret
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
+          scanners: secret
+          skip-dirs: .cache,node_modules
           trivyignores: .trivyignore
           format: table
           exit-code: '1'
