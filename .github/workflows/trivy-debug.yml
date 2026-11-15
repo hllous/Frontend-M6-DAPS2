@@ -13,13 +13,16 @@ jobs:
         with:
           version: v0.70.0
       - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-node-pnpm
       - name: variantes
         run: |
-          mkdir d e
+          mkdir d
           cp pnpm-lock.yaml package.json d/
-          echo "=== d (con package.json, dev deps)"
-          trivy fs --scanners vuln --severity HIGH,CRITICAL --include-dev-deps -f table d 2>&1 | grep -E "Total|lodash|WARN|not found" | head -5
-          echo "=== e (sbom)"
-          pnpm --version
-          pnpm sbom --sbom-format cyclonedx --prod > e/sbom.json 2> e/err.txt; echo exit $?; head -c 300 e/err.txt; ls -la e; head -c 400 e/sbom.json; echo
-          trivy sbom --severity HIGH,CRITICAL -f table e/sbom.json 2>&1 | grep -E "Total|lodash|WARN|CVE-2021-23337|not found|FATAL" | head -8
+          echo "=== d"
+          trivy fs --scanners vuln --severity LOW,MEDIUM,HIGH,CRITICAL --include-dev-deps -f table d 2>&1 | grep -vE "^\s*$" | head -40
+          echo "=== d json pkgs"
+          trivy fs --scanners vuln --include-dev-deps --list-all-pkgs -f json d 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); [print(r['Target'],len(r.get('Packages',[])),len(r.get('Vulnerabilities',[]))) for r in d.get('Results',[])]"
+          echo "=== d prod json"
+          trivy fs --scanners vuln --list-all-pkgs -f json d 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('Results'))"
+          echo "=== lodash in sbom"
+          pnpm sbom --sbom-format cyclonedx --prod | grep -c '"name": "lodash"'
