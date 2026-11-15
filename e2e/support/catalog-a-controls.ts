@@ -47,20 +47,29 @@ export async function chooseCatalogAOption(
   await expect(page.getByRole("listbox")).toHaveCount(0);
 }
 
+/**
+ * Clicks through a write action and waits for the BFF to answer it, not just for
+ * the request to leave the browser. Callers usually navigate or switch session
+ * right after; with only the request awaited, that navigation can cancel the
+ * POST in flight, so the mutation is never applied and the next screen shows
+ * the old state (#942).
+ */
 export async function expectCatalogAMutation(
   page: Page,
   endpoint: RegExp,
   payload: unknown,
   action: () => Promise<unknown>,
 ) {
-  const request = page.waitForRequest(
-    (request) =>
-      request.method() === "POST" &&
-      endpoint.test(new URL(request.url()).pathname),
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      endpoint.test(new URL(response.url()).pathname),
   );
   await action();
-  const sent = await request;
+  const response = await responsePromise;
+  const sent = response.request();
   expect(payload === null ? sent.postData() : sent.postDataJSON()).toEqual(
     payload,
   );
+  expect(response.ok(), `La mutación ${endpoint} respondió ${response.status()}`).toBe(true);
 }
