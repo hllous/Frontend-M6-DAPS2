@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { argentinaDay, formatArgentinaCalendarDate, formatArgentinaDateTime, formatArgentinaNumericDateTime, formatCalendarDay, todayInArgentina } from "./argentina-date";
+import { argentinaDay, formatArgentinaCalendarDate, formatArgentinaDateTime, formatArgentinaNumericDateTime, formatCalendarDay, todayInArgentina, withArgentinaOffset } from "./argentina-date";
 
 describe("todayInArgentina", () => {
   it("returns the day at 22:30 ART even when UTC is already the next day", () => {
@@ -93,5 +93,30 @@ describe("formatArgentinaNumericDateTime", () => {
 
   it("returns values that are not dates untouched", () => {
     expect(formatArgentinaNumericDateTime("sin fecha")).toBe("sin fecha");
+  });
+});
+
+describe("withArgentinaOffset", () => {
+  it.each([
+    ["2026-11-15T16:00", "2026-11-15T16:00-03:00"],
+    ["2026-11-15T16:00:30", "2026-11-15T16:00:30-03:00"],
+  ])("reads the zoneless local time %s as Argentina time", (value, expected) => {
+    expect(withArgentinaOffset(value)).toBe(expected);
+  });
+
+  it("puts 16:00 in Argentina at 19:00 UTC", () => {
+    expect(new Date(withArgentinaOffset("2026-11-15T16:00")).toISOString()).toBe("2026-11-15T19:00:00.000Z");
+  });
+
+  it.each(["2026-11-15T19:00Z", "2026-11-15T19:00:00.000Z", "2026-11-15T16:00-03:00", "2026-11-15T21:00:00+02:00"])(
+    "leaves %s unchanged because it already carries a zone",
+    (value) => {
+      expect(withArgentinaOffset(value)).toBe(value);
+    },
+  );
+
+  it("leaves values that are not a local date-time unchanged", () => {
+    expect(withArgentinaOffset("2026-11-15")).toBe("2026-11-15");
+    expect(withArgentinaOffset("mañana")).toBe("mañana");
   });
 });
