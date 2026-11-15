@@ -642,6 +642,25 @@ function throwServiceResponseError(payload: unknown, malformedMessage: string): 
   throw new ServiceRequestError(message, parsedError.data.statusCode);
 }
 
+/** Pide un Servicio a `/api/services*`: respuesta de error traducida, sobre `{ data }` abierto y esquema validado. */
+async function requestServicio(
+  path: string,
+  init: RequestInit | undefined,
+  malformedMessage: string,
+): Promise<Service> {
+  const response = await fetchServicesApi(path, init);
+  const payload = await readJsonBody(response);
+  if (!response.ok) throwServiceResponseError(payload, malformedMessage);
+  return parseServicio(unwrapData(payload), malformedMessage);
+}
+
+/** Abre el sobre `{ data }` de una respuesta; si el cuerpo ya es el recurso (tiene `id`), lo devuelve tal cual. */
+function unwrapData(payload: unknown): unknown {
+  return payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+    ? (payload as { data: unknown }).data
+    : payload;
+}
+
 export const servicesAdapter = {
   async list(query: ServiceQuery = {}): Promise<ServicesPage> {
     // Se arranca el catalogo junto con el listado y no despues: encadenarlos dejaba
@@ -699,10 +718,7 @@ export const servicesAdapter = {
 
     if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de servicios. Reintente en unos segundos.");
 
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
+    const raw = unwrapData(payload);
 
     return parseServicio(raw, "No se pudo obtener información válida de la creación de servicio. Reintente en unos segundos.");
   },
@@ -716,22 +732,11 @@ export const servicesAdapter = {
       );
     }
 
-    const response = await fetchServicesApi(`/api/services/${serviceId}/assign-crew`, {
+    return requestServicio(`/api/services/${serviceId}/assign-crew`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la asignación de servicio. Reintente en unos segundos.");
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la asignación de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la asignación de servicio. Reintente en unos segundos.");
   },
 
   async start(serviceId: string): Promise<Service> {
@@ -749,20 +754,9 @@ export const servicesAdapter = {
       );
     }
 
-    const response = await fetchServicesApi(`/api/services/${serviceId}/start`, {
+    return requestServicio(`/api/services/${serviceId}/start`, {
         method: "POST",
-      });
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida del inicio de servicio. Reintente en unos segundos.");
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida del inicio de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida del inicio de servicio. Reintente en unos segundos.");
   },
 
   async suspend(serviceId: string, input: SuspendServiceInput): Promise<Service> {
@@ -774,39 +768,17 @@ export const servicesAdapter = {
       );
     }
 
-    const response = await fetchServicesApi(`/api/services/${serviceId}/suspend`, {
+    return requestServicio(`/api/services/${serviceId}/suspend`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la suspensión de servicio. Reintente en unos segundos.");
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la suspensión de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la suspensión de servicio. Reintente en unos segundos.");
   },
 
   async resume(serviceId: string): Promise<Service> {
-    const response = await fetchServicesApi(`/api/services/${serviceId}/resume`, {
+    return requestServicio(`/api/services/${serviceId}/resume`, {
         method: "POST",
-      });
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la reanudación de servicio. Reintente en unos segundos.");
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la reanudación de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la reanudación de servicio. Reintente en unos segundos.");
   },
 
   async reschedule(serviceId: string, input: RescheduleServiceInput): Promise<Service> {
@@ -818,22 +790,11 @@ export const servicesAdapter = {
       );
     }
 
-    const response = await fetchServicesApi(`/api/services/${serviceId}/reschedule`, {
+    return requestServicio(`/api/services/${serviceId}/reschedule`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la reprogramación de servicio. Reintente en unos segundos.");
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la reprogramación de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la reprogramación de servicio. Reintente en unos segundos.");
   },
 
   async cancel(serviceId: string, input: CancelServiceInput): Promise<Service> {
@@ -845,22 +806,11 @@ export const servicesAdapter = {
       );
     }
 
-    const response = await fetchServicesApi(`/api/services/${serviceId}/cancel`, {
+    return requestServicio(`/api/services/${serviceId}/cancel`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la cancelación de servicio. Reintente en unos segundos.");
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la cancelación de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la cancelación de servicio. Reintente en unos segundos.");
   },
 
   async confirmReschedule(serviceId: string, input: ConfirmRescheduleInput): Promise<Service> {
@@ -872,22 +822,11 @@ export const servicesAdapter = {
       );
     }
 
-    const response = await fetchServicesApi(`/api/services/${serviceId}/confirm-reschedule`, {
+    return requestServicio(`/api/services/${serviceId}/confirm-reschedule`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la confirmación de reprogramación. Reintente en unos segundos.");
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la confirmación de reprogramación. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la confirmación de reprogramación. Reintente en unos segundos.");
   },
 
   async getZoneResults(serviceId: string): Promise<ZoneResult[]> {
@@ -927,10 +866,7 @@ export const servicesAdapter = {
 
     if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida del registro de zona. Reintente en unos segundos.");
 
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
+    const raw = unwrapData(payload);
 
     const parsed = zoneResultSchema.safeParse(raw);
     if (!parsed.success) {
@@ -1032,18 +968,7 @@ export const servicesAdapter = {
       requestInit.body = JSON.stringify(parsedInput.data);
     }
 
-    const response = await fetchServicesApi(`/api/services/${serviceId}/complete`, requestInit);
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la finalización de servicio. Reintente en unos segundos.");
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la finalización de servicio. Reintente en unos segundos.");
+    return requestServicio(`/api/services/${serviceId}/complete`, requestInit, "No se pudo obtener información válida de la finalización de servicio. Reintente en unos segundos.");
   },
 };
 
