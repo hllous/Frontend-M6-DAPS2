@@ -236,6 +236,28 @@ export function handleRouteError(error: unknown, path: string, fallbackMessage: 
   return mapSessionError(error, path, fallbackMessage);
 }
 
+/**
+ * Lee el cuerpo JSON y lo valida con `schema`. Devuelve `{ data }` o el error 400 de Problem Details
+ * (JSON inválido, o los mensajes del esquema unidos por espacios).
+ */
+export async function parseJsonBody<S extends z.ZodType>(
+  request: Request,
+  schema: S,
+  path: string,
+): Promise<{ data: z.output<S> } | NextResponse> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
+  }
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+  }
+  return { data: parsed.data };
+}
+
 export function forwardResponse(response: Response, path = bffPathForResponse(response) ?? ""): NextResponse {
   const contentType = response.headers.get("content-type");
   const bodyless = [204, 205, 304].includes(response.status);

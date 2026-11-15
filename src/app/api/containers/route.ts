@@ -1,4 +1,4 @@
-import { backendMode, backendQuery, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
+import { backendMode, backendQuery, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -72,17 +72,8 @@ export async function POST(request: Request) {
       return errorResponse(403, "Solo el rol de Oficina puede gestionar contenedores.", path);
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = createContainerInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
-    }
+    const parsed = await parseJsonBody(request, createContainerInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/containers", "container:manage", {

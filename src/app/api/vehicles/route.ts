@@ -1,4 +1,4 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -43,10 +43,8 @@ export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = requireOfficeCapability(request);
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = createVehicleInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, createVehicleInputSchema, path);
+    if (parsed instanceof Response) return parsed;
     if (backendMode(session)) {
       const response = await fetchBackend(request, "/vehicles", "vehicle:manage", {
         method: "POST",

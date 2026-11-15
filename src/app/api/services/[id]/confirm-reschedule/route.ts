@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -27,21 +27,8 @@ export async function POST(
     // Permission check: reprogramming is an Office decision, not a Field action.
     authorize(session, { office: true, officeMessage: "Solo Oficina puede confirmar la nueva fecha de un servicio.", capability: "service:reschedule", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = confirmRescheduleInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(
-        400,
-        parsed.error.issues.map((i) => i.message).join(" "),
-        path,
-      );
-    }
+    const parsed = await parseJsonBody(request, confirmRescheduleInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     const input = parsed.data;
 

@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError } from "@/lib/bff-route";
+import { backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -120,10 +120,8 @@ export async function POST(request: Request) {
       return errorResponse(403, "Su rol no permite crear derivaciones.", path, FORBIDDEN_CODES.roleRequired);
     }
 
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = createRepairRequestInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, createRepairRequestInputSchema, path);
+    if (parsed instanceof Response) return parsed;
     if (backendMode(session)) {
       const sourcePath = parsed.data.detectedInType === "SERVICE" ? "/services" : "/environmental-inspections";
       const sourceResponse = await fetchBackend(request, `${sourcePath}/${pathId(parsed.data.detectedInId)}`);

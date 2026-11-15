@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -29,21 +29,8 @@ export async function POST(
     // Permission check: cancellation is an Office decision, not a Field action.
     authorize(session, { office: true, officeMessage: "Solo Oficina puede cancelar un servicio.", capability: "service:cancel", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = cancelServiceInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(
-        400,
-        parsed.error.issues.map((i) => i.message).join(" "),
-        path,
-      );
-    }
+    const parsed = await parseJsonBody(request, cancelServiceInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     const input = parsed.data;
 

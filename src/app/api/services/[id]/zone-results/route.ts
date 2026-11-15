@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -77,21 +77,8 @@ export async function POST(
 
     authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para registrar resultados de zona. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = recordZoneResultInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(
-        400,
-        parsed.error.issues.map((i) => i.message).join(" "),
-        path,
-      );
-    }
+    const parsed = await parseJsonBody(request, recordZoneResultInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     const input = parsed.data;
 

@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, forwardResponse, requireCrewScope, handleRouteError } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, forwardResponse, requireCrewScope, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -33,21 +33,8 @@ export async function POST(
     // Permission check: only actors with service:execute capability (Crew Leader of the assigned crew)
     authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para suspender el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = suspendServiceRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(
-        400,
-        parsed.error.issues.map((i) => i.message).join(" "),
-        path,
-      );
-    }
+    const parsed = await parseJsonBody(request, suspendServiceRequestSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     const input = parsed.data;
 

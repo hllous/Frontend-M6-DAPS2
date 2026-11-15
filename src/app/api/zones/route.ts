@@ -1,4 +1,4 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -60,17 +60,8 @@ export async function POST(request: Request) {
 
     authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede crear zonas operativas.", capability: "zone:manage", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = createZoneInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
-    }
+    const parsed = await parseJsonBody(request, createZoneInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/zones", "zone:manage", {
