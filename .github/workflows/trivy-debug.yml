@@ -12,17 +12,14 @@ jobs:
       - uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514
         with:
           version: v0.70.0
+      - uses: ./.github/actions/setup-node-pnpm
       - name: variantes
         run: |
-          mkdir a b c
-          cp pnpm-lock.yaml a/
-          tail -n +2 pnpm-lock.yaml > b/pnpm-lock.yaml
-          python3 - <<'PY'
-          import re
-          s=open('pnpm-lock.yaml').read()
-          s=s.replace("    configDependencies: {}\n","")
-          s=re.sub(r"    packageManagerDependencies:\n      pnpm:\n        specifier: [^\n]*\n        version: [^\n]*\n","",s)
-          open('c/pnpm-lock.yaml','w').write(s)
-          PY
-          head -12 c/pnpm-lock.yaml
-          for d in a b c; do echo "=== $d"; trivy fs --scanners vuln --severity HIGH,CRITICAL --skip-db-update=false -f table $d 2>&1 | grep -E "Total|lodash|WARN|CVE-2021-23337|not found" | head -5; done
+          mkdir d e
+          cp pnpm-lock.yaml package.json d/
+          echo "=== d (con package.json, dev deps)"
+          trivy fs --scanners vuln --severity HIGH,CRITICAL --include-dev-deps -f table d 2>&1 | grep -E "Total|lodash|WARN|not found" | head -5
+          echo "=== e (sbom)"
+          pnpm --version
+          pnpm sbom --sbom-format cyclonedx --prod > e/sbom.json 2> e/err.txt; echo exit $?; head -c 300 e/err.txt; ls -la e; head -c 400 e/sbom.json; echo
+          trivy sbom --severity HIGH,CRITICAL -f table e/sbom.json 2>&1 | grep -E "Total|lodash|WARN|CVE-2021-23337|not found|FATAL" | head -8
