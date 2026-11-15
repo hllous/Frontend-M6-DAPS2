@@ -185,7 +185,7 @@ jobs:
       - name: Playwright smoke and accessibility suite
         run: |
           grep=$(node scripts/ci/e2e-shard.cjs --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }})
-          pnpm exec playwright test --project=chromium --grep "$grep"
+          pnpm exec playwright test --project=chromium --repeat-each=3 --retries=0 --grep "$grep"
 
       - name: Upload Playwright report
         if: ${{ failure() }}
