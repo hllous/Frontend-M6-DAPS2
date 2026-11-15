@@ -1,4 +1,4 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -6,7 +6,6 @@ import { serviceFrequencyResponseFixture, addServiceFrequencyFixture, filterServ
 import { serviceFrequencyCreateInputSchema, serviceFrequencyShiftSchema, type ServiceFrequencyQuery } from "@/lib/service-frequencies";
 import { serviceTypeFixtures } from "@/lib/service-type-fixtures";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 
@@ -40,9 +39,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(paginateServiceFrequencyFixtures(filterServiceFrequencyFixtures(query), query.page, query.pageSize));
   } catch (error) {
-    if (error instanceof InvalidSessionError) { recordTelemetryEvent({ name: "auth_session_expired", status: 401 }); return errorResponse(401, "La sesión no está activa.", path); }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudieron cargar las frecuencias de servicio.");
+    return handleRouteError(error, path, "No se pudieron cargar las frecuencias de servicio.");
   }
 }
 

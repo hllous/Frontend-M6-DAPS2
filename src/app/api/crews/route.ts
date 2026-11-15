@@ -1,4 +1,4 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -7,7 +7,6 @@ import { createCrewInputSchema, type CrewQuery, crewSchema, crewSpecialtySchema,
 import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 
@@ -90,9 +89,7 @@ export async function GET(request: Request) {
     const scopedQuery = scenario.actor.kind === "FIELD" ? { ...query, crewId: scenario.actor.crewId } : query;
     return NextResponse.json(paginateCrewFixtures(filterCrewFixtures(scopedQuery), query.page, query.pageSize));
   } catch (error) {
-    if (error instanceof InvalidSessionError) { recordTelemetryEvent({ name: "auth_session_expired", status: 401 }); return errorResponse(401, "La sesión no está activa.", path); }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudieron cargar las cuadrillas.");
+    return handleRouteError(error, path, "No se pudieron cargar las cuadrillas.");
   }
 }
 

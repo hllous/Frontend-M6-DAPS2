@@ -1,4 +1,4 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -46,14 +46,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(paginateRouteFixtures(filterRouteFixtures(query), query.page, query.pageSize));
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudieron cargar los recorridos.");
+    return handleRouteError(error, path, "No se pudieron cargar los recorridos.");
   }
 }
 

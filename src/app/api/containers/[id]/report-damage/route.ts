@@ -1,11 +1,10 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getContainerFixture, reportDamageFixture } from "@/lib/containers-fixtures";
 import { reportDamageInputSchema } from "@/lib/containers";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -64,11 +63,6 @@ export async function POST(
     const updated = reportDamageFixture(id, parsed.data);
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo reportar el daño del contenedor.");
+    return handleRouteError(error, path, "No se pudo reportar el daño del contenedor.");
   }
 }

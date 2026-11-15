@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError } from "@/lib/bff-route";
+import { backendMode, errorResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -10,9 +10,7 @@ import type { RouteReferenceReport } from "@/lib/routes";
 import {
   AuthUnavailableError,
   getRequiredSession,
-  InvalidSessionError,
 } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
 import { getRouteFixture, getRouteReferences } from "@/lib/routes-fixtures";
 
 
@@ -69,13 +67,6 @@ export async function GET(
     const report = getRouteReferences(id);
     return NextResponse.json(report);
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudieron obtener las referencias del recorrido.");
+    return handleRouteError(error, path, "No se pudieron obtener las referencias del recorrido.");
   }
 }

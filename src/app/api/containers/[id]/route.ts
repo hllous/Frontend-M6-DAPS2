@@ -1,12 +1,11 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { containerFixtures, updateContainerFixture } from "@/lib/containers-fixtures";
 import { updateContainerInputSchema } from "@/lib/containers";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -38,12 +37,7 @@ export async function GET(
 
     return NextResponse.json(container);
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo cargar el contenedor.");
+    return handleRouteError(error, path, "No se pudo cargar el contenedor.");
   }
 }
 
@@ -93,11 +87,6 @@ export async function PATCH(
     const updated = updateContainerFixture(id, parsed.data);
     return NextResponse.json(updated);
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo actualizar el contenedor.");
+    return handleRouteError(error, path, "No se pudo actualizar el contenedor.");
   }
 }

@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -7,8 +7,7 @@ import {
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { cancelServiceInputSchema, STATUS_LABEL } from "@/lib/services";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -92,13 +91,6 @@ export async function POST(
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudo cancelar el servicio.");
+    return handleRouteError(error, path, "No se pudo cancelar el servicio.");
   }
 }
