@@ -33,6 +33,8 @@ export default defineConfig({
         "src/test/**",
         // Handlers y fixtures de MSW: infraestructura de test y modo mock, no código de la app.
         "src/mocks/**",
+        // Datos de prueba del modo mock (también excluidos de Sonar).
+        "src/lib/services-fixtures.ts",
         // Componentes de shadcn idénticos a los que genera el CLI (verificados uno a uno).
         "src/components/ui/card.tsx",
         "src/components/ui/chart.tsx",
