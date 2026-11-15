@@ -1,4 +1,5 @@
 "use client";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import { errorMessage } from "@/lib/error-message";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -49,7 +50,7 @@ import {
   type GreenSpaceQuery,
   type GreenSpaceType,
 } from "@/lib/green-spaces";
-import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
+import { zoneLabel, type Zone } from "@/lib/zones";
 import type { OperationalScenario } from "@/lib/scenarios";
 import { MAX_DECIMAL_10_2 } from "@/lib/input-limits";
 
@@ -148,10 +149,9 @@ export function GreenSpacesPanel({
 
   useEffect(() => {
     let isCurrent = true;
-    void zonesAdapter
-      .list({ pageSize: 100 })
-      .then((page) => {
-        if (isCurrent) setZones(page.zones);
+    void loadReferenceCatalog("zones")
+      .then((zones) => {
+        if (isCurrent) setZones(zones);
       })
       .catch(() => undefined)
       .finally(() => {

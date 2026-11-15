@@ -72,6 +72,7 @@ describe("ServiceFrequenciesPanel", () => {
     expect(sheet).toHaveTextContent("Recorrido Casco Histórico");
     expect(within(sheet).getByRole("button", { name: "Editar" })).toBeVisible();
     expect(within(sheet).getByRole("button", { name: "Cerrar vigencia" })).toBeVisible();
+    expect(within(sheet).getByRole("button", { name: "Cerrar vigencia" })).toHaveAttribute("aria-haspopup", "dialog");
   });
 
   it("keeps Cerrar vigencia as a distinct confirmation and never calls the Services endpoint", async () => {

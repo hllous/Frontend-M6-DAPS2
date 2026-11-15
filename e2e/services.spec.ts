@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { startService } from "./support/start-service";
 import { chooseDialogOption, pickDialogDay } from "./support/services-626-controls";
 import { chooseFieldOption, chooseFieldRadio } from "./support/services-608-controls";
 
@@ -575,9 +576,14 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
 
     // 2. Reject starting service missing a required vehicle (SVC-1054)
     const card1054 = page.locator('li[data-service-id="SVC-1054"]');
-    await card1054.getByRole("button", { name: "Iniciar servicio" }).click();
+    const confirmation1054 = await startService(page, card1054);
 
-    // Backend 409 error is surfaced in UI alert
+    // Backend 409 error is surfaced inside the out-of-hours confirmation, then stays on the card
+    if (confirmation1054) {
+      await expect(confirmation1054.getByRole("alert")).toHaveText(/vehículo operativo/i);
+      await confirmation1054.getByRole("button", { name: "Cancelar" }).click();
+      await expect(confirmation1054).toBeHidden();
+    }
     const alert = card1054.getByRole("alert");
     await expect(alert).toBeVisible();
     await expect(alert).toHaveText(/El tipo de servicio requiere un vehículo operativo asignado para iniciar/i);
@@ -586,7 +592,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
     // SVC-1050 now carries #117's baseline pending StreetClosureRequest and is used
     // elsewhere to exercise that gate, so it is no longer a "starts cleanly" fixture)
     const card1096 = page.locator('li[data-service-id="SVC-1096"]');
-    await card1096.getByRole("button", { name: "Iniciar servicio" }).click();
+    await startService(page, card1096);
 
     // Status transitions to IN_PROGRESS ("En curso") in My Work list
     await expect(card1096.getByText("En curso")).toBeVisible();
@@ -630,7 +636,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
 
     const card1055 = page.locator('li[data-service-id="SVC-1055"]');
     await expect(card1055).toBeVisible();
-    await card1055.getByRole("button", { name: "Iniciar servicio" }).click();
+    await startService(page, card1055);
     await expect(card1055.getByText("En curso")).toBeVisible();
 
     // 2. Open detail view
@@ -754,7 +760,7 @@ test.describe("Field assigned service viewing, start action, and cross-view stat
 
     const card1080 = page.locator('li[data-service-id="SVC-1080"]');
     await expect(card1080).toBeVisible();
-    await card1080.getByRole("button", { name: "Iniciar servicio" }).click();
+    await startService(page, card1080);
     await expect(card1080.getByText("En curso")).toBeVisible();
 
     // 2. Open detail view and suspend it
@@ -1051,7 +1057,7 @@ test.describe("Field local drafts and Conflict resolution for offline actions @s
     await expect(card).toBeVisible();
 
     await page.route("**/api/services/*/start", (route) => route.abort("failed"));
-    await card.getByRole("button", { name: "Iniciar servicio" }).click();
+    await startService(page, card);
 
     await expect(card.getByText(/Sin enviar \(sin conexión\)/i)).toBeVisible();
     const retryButton = card.getByRole("button", { name: "Reenviar" });

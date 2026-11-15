@@ -49,6 +49,7 @@ describe("IntegrationMonitor", () => {
     await user.click((await screen.findAllByRole("button", { name: "Ver detalle de containerDamaged" }))[0]);
     const detail = await screen.findByRole("dialog", { name: "Detalle del evento" });
     expect(within(detail).getByText(/"severity": "HIGH"/)).toBeVisible();
+    expect(within(detail).getByRole("button", { name: "Reintentar evento" })).toHaveAttribute("aria-haspopup", "dialog");
     await user.click(within(detail).getByRole("button", { name: "Reintentar evento" }));
 
     const confirmation = await screen.findByRole("dialog", { name: "Confirmar reintento" });
@@ -87,6 +88,7 @@ describe("IntegrationMonitor", () => {
     const user = userEvent.setup();
     render(<IntegrationMonitor canManage initialTab="events" />);
 
+    expect(await screen.findByRole("button", { name: "Reintentar eventos fallidos" })).toHaveAttribute("aria-haspopup", "dialog");
     await user.click(await screen.findByRole("button", { name: "Reintentar eventos fallidos" }));
     const confirmation = await screen.findByRole("dialog", { name: "Reintentar eventos fallidos" });
     await user.clear(within(confirmation).getByRole("spinbutton", { name: "Límite de reintentos" }));
@@ -120,6 +122,14 @@ describe("IntegrationMonitor", () => {
     expect(within(table).getByText("Informó un daño")).toBeVisible();
     expect(within(table).getAllByText("Activo").length).toBeGreaterThan(0);
     expect(within(table).queryByText(/Acción registrada/)).not.toBeInTheDocument();
+  });
+
+  it("shows an inbox event READ row with its Spanish labels", async () => {
+    render(<IntegrationMonitor canManage initialTab="activity" />);
+
+    const table = await screen.findByRole("table", { name: "Registro de actividad" });
+    expect(within(table).getByText("Consultó el dato")).toBeVisible();
+    expect(within(table).getByRole("link", { name: /Ver actividad de Evento recibido 550e8400-e29b-41d4-a716-446655440051/ })).toBeVisible();
   });
 
   it("falls back to a Spanish label for unknown values and shows the raw code only to administrators", async () => {

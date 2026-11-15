@@ -352,6 +352,7 @@ describe("ReferralsWorkspace", () => {
     const list = await screen.findByRole("region", { name: "Lista de derivaciones" });
     await user.click(within(list).getByRole("button", { name: /Reparación · Pavimento roto · Bulevar Costero y Calle 12/ }));
     const detail = await screen.findByRole("region", { name: "Detalle de Reparación · Pavimento roto · Bulevar Costero y Calle 12" });
+    expect(within(detail).getByRole("button", { name: "Registrar inicio" })).toHaveAttribute("aria-haspopup", "dialog");
     await user.click(within(detail).getByRole("button", { name: "Registrar inicio" }));
 
     const dialog = screen.getByRole("dialog");

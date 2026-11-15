@@ -11,10 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CompactPager } from "@/components/ui/compact-pager";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -31,12 +32,14 @@ import { servicesAdapter, ServiceRequestError, OVERRIDE_NOTE_MIN, OVERRIDE_NOTE_
 import { resolveServiceType, TREE_PRUNING_SERVICE_TYPE_RULE } from "@/lib/service-types";
 import { treeInterventionCreateInputSchema, treeInterventionsAdapter, TreeInterventionRequestError, type TreeIntervention, type TreeInterventionCreateInput, type TreeInterventionDetail, type TreeInterventionPriority, type TreeInterventionStatus, type TreeInterventionType, type TreeInterventionQuery } from "@/lib/tree-interventions";
 import { asksForOverrideNote } from "@/lib/crew-fit";
-import { crewsAdapter, type Crew } from "@/lib/crews";
-import { vehiclesAdapter, type Vehicle } from "@/lib/vehicles";
+import type { Crew } from "@/lib/crews";
+import type { Vehicle } from "@/lib/vehicles";
 import { todayInArgentina } from "@/lib/argentina-date";
 import { serviceSourceHref } from "@/lib/referrals";
 import type { OperationalScenario } from "@/lib/scenarios";
 import type { Tree } from "@/lib/trees";
+import { loadReferenceCatalog, REFERENCE_UNAVAILABLE, treeReferenceName } from "@/lib/reference-catalog";
+import { useTreeReferences } from "@/lib/use-reference-catalog";
 
 export const TREE_INTERVENTION_LABELS: Record<TreeInterventionType, string> = {
   FORMATION_PRUNING: "Poda de formación",
@@ -111,9 +114,6 @@ function formFor(props: RequestDialogProps): RequestForm {
   };
 }
 
-function treeName(tree: Tree) {
-  return `${tree.surveyCode} · ${tree.species ?? "Especie no registrada"}`;
-}
 
 function dateTimeLabel(value?: string | null) {
   return value ? new Intl.DateTimeFormat("es-AR", {
@@ -149,7 +149,7 @@ function writeUnsynced(interventionId: string, serviceId: string | null) {
 
 function treeTargetRef(trees: Tree[], treeIds: string[]) {
   return (trees.length ? trees : treeIds.map((id) => ({ id, surveyCode: id, species: "Árbol", address: null } as Tree)))
-    .map((tree) => treeName(tree))
+    .map((tree) => treeReferenceName(tree))
     .join("; ");
 }
 
@@ -210,7 +210,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
             <Field data-invalid={fieldHasError("treeIds")}>
               <FieldLabel htmlFor="intervention-trees">Árboles a intervenir <span aria-hidden="true">*</span></FieldLabel>
               <Select
-                items={Object.fromEntries(props.trees.map((tree) => [tree.id, `${treeName(tree)} · ${tree.address ?? "Sin dirección"}`]))}
+                items={Object.fromEntries(props.trees.map((tree) => [tree.id, `${treeReferenceName(tree)} · ${tree.address ?? "Sin dirección"}`]))}
                 multiple
                 value={form.treeIds}
                 onValueChange={(value) => {
@@ -222,7 +222,7 @@ export function TreeInterventionRequestDialog(props: RequestDialogProps) {
                 <SelectTrigger id="intervention-trees" aria-label="Árboles a intervenir" aria-required="true" aria-invalid={fieldHasError("treeIds")} aria-describedby={fieldHasError("treeIds") ? "intervention-trees-error" : undefined}>
                   <SelectValue placeholder="Seleccione uno o más árboles" />
                 </SelectTrigger>
-                <SelectContent><SelectGroup>{props.trees.map((tree) => <SelectItem key={tree.id} value={tree.id}>{treeName(tree)} · {tree.address ?? "Sin dirección"}</SelectItem>)}</SelectGroup></SelectContent>
+                <SelectContent><SelectGroup>{props.trees.map((tree) => <SelectItem key={tree.id} value={tree.id}>{treeReferenceName(tree)} · {tree.address ?? "Sin dirección"}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
               
               {fieldHasError("treeIds") ? <FieldError id="intervention-trees-error">{formError}</FieldError> : null}
@@ -279,8 +279,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [activeAction, setActiveAction] = useState<"submit" | "authorize" | "reject" | "schedule" | "retry-link" | null>(null);
-  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [activeAction, setActiveAction] = useState<"submit" | "schedule" | "retry-link" | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState(emptySchedule);
   const [scheduleFieldErrors, setScheduleFieldErrors] = useState<ScheduleField[]>([]);
@@ -310,8 +309,8 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
   useEffect(() => {
     if (!scheduleOpen) return;
     let current = true;
-    void Promise.all([crewsAdapter.list({ active: true, pageSize: 100 }), vehiclesAdapter.list({ active: true, pageSize: 100 })])
-      .then(([crewsPage, vehiclesPage]) => { if (current) setResources({ crews: crewsPage.crews, vehicles: vehiclesPage.vehicles }); })
+    void Promise.all([loadReferenceCatalog("crews", { active: true }), loadReferenceCatalog("vehicles", { active: true })])
+      .then(([crews, vehicles]) => { if (current) setResources({ crews, vehicles }); })
       .catch(() => { if (current) setResources("error"); });
     return () => { current = false; };
   }, [scheduleOpen]);
@@ -394,10 +393,34 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
     if (intervention) void Promise.resolve().then(() => openDetail(intervention));
     else void treeInterventionsAdapter.get(initialDetailId).then(openDetail).catch(() => undefined);
   }, [state, initialDetailId, detail, openDetail]);
-  const treeById = (id: string) => trees.find((tree) => tree.id === id);
+  // Los árboles vinculados se resuelven por id (cualquier estado, sin depender de la primera página del censo).
+  const shownTreeIds = useMemo(() => [
+    ...(state.status === "ready" ? state.page.interventions.flatMap((intervention) => intervention.treeIds) : []),
+    ...(detail && !detail.trees ? detail.treeIds : []),
+  ], [state, detail]);
+  const treeReferences = useTreeReferences(shownTreeIds);
+  /** Árbol vinculado: el embebido en el detalle o el resuelto por id; `null` mientras carga, `undefined` si no existe. */
+  const linkedTree = (id: string) => detail?.trees?.find((tree) => tree.id === id) ?? treeReferences.lookup(id);
+  const treeById = (id: string) => linkedTree(id) ?? undefined;
   const [crewConflict, setCrewConflict] = useState(false);
   const [overrideNote, setOverrideNote] = useState("");
-  const runAction = async (action: "submit" | "authorize" | "reject" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
+  // #910: autorizar y rechazar se confirman; el error queda dentro del diálogo de confirmación.
+  const decide = async (action: "authorize" | "reject"): Promise<string | null> => {
+    if (!detail) return null;
+    try {
+      const updated = action === "authorize" ? await treeInterventionsAdapter.authorize(detail.id) : await treeInterventionsAdapter.reject(detail.id);
+      setDetail(updated);
+      setActionError(null);
+      setScheduleOpen(false);
+      setRequestVersion((version) => version + 1);
+      setDuplicateService(null);
+      setNotice(action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
+      return null;
+    } catch (caught) {
+      return errorMessage(caught, "No se pudo actualizar la intervención.");
+    }
+  };
+  const runAction = async (action: "submit" | "schedule", input?: ReturnType<typeof emptySchedule>) => {
     if (!detail) return;
     setActionError(null); setActiveAction(action);
     try {
@@ -442,17 +465,12 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
         return;
       }
 
-      const updated = action === "submit"
-        ? await treeInterventionsAdapter.submitForAuthorization(detail.id)
-        : action === "authorize"
-          ? await treeInterventionsAdapter.authorize(detail.id)
-          : await treeInterventionsAdapter.reject(detail.id);
+      const updated = await treeInterventionsAdapter.submitForAuthorization(detail.id);
       setDetail(updated);
       setScheduleOpen(false);
       setRequestVersion((version) => version + 1);
       setDuplicateService(null);
-      setNotice(action === "submit" ? "Extracción enviada a autorización." : action === "authorize" ? "La intervención fue autorizada." : "La extracción fue rechazada. Puede crear una nueva solicitud con los mismos datos.");
-      if (action === "reject") setRejectConfirmOpen(false);
+      setNotice("Extracción enviada a autorización.");
     } catch (caught) {
       if (action === "schedule" && caught instanceof ServiceRequestError && caught.status === 409 && asksForOverrideNote(caught.message)) { setCrewConflict(true); return; }
       setActionError(errorMessage(caught, "No se pudo actualizar la intervención."));
@@ -599,12 +617,12 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
           }}
         />
       ) : null}
-      <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); setRejectConfirmOpen(false); } }}>
+      <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) { serviceLookupRequest.current += 1; setDetail(null); setUnsyncedService(null); setServiceLookupStatus("idle"); } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle de la intervención</DialogTitle></DialogHeader>
           {detailLoading ? <LoadingRegion label="Detalle de la intervención"><DetailFieldsSkeleton fieldCount={6} /></LoadingRegion> : null}
           {detailError ? <Alert variant="destructive"><AlertDescription>{detailError}</AlertDescription></Alert> : null}
-          {detail && !detailLoading && !detailError ? <div className="flex shrink-0 flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{(detail.trees ?? detail.treeIds.map((id) => treeById(id))).map((tree, index) => <Item key={tree?.id ?? detail.treeIds[index]} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : detail.treeIds[index]}</Item>)}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
+          {detail && !detailLoading && !detailError ? <div className="flex shrink-0 flex-col gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{TREE_INTERVENTION_LABELS[detail.interventionType]}</p><InterventionStatusBadge status={detail.status} /></div><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridad</dt><dd className="mt-0.5">{detail.priority === null ? "—" : <Badge variant={PRIORITY_BADGE_VARIANTS[detail.priority]}>{PRIORITY_LABELS[detail.priority]}</Badge>}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fecha de solicitud</dt><dd className="mt-0.5 tabular-nums">{dateTimeLabel(detail.createdAt)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dirección</dt><dd className="mt-0.5">{detail.address ?? "Sin dirección registrada"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Corte de calle</dt><dd className="mt-0.5">{detail.requiresStreetClosure ? "Sí" : "No"}</dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Árboles vinculados</dt><dd className="mt-1"><ItemGroup className="gap-2">{detail.treeIds.map((id) => { const tree = linkedTree(id); return <Item key={id} variant="muted" className="rounded-xl border-border bg-muted py-2">{tree ? <><span className="font-medium">{treeReferenceName(tree)}</span><span className="block text-xs text-muted-foreground">{tree.address ?? "Sin dirección registrada"}</span></> : tree === null ? <Skeleton aria-hidden="true" className="h-4 w-40" /> : <span className="text-muted-foreground">{REFERENCE_UNAVAILABLE.trees}</span>}</Item>; })}</ItemGroup></dd></div><div className="sm:col-span-2"><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Justificación</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div></dl></div> : null}
           {detail && !detailLoading && !detailError ? (
             <>
               {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
@@ -683,6 +701,7 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
                   </form>
                 ) : null}
                 {detail.status === "REJECTED" && canRequest ? <p className="text-sm text-muted-foreground">Extracción rechazada. Puede crear otra solicitud.</p> : null}
+                {canAuthorize && detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED" ? <p className="text-sm text-muted-foreground">Una poda Solicitada se autoriza directamente. Solo la extracción pasa por Pendiente de autorización, donde se puede rechazar.</p> : null}
               </div>
             </>
           ) : null}
@@ -694,18 +713,32 @@ export function TreeInterventionsPanel({ scenario }: { scenario: OperationalScen
               {detail.interventionType === "REMOVAL" && detail.status === "REQUESTED" && canRequest ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} aria-busy={activeAction === "submit"} onClick={() => void runAction("submit")}><Send data-icon="inline-start" aria-hidden />{activeAction === "submit" ? "Enviando a autorización…" : "Enviar a autorización"}</Button> : null}
               {detail.status === "REJECTED" && canRequest ? <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" onClick={() => { setDetail(null); openRequest({ initialTreeIds: detail.treeIds, initialType: detail.interventionType, initialAddress: detail.address ?? undefined, initialRequiresStreetClosure: detail.requiresStreetClosure, initialPriority: detail.priority ?? undefined, initialJustification: detail.justification ?? "" }); }}>Crear nueva solicitud</Button> : null}
               {((canAuthorizeRemoval && detail.interventionType === "REMOVAL" && detail.status === "PENDING_AUTHORIZATION") || (canAuthorize && detail.interventionType !== "REMOVAL" && detail.status === "REQUESTED")) ? <>
-                {detail.interventionType === "REMOVAL" ? <Button type="button" variant="destructive" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(true)}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button> : null}
-                <Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null} aria-busy={activeAction === "authorize"} onClick={() => void runAction("authorize")}><CheckCircle2 data-icon="inline-start" aria-hidden />{activeAction === "authorize" ? "Autorizando intervención…" : "Autorizar intervención"}</Button>
+                {detail.interventionType === "REMOVAL" ? (
+                  <ConfirmActionDialog
+                    trigger={<Button type="button" variant="destructive" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null}><CircleX data-icon="inline-start" aria-hidden />Rechazar intervención</Button>}
+                    title="Confirmar rechazo"
+                    description="La extracción quedará rechazada. No se puede deshacer."
+                    confirmLabel="Confirmar rechazo de intervención"
+                    tone="destructive"
+                    onConfirm={() => decide("reject")}
+                  />
+                ) : null}
+                <ConfirmActionDialog
+                  trigger={<Button type="button" className="w-full min-w-0 whitespace-normal sm:w-auto" disabled={activeAction !== null}><CheckCircle2 data-icon="inline-start" aria-hidden />Autorizar intervención</Button>}
+                  title="Autorizar intervención"
+                  description="La intervención pasa a Autorizada y queda lista para programar su servicio."
+                  confirmLabel="Autorizar intervención"
+                  onConfirm={() => decide("authorize")}
+                >
+                  <dl className="grid gap-3 text-sm">
+                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{detail.treeIds.length > 1 ? "Árboles" : "Árbol"}</dt><dd className="mt-0.5">{detail.treeIds.map((id) => { const tree = linkedTree(id); return tree ? treeReferenceName(tree) : REFERENCE_UNAVAILABLE.trees; }).join(", ")}</dd></div>
+                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo de intervención</dt><dd className="mt-0.5">{TREE_INTERVENTION_LABELS[detail.interventionType]}</dd></div>
+                    <div><dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Motivo</dt><dd className="mt-0.5 whitespace-pre-wrap">{detail.justification ?? "Sin justificación registrada."}</dd></div>
+                  </dl>
+                </ConfirmActionDialog>
               </> : null}
             </> : null}
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={rejectConfirmOpen} onOpenChange={(open) => { if (!activeAction) setRejectConfirmOpen(open); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar rechazo</DialogTitle><DialogDescription>La extracción quedará rechazada. No se puede deshacer.</DialogDescription></DialogHeader>
-          {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
-          <DialogFooter><Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => setRejectConfirmOpen(false)}>Conservar solicitud</Button><Button type="button" variant="destructive" disabled={activeAction !== null} aria-busy={activeAction === "reject"} onClick={() => void runAction("reject")}>{activeAction === "reject" ? "Rechazando intervención…" : "Confirmar rechazo de intervención"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </section>

@@ -16,6 +16,7 @@ export const AUDIT_ENTITY_TYPES = [
   "VEHICLE",
   "ROUTE",
   "SANCTION_OUTCOME",
+  "INBOX_EVENT",
 ] as const;
 
 export const INBOX_STATUSES = ["processed", "failed", "pending"] as const;

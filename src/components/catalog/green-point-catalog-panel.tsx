@@ -1,4 +1,5 @@
 "use client";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import {
@@ -75,7 +76,7 @@ import {
   WASTE_TYPE_LABELS,
 } from "@/lib/green-points";
 import type { OperationalScenario } from "@/lib/scenarios";
-import { zoneLabel, zonesAdapter, type Zone } from "@/lib/zones";
+import { zoneLabel, type Zone } from "@/lib/zones";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 import { DetailFieldsSkeleton, GreenPointCardSkeleton } from "./catalog-a-loading";
@@ -197,10 +198,9 @@ export function GreenPointCatalogPanel({
 
   useEffect(() => {
     let isCurrent = true;
-    void zonesAdapter
-      .list({ pageSize: 100 })
-      .then((page) => {
-        if (isCurrent) setZones(page.zones);
+    void loadReferenceCatalog("zones")
+      .then((zones) => {
+        if (isCurrent) setZones(zones);
       })
       .catch(() => undefined)
       .finally(() => {

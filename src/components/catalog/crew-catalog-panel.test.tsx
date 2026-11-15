@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
@@ -8,6 +9,7 @@ import { scenarios } from "@/lib/scenarios";
 import { crewsAdapter } from "@/lib/crews";
 import { crewZoneAssignmentsAdapter } from "@/lib/crew-zone-assignments";
 import { crewFixtures, resetCrewFixtures } from "@/lib/crew-fixtures";
+import { zoneFixtures } from "@/lib/zones-fixtures";
 import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { CrewCatalogPanel } from "./crew-catalog-panel";
 
@@ -86,7 +88,79 @@ describe("CrewCatalogPanel", () => {
     expect(await within(members).findByText("Pedro Ruiz")).toBeVisible();
 
     await user.click(within(sheet).getByRole("button", { name: "Quitar a Pedro Ruiz" }));
-    expect(within(members).queryByText("Pedro Ruiz")).not.toBeInTheDocument();
+    const confirm = await screen.findByRole("dialog", { name: "Quitar a Pedro Ruiz" });
+    await user.click(within(confirm).getByRole("button", { name: "Quitar integrante" }));
+    await waitFor(() => expect(within(members).queryByText("Pedro Ruiz")).not.toBeInTheDocument());
+  });
+
+  describe("confirmación de Quitar integrante", () => {
+    function recordRemovals() {
+      const calls: string[] = [];
+      server.use(
+        http.delete("*/api/crews/:crewId/members/:userId", ({ request }) => {
+          calls.push(request.url);
+        }),
+      );
+      return calls;
+    }
+
+    async function openCrewA(user: ReturnType<typeof userEvent.setup>) {
+      render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      await user.click(await screen.findByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+      const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+      return { sheet, members: within(sheet).getByRole("list", { name: "Integrantes de la cuadrilla" }) };
+    }
+
+    it("anuncia el diálogo, no envía nada antes de confirmar y envía una sola vez al confirmar", async () => {
+      const calls = recordRemovals();
+      const user = userEvent.setup();
+      const { sheet, members } = await openCrewA(user);
+      const trigger = within(sheet).getByRole("button", { name: "Quitar a Carlos López" });
+      expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+
+      await user.click(trigger);
+      const confirm = await screen.findByRole("dialog", { name: "Quitar a Carlos López" });
+      expect(within(confirm).getByText(/Carlos López deja de integrar Cuadrilla A · López/)).toBeVisible();
+      expect(calls).toHaveLength(0);
+
+      await user.click(within(confirm).getByRole("button", { name: "Quitar integrante" }));
+      await waitFor(() => expect(within(members).queryByText("Carlos López")).not.toBeInTheDocument());
+      expect(calls).toHaveLength(1);
+    });
+
+    it.each([
+      ["Cancelar", async (user: ReturnType<typeof userEvent.setup>, confirm: HTMLElement) => user.click(within(confirm).getByRole("button", { name: "Cancelar" }))],
+      ["Escape", async (user: ReturnType<typeof userEvent.setup>) => user.keyboard("{Escape}")],
+      ["la X", async (user: ReturnType<typeof userEvent.setup>, confirm: HTMLElement) => user.click(within(confirm).getByRole("button", { name: "Cerrar diálogo" }))],
+    ])("al cancelar con %s no envía nada y devuelve el foco al trigger", async (_label, cancel) => {
+      const calls = recordRemovals();
+      const user = userEvent.setup();
+      const { sheet, members } = await openCrewA(user);
+      const trigger = within(sheet).getByRole("button", { name: "Quitar a Carlos López" });
+      await user.click(trigger);
+      const confirm = await screen.findByRole("dialog", { name: "Quitar a Carlos López" });
+
+      await cancel(user, confirm);
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Quitar a Carlos López" })).not.toBeInTheDocument());
+      expect(within(members).getByText("Carlos López")).toBeVisible();
+      expect(calls).toHaveLength(0);
+      await waitFor(() => expect(trigger).toHaveFocus());
+    });
+
+    it("deja el diálogo abierto con el error si quitar falla", async () => {
+      server.use(
+        http.delete("*/api/crews/:crewId/members/:userId", () =>
+          HttpResponse.json({ statusCode: 409, message: "El integrante es el líder de la cuadrilla.", error: "Conflict", timestamp: "2026-11-14T12:00:00.000Z", path: "/api/crews" }, { status: 409 }),
+        ),
+      );
+      const user = userEvent.setup();
+      const { sheet } = await openCrewA(user);
+      await user.click(within(sheet).getByRole("button", { name: "Quitar a Carlos López" }));
+      const confirm = await screen.findByRole("dialog", { name: "Quitar a Carlos López" });
+      await user.click(within(confirm).getByRole("button", { name: "Quitar integrante" }));
+      expect(await within(confirm).findByRole("alert")).toHaveTextContent("El integrante es el líder de la cuadrilla.");
+      expect(within(confirm).getByRole("button", { name: "Quitar integrante" })).toBeEnabled();
+    });
   });
 
   it("reserves the scrollbar gutter on the detail body so adding a member does not shift the layout", async () => {
@@ -278,13 +352,41 @@ describe("nombres de referencias de cuadrilla", () => {
   });
 });
 
+describe("zonas de cuadrilla fuera de la primera página de zonas", () => {
+  it("muestra el nombre de la zona en la tabla, el detalle y el combo de edición", async () => {
+    const lastZone = zoneFixtures[zoneFixtures.length - 1]!;
+    expect(zoneFixtures.length).toBeGreaterThan(20);
+    const crew = crewFixtures.find((item) => item.id === "crew-a")!;
+    crew.homeZoneId = lastZone.id;
+    crew.effectiveZoneId = lastZone.id;
+    const user = userEvent.setup();
+    render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    const row = await screen.findByRole("row", { name: /Cuadrilla A/ });
+    expect(await within(row).findByText(lastZone.name)).toBeVisible();
+    expect(within(row).queryByText(lastZone.id)).not.toBeInTheDocument();
+
+    await user.click(within(row).getByRole("button", { name: "Ver detalle de Cuadrilla A · López" }));
+    const sheet = await screen.findByRole("dialog", { name: "Detalle de cuadrilla" });
+    const home = within(sheet).getByText("Zona base").closest("div")!;
+    expect(within(home).getByText(lastZone.name)).toBeVisible();
+    const effective = within(sheet).getByText("Zona vigente hoy").closest("div")!;
+    expect(within(effective).getByText(lastZone.name)).toBeVisible();
+    expect(within(sheet).queryByText(lastZone.id)).not.toBeInTheDocument();
+
+    await user.click(within(sheet).getByRole("button", { name: "Editar" }));
+    const form = await screen.findByRole("dialog", { name: /Editar cuadrilla/ });
+    expect(within(form).getByRole("combobox", { name: "Zona base" })).toHaveTextContent(lastZone.name);
+  });
+});
+
 describe("especialidad y zona de cuadrilla", () => {
   async function pick(user: ReturnType<typeof userEvent.setup>, name: string | RegExp, option: string) {
     await user.click(screen.getByRole("combobox", { name }));
     await user.click(await screen.findByRole("option", { name: option }));
   }
 
-  it("muestra especialidad y zona vigente en la tabla, con el identificador de zonas desconocidas", async () => {
+  it("muestra especialidad y zona vigente en la tabla, con un texto legible para zonas desconocidas", async () => {
     crewFixtures.find((crew) => crew.id === "crew-d")!.effectiveZoneId = "zone-inexistente";
     render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const table = await screen.findByRole("table");
@@ -295,7 +397,8 @@ describe("especialidad y zona de cuadrilla", () => {
     expect(await within(a).findByText("Belgrano")).toBeVisible();
     const d = screen.getByRole("row", { name: /Cuadrilla D/ });
     expect(within(d).getByText("Sin especialidad")).toBeVisible();
-    expect(within(d).getByText("zone-inexistente")).toBeVisible();
+    expect(await within(d).findByText("Zona no disponible")).toBeVisible();
+    expect(within(d).queryByText("zone-inexistente")).not.toBeInTheDocument();
     expect(within(screen.getByRole("row", { name: /Cuadrilla E/ })).getByText("Sin zona")).toBeVisible();
   });
 

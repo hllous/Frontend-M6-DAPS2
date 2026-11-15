@@ -158,6 +158,7 @@ test.describe("EnvironmentalReport case file", () => {
     const detail = page.getByRole("region", { name: "Detalle de EXP-2026-001001" });
     await expect(detail).toBeVisible();
     await detail.getByRole("button", { name: "Iniciar revisión" }).click();
+    await page.getByRole("dialog", { name: /^Iniciar revisión/ }).getByRole("button", { name: "Iniciar revisión" }).click();
     await expect(detail.getByRole("status", { name: /En revisión/ })).toBeVisible();
     await expect(detail.getByRole("button", { name: "Derivar expediente" })).toBeVisible();
     await expect(detail.getByRole("button", { name: "Desestimar expediente" })).toBeVisible();

@@ -103,6 +103,7 @@ describe("TreeCatalogPanel", () => {
     server.events.on("request:start", ({ request }) => { if (request.method === "DELETE") removed += 1; });
     render(<TreeCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const row = await screen.findByRole("row", { name: /ARB-00442/ });
+    expect(within(row).getByRole("button", { name: "Dar de baja" })).toHaveAttribute("aria-haspopup", "dialog");
     fireEvent.click(within(row).getByRole("button", { name: "Dar de baja" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Conservar árbol ARB-00442" }));
