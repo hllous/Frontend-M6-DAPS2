@@ -21,6 +21,14 @@ on:
     branches: [develop, test, main]
   push:
     branches: [develop, test, main]
+  # Subir a mano un análisis de Sonar (#923). `sonar_branch_name` fuerza el nombre de la rama
+  # analizada (p. ej. main) y solo se usa en disparos manuales.
+  workflow_dispatch:
+    inputs:
+      sonar_branch_name:
+        description: "Forzar sonar.branch.name (vacío = el de la rama del disparo)"
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -148,11 +156,13 @@ jobs:
           retention-days: 7
 
   # Combina los blobs de los 4 shards en un solo lcov. Vive fuera del job agregador `test`
-  # y de la branch protection: solo mide, no decide si el PR se puede mergear.
+  # y de la branch protection: solo mide, no decide si el PR se puede mergear. Solo alimenta
+  # a Sonar, y el plan Free de SonarCloud analiza PRs y la rama principal (main): se saltea
+  # en pushes a develop/test.
   unit-coverage:
     name: unit coverage
     needs: [changes, unit-shard]
-    if: ${{ !cancelled() && needs.unit-shard.result == 'success' }}
+    if: ${{ !cancelled() && needs.unit-shard.result == 'success' && (github.event_name != 'push' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -213,6 +223,7 @@ jobs:
         with:
           args: >
             -Dsonar.qualitygate.wait=false
+            ${{ inputs.sonar_branch_name && format('-Dsonar.branch.name={0}', inputs.sonar_branch_name) || '' }}
 
   test:
     name: test
