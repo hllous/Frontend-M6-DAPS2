@@ -66,12 +66,10 @@ jobs:
       - name: Smoke (scratch)
         run: |
           docker run -d --name smoke -p 3000:3000 m6-frontend:ci
-          for i in $(seq 1 30); do curl -s -o /dev/null -w "%{http_code}
-" http://localhost:3000/ && break; sleep 2; done
+          for i in $(seq 1 30); do curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ && break; sleep 2; done
           docker exec smoke id
           docker exec smoke sh -c "command -v npm npx corepack yarn || echo sin-npm-npx-corepack-yarn"
-          curl -s -o /dev/null -w "HTTP %{http_code}
-" http://localhost:3000/
+          curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:3000/
           docker logs smoke | tail -5
 
       # ── Reporte (SARIF, incluye las sin fix) ──
