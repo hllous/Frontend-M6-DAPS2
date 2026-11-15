@@ -15,10 +15,9 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-node-pnpm
       - name: variantes
         run: |
-          pnpm sbom --sbom-format cyclonedx --prod > sbom.json
-          python3 -c "import json; d=json.load(open('sbom.json')); c=d['components']; print(len(c)); print([x for x in c if x['name']=='lodash'][:1]); print(c[0])"
-          trivy sbom --scanners vuln --severity HIGH,CRITICAL -f table sbom.json 2>&1 | grep -v "^$" | tail -25 | cut -c1-200
-          echo "=== lock-only npm"
-          mkdir n && cp package.json n/ && cd n && npm install --package-lock-only --omit=dev --ignore-scripts >/dev/null 2>&1; ls; cd ..; trivy fs --scanners vuln --severity HIGH,CRITICAL -f table n 2>&1 | grep -v "^$" | tail -12 | cut -c1-200
+          pnpm sbom --sbom-format spdx --prod > sbom.spdx.json; echo exit $?
+          head -c 500 sbom.spdx.json; echo
+          trivy sbom --scanners vuln --severity HIGH,CRITICAL -f table sbom.spdx.json 2>&1 | grep -v "^$" | tail -20 | cut -c1-200
