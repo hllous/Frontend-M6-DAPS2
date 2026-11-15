@@ -188,4 +188,34 @@ describe("street closure request BFF routes", () => {
     expect(forwardedBody).not.toHaveProperty("affectedSections");
     expect(forwardedBody).not.toHaveProperty("sourceModule");
   });
+
+  async function forwardedWindow(window: { requestedFrom: string; requestedTo: string }) {
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "SCR-1003" }));
+
+    const response = await POST(new Request("http://localhost/api/street-closure-requests", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ ...requestBody(), ...window }),
+    }));
+
+    expect(response.status).toBe(200);
+    const { requestedFrom, requestedTo } = JSON.parse(String(backendFetch.mock.calls[0]?.[1]?.body));
+    return { requestedFrom, requestedTo };
+  }
+
+  it("sends a zoneless closure window to the backend as Argentina time", async () => {
+    expect(await forwardedWindow({ requestedFrom: "2026-11-15T16:00", requestedTo: "2026-11-15T18:00:30" })).toEqual({
+      requestedFrom: "2026-11-15T16:00-03:00",
+      requestedTo: "2026-11-15T18:00:30-03:00",
+    });
+  });
+
+  it("forwards a closure window that already carries a zone unchanged", async () => {
+    expect(await forwardedWindow({ requestedFrom: "2026-11-15T19:00:00.000Z", requestedTo: "2026-11-15T18:00-03:00" })).toEqual({
+      requestedFrom: "2026-11-15T19:00:00.000Z",
+      requestedTo: "2026-11-15T18:00-03:00",
+    });
+  });
 });
