@@ -22,6 +22,7 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 - [design/examples/](design/examples/README.md): ejemplos verificables del estándar de [DESIGN](../DESIGN.md).
 - [operations/deploy.md](operations/deploy.md): estado y procedimiento de despliegue.
 - [operations/external-contracts.md](operations/external-contracts.md): contratos externos, evidencia y estado de GA.
+- [security/zap.md](security/zap.md): escaneo dinámico con OWASP ZAP (workflow `dast.yml`), resultados y limitaciones.
 
 ## Dónde agregar documentación
 
