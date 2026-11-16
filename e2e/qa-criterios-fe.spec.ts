@@ -111,7 +111,7 @@ test.describe("CA-HU01 catálogos con tabla compartida, esqueleto y error", () =
 
   for (const failure of [
     { name: "un 500 del backend", status: 500, message: "Error interno del servidor." },
-    { name: "el timeout de 15 s del BFF (504)", status: 504, message: "El backend no respondió a tiempo." },
+    { name: "el timeout de 5 s del BFF (503)", status: 503, message: "El sistema no responde. Reintente en unos segundos." },
   ]) {
     for (const catalog of [
       { path: "/app/catalog/vehicles", api: "**/api/vehicles?*", heading: "Vehículos" },
@@ -127,7 +127,7 @@ test.describe("CA-HU01 catálogos con tabla compartida, esqueleto y error", () =
         await loginViaApi(page, "office-duty-queue");
         await page.goto(catalog.path);
 
-        const alert = page.getByRole("alert").filter({ hasText: /No se pudieron cargar|no respondió|Error|No se pudo/i }).first();
+        const alert = page.getByRole("alert").filter({ hasText: /No se pudieron cargar|no respondió|no responde|Error|No se pudo/i }).first();
         await expect(alert).toBeVisible();
         await expect(page.locator("table[data-slot='table'] tbody tr")).toHaveCount(0);
         await expect(page.getByRole("button", { name: /Reintentar/ }).first()).toBeVisible();
