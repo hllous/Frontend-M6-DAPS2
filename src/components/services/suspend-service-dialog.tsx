@@ -45,6 +45,7 @@ import {
 } from "@/lib/field-drafts";
 import { DraftConflictView } from "./draft-conflict-view";
 import { useRevealFirstError } from "./use-reveal-first-error";
+import { randomUuid } from "@/lib/random-id";
 
 interface SuspendDraftPayload {
   reason: NotServicedReason;
@@ -140,13 +141,11 @@ function SuspendServiceForm({
     if (!files || files.length === 0) return;
 
     const newQueued: QueuedEvidenceFile[] = Array.from(files).map((file) => ({
-      id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `file-${randomUuid()}`,
       file,
       localFilename: file.name,
       idempotencyKey:
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `idemp-${Date.now()}-${Math.random()}`,
+        randomUuid(),
       status: "pending",
     }));
 
