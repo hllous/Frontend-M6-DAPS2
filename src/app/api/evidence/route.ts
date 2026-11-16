@@ -30,6 +30,7 @@ import {
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { randomInt } from "@/lib/random-id";
 
 
 
@@ -292,7 +293,7 @@ export async function POST(request: Request) {
     const sanitizedFilename = sanitizeFilename(fileName, mimeType);
 
     const attachment: Attachment = {
-      id: `att-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `att-${randomInt(1000, 9999)}`,
       url: `/mock/evidence/${sanitizedFilename}`,
       filename: sanitizedFilename,
       contentType: mimeType,

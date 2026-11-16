@@ -14,6 +14,7 @@ import {
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { randomInt } from "@/lib/random-id";
 
 
 
@@ -131,7 +132,7 @@ export async function POST(
     }
 
     const newResult: ZoneResult = {
-      id: `ZR-${serviceId}-${Math.floor(100 + Math.random() * 900)}`,
+      id: `ZR-${serviceId}-${randomInt(100, 999)}`,
       serviceId,
       zoneId: input.zoneId,
       status: input.status,
