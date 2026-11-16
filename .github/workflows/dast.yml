@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: ZAP baseline scan (pasivo)
-        uses: zaproxy/action-baseline@v0.15.0
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: ${{ env.TARGET_URL }}
           # -a: incluye también las reglas pasivas alfa. Sin rules_file: nada se ignora.
@@ -71,6 +71,10 @@ jobs:
       # Semillas para el spider: una sitemap.xml efímera (no se commitea) con cada página y cada
       # ruta GET del BFF, derivadas del árbol de src/app. ZAP la lee sola, así que el escaneo
       # recorre /app/*, /consulta/* y /api/*, no solo la home.
+      # Los `http://` de este job son locales y efímeros: apuntan al `next start` y al M1 falso del runner
+      # (localhost / 127.0.0.1, sin salir de la máquina), que no sirven HTTPS. El de `xmlns` es el
+      # identificador de espacio de nombres del protocolo sitemap, no una conexión: con https sería
+      # un XML inválido. Hallazgo S5332 de Sonar: pendiente de marcar como Accepted/Safe por una persona.
       - name: Generate seed sitemap from the route tree
         run: |
           {
@@ -115,7 +119,7 @@ jobs:
           echo "app did not start"; cat next.log fake-m1.log; exit 1
 
       - name: ZAP full scan (activo, sin autenticar)
-        uses: zaproxy/action-full-scan@v0.13.0
+        uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c # v0.13.0
         with:
           target: http://localhost:3000
           # -j: spider AJAX además del tradicional (la app es de cliente). -a: reglas alfa.
