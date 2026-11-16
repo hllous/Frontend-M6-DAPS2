@@ -9,6 +9,9 @@ export const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=(), geolocation=(self)" },
 ];
 
+/** HSTS solo en producción (HTTPS): en desarrollo, http://localhost quedaría fijado a HTTPS en el navegador. Vercel manda el suyo; esto cubre Docker/standalone. */
+export const HSTS_HEADER = { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" };
+
 /** Las respuestas del BFF son JSON: no cargan nada, igual que el Backend. */
 export const API_CSP = "default-src 'none'; frame-ancestors 'none'";
 
@@ -43,7 +46,7 @@ const nextConfig = {
   poweredByHeader: false,
   async headers() {
     return [
-      { source: "/:path*", headers: securityHeaders },
+      { source: "/:path*", headers: process.env.NODE_ENV === "production" ? [...securityHeaders, HSTS_HEADER] : securityHeaders },
       { source: "/api/:path*", headers: [{ key: "Content-Security-Policy", value: API_CSP }] },
     ];
   },
