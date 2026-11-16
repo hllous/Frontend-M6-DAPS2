@@ -1206,6 +1206,50 @@ describe("confirmación de Iniciar revisión y Cerrar expediente (#910)", () => 
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
+  it("Cerrar expediente ofrece un motivo opcional limitado a 500 caracteres y, sin escribirlo, no manda cuerpo", async () => {
+    const bodies: string[] = [];
+    server.use(http.post("*/api/environmental-reports/:id/close", async ({ request }) => { bodies.push(await request.clone().text()); }));
+    const user = userEvent.setup();
+    const detail = await openReport(user, "ER-1004");
+    await user.click(within(detail).getByRole("button", { name: "Cerrar expediente" }));
+    const dialog = await screen.findByRole("dialog", { name: /^Cerrar expediente/ });
+    const reason = within(dialog).getByRole("textbox", { name: "Motivo (opcional)" });
+    expect(reason).toHaveAttribute("maxlength", "500");
+    expect(reason).toHaveValue("");
+    expect(within(dialog).getByText("Queda en el historial. Hasta 500 caracteres.")).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Cerrar expediente" }));
+    await waitFor(() => expect(bodies).toEqual([""]));
+  });
+
+  it.each([
+    ["el motivo recortado", "  Regularizado por el vecino.  ", JSON.stringify({ reason: "Regularizado por el vecino." })],
+    ["un motivo solo de espacios como si no hubiera", "   ", ""],
+  ])("Cerrar expediente envía %s", async (_label, typed, expectedBody) => {
+    const bodies: string[] = [];
+    server.use(http.post("*/api/environmental-reports/:id/close", async ({ request }) => { bodies.push(await request.clone().text()); }));
+    const user = userEvent.setup();
+    const detail = await openReport(user, "ER-1004");
+    await user.click(within(detail).getByRole("button", { name: "Cerrar expediente" }));
+    const dialog = await screen.findByRole("dialog", { name: /^Cerrar expediente/ });
+    await user.type(within(dialog).getByRole("textbox", { name: "Motivo (opcional)" }), typed);
+    await user.click(within(dialog).getByRole("button", { name: "Cerrar expediente" }));
+    await waitFor(() => expect(bodies).toEqual([expectedBody]));
+    expect(await within(detail).findByText("Cerrado")).toBeVisible();
+  });
+
+  it("Cerrar expediente no arrastra el motivo de una confirmación cancelada", async () => {
+    const user = userEvent.setup();
+    const detail = await openReport(user, "ER-1004");
+    await user.click(within(detail).getByRole("button", { name: "Cerrar expediente" }));
+    let dialog = await screen.findByRole("dialog", { name: /^Cerrar expediente/ });
+    await user.type(within(dialog).getByRole("textbox", { name: "Motivo (opcional)" }), "Borrador");
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /^Cerrar expediente/ })).not.toBeInTheDocument());
+    await user.click(within(detail).getByRole("button", { name: "Cerrar expediente" }));
+    dialog = await screen.findByRole("dialog", { name: /^Cerrar expediente/ });
+    expect(within(dialog).getByRole("textbox", { name: "Motivo (opcional)" })).toHaveValue("");
+  });
+
   it("Cerrar expediente deja el diálogo abierto con el error si falla", async () => {
     server.use(http.post("*/api/environmental-reports/:id/close", () => HttpResponse.json({ statusCode: 500, message: "El servicio no responde." }, { status: 500 })));
     const user = userEvent.setup();

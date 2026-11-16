@@ -75,6 +75,10 @@ export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalR
 export const reportDecisionInputSchema = z.object({ reason: reasonInput("Debe indicar el motivo.") });
 export type ReportDecisionInput = z.infer<typeof reportDecisionInputSchema>;
 
+// Backend CloseReportDto (#653): close takes an optional reason (max 500); an empty one is a 400, so it is never sent.
+export const closeReportInputSchema = z.object({ reason: reasonInput("Debe indicar el motivo.").optional() });
+export type CloseReportInput = z.input<typeof closeReportInputSchema>;
+
 // Backend RequestInformationDto: message (required, max 500) is what the citizen sees in M2;
 // requiredBy is a SUGGESTED deadline (YYYY-MM-DD; M2 sets the effective one); internalNote is
 // team-only (max 500); a blank one is dropped instead of sent as "".
@@ -613,8 +617,9 @@ export const environmentalReportsAdapter = {
       body: JSON.stringify(parsed.data),
     }), "No se pudo obtener información válida del pedido de información. Reintente en unos segundos.");
   },
-  async close(id: string): Promise<EnvironmentalReport> {
-    return transition(id, "close", "No se pudo obtener información válida de cierre. Reintente en unos segundos.");
+  async close(id: string, input: CloseReportInput = {}): Promise<EnvironmentalReport> {
+    const reason = input.reason?.trim();
+    return transition(id, "close", "No se pudo obtener información válida de cierre. Reintente en unos segundos.", reason ? decisionBody({ reason }) : undefined);
   },
 
   async schedule(reportId: string, input: EnvironmentalInspectionScheduleInput): Promise<EnvironmentalInspection> {
