@@ -24,7 +24,7 @@ import {
   X,
   Wrench,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -94,7 +94,7 @@ import { RescheduleReasonDialog } from "@/components/services/reschedule-reason-
 import { ConfirmRescheduleDialog } from "@/components/services/confirm-reschedule-dialog";
 import { ReportDecisionDialog, type ReportDecision } from "./report-decision-dialog";
 import { RequestInformationDialog } from "./request-information-dialog";
-import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
+import { MAX_REASON_LENGTH, MAX_SEARCH_LENGTH } from "@/lib/input-limits";
 
 type LoadState =
   | { status: "loading" }
@@ -337,7 +337,7 @@ export function EnvironmentalReportsWorkspace({ scenario }: { scenario: Operatio
   const handleAction = useCallback(async (action: Action, report: EnvironmentalReport, reason?: string): Promise<string | null> => {
     setAnnouncement("");
     try {
-      const updated = action === "start-review" ? await environmentalReportsAdapter.startReview(report.id) : action === "forward" ? await environmentalReportsAdapter.forward(report.id, { reason: reason ?? "" }) : action === "dismiss" ? await environmentalReportsAdapter.dismiss(report.id, { reason: reason ?? "" }) : await environmentalReportsAdapter.close(report.id);
+      const updated = action === "start-review" ? await environmentalReportsAdapter.startReview(report.id) : action === "forward" ? await environmentalReportsAdapter.forward(report.id, { reason: reason ?? "" }) : action === "dismiss" ? await environmentalReportsAdapter.dismiss(report.id, { reason: reason ?? "" }) : await environmentalReportsAdapter.close(report.id, { reason });
       replaceReport(updated);
       setAnnouncement(`${reportLabel(report)}: ${ENVIRONMENTAL_REPORT_STATUS_LABELS[updated.status]}.`);
       return null;
@@ -496,6 +496,8 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
   const [noticeError, setNoticeError] = useState<string | null>(null);
   const [issueNoticeOpen, setIssueNoticeOpen] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<ReportDecision | null>(null);
+  const [closeReason, setCloseReason] = useState("");
+  const closeReasonId = useId();
   const [requestInfoOpen, setRequestInfoOpen] = useState(false);
   const [rescheduleStep, setRescheduleStep] = useState<"reason" | "confirm" | null>(null);
   const reportTitleRef = useRef<HTMLHeadingElement>(null);
@@ -626,6 +628,13 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
         notice: linkedClaim ? `Tiene vinculado ${linkedClaim}: al cerrar, se le notifica al vecino.` : undefined,
         confirmLabel: "Cerrar expediente",
         tone: "destructive" as const,
+        children: (
+          <Field>
+            <FieldLabel htmlFor={closeReasonId}>Motivo (opcional)</FieldLabel>
+            <Textarea id={closeReasonId} rows={3} maxLength={MAX_REASON_LENGTH} value={closeReason} onChange={(event) => setCloseReason(event.target.value)} aria-describedby={`${closeReasonId}-help`} className="resize-y" />
+            <FieldDescription id={`${closeReasonId}-help`}>Queda en el historial. Hasta {MAX_REASON_LENGTH} caracteres.</FieldDescription>
+          </Field>
+        ),
       };
     }
     return {
@@ -773,7 +782,7 @@ function ReportDetail({ report, scenario, focusedInspectionId, onBack, onAction,
           const opensDecision = action === "forward" || action === "dismiss";
           const button = <Button key={action} variant={action === "forward" || action === "start-review" ? "default" : "outline"} className={`gap-2 ${toneClass ?? ""}`} {...(opensDecision ? { "aria-haspopup": "dialog" as const, onClick: () => setPendingDecision(action) } : {})}><Icon data-icon="inline-start" aria-hidden />{label}</Button>;
           if (opensDecision) return button;
-          return <ConfirmActionDialog key={action} trigger={button} finalFocus={dialogFinalFocus} {...transitionConfirmation(action)} onConfirm={async () => { const error = await onAction(action, report); if (error === null) focusTitleAfterDialogRef.current = true; return error; }} />;
+          return <ConfirmActionDialog key={action} trigger={button} finalFocus={dialogFinalFocus} {...transitionConfirmation(action)} onOpenChange={(open) => { if (open) setCloseReason(""); }} onConfirm={async () => { const error = await onAction(action, report, action === "close" ? closeReason : undefined); if (error === null) focusTitleAfterDialogRef.current = true; return error; }} />;
         })}{canRequestInfo && <Button aria-haspopup="dialog" variant="outline" className="gap-2" onClick={() => setRequestInfoOpen(true)}><MessageCircleQuestion data-icon="inline-start" aria-hidden />Pedir información al vecino</Button>}{orphanInspection && <Button aria-haspopup="dialog" className="gap-2" onClick={() => { setScheduleMode("service"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />Programar servicio</Button>}{(canSchedule || canReinspect) && <Button aria-haspopup="dialog" className="gap-2" onClick={() => { setScheduleMode(canReinspect ? "reinspection" : "schedule"); setScheduleOpen(true); }}><CalendarDays data-icon="inline-start" aria-hidden />{canReinspect ? "Programar reinspección" : "Programar inspección"}</Button>}{canReprogram && <Button aria-haspopup="dialog" variant="outline" className="gap-2" onClick={() => setRescheduleStep(activeService?.status === "RESCHEDULED" ? "confirm" : "reason")}><RefreshCw data-icon="inline-start" aria-hidden />{activeService?.status === "RESCHEDULED" ? "Confirmar nueva fecha" : "Reprogramar inspección"}</Button>}</div>{infoPending && <InformationRequestPending report={report} />}</section>}
         {scheduleError && <Alert variant="danger">{scheduleError}</Alert>}
         {canViewViolationNotice && completedViolationInspection && <ViolationNoticePanel inspection={completedViolationInspection} notice={violationNotice} loading={noticeLoading} error={noticeError} showIssue={showNoticeIssuance} canIssue={canSubmitNotice} hasEvidence={hasInspectionEvidence} onIssue={() => setIssueNoticeOpen(true)} />}
