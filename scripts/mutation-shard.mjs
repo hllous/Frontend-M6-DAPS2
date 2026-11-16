@@ -34,10 +34,14 @@ const files = [
 ];
 
 // Reparto voraz por peso (bytes del archivo, que aproxima la cantidad de mutantes y el costo de
-// probarlos). Un archivo que pesa más que un shard (src/lib/services.ts) se parte en rangos de
-// líneas (`archivo:desde-hasta`, sintaxis de `mutate` de Stryker) para que ningún shard cargue solo con él.
+// probarlos). Los bytes predicen mal el tiempo: en la corrida del 16/11 el tiempo de un shard no
+// correlacionó con sus mutantes ni con sus tests (un shard de 950 mutantes tardó 58 min y otro de
+// 2600, 41), y el shard 0, con la primera mitad de src/lib/services.ts, pasó de 112 min cuando los
+// otros 15 terminaron en menos de 64. Por eso las unidades son chicas (1/4 del peso de un shard):
+// un archivo más pesado que eso (src/lib/services.ts) se parte en rangos de líneas
+// (`archivo:desde-hasta`, sintaxis de `mutate` de Stryker) y ningún shard carga solo con un trozo caro.
 const totalBytes = files.reduce((sum, f) => sum + statSync(f).size, 0);
-const maxChunk = totalBytes / count / 2;
+const maxChunk = totalBytes / count / 4;
 const units = [];
 for (const file of files) {
   const size = statSync(file).size;
