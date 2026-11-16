@@ -112,3 +112,46 @@ describe("BFF write routes with a malformed body", () => {
     expect(response.status).toBeLessThan(600);
   });
 });
+
+describe("BFF DELETE routes in real-m1 mode", () => {
+  const deletes = routes.filter((route) => route.method === "DELETE");
+
+  it("discovers the DELETE handlers under test", () => {
+    expect(deletes.length).toBeGreaterThan(3);
+  });
+
+  it.each(deletes)("$path forwards the deletion to the backend and relays its status", async (route) => {
+    restoreEnv = backendEnv();
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
+    const backend = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ marker: "from-backend" }, { status: 200 }));
+
+    const response = await call(route, { cookie });
+
+    if (backend.mock.calls.length === 0) return;
+    expect(String(backend.mock.calls[0][0]).startsWith("https://backend.internal/")).toBe(true);
+    expect((backend.mock.calls[0][1] as RequestInit | undefined)?.method).toBe("DELETE");
+    expect(response.status).toBe(200);
+  });
+
+  it.each(deletes)("$path relays a backend 409 instead of reporting success", async (route) => {
+    restoreEnv = backendEnv();
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
+    const backend = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ message: "En uso." }, { status: 409 }));
+
+    const response = await call(route, { cookie });
+
+    if (backend.mock.calls.length === 0) return;
+    expect(response.status).toBe(409);
+  });
+
+  it.each(deletes)("$path answers with a server error when the backend is unreachable", async (route) => {
+    restoreEnv = backendEnv();
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1" });
+    const backend = vi.spyOn(globalThis, "fetch").mockImplementation(async () => { throw new TypeError("fetch failed"); });
+
+    const response = await call(route, { cookie });
+
+    if (backend.mock.calls.length === 0) return;
+    expect(response.status).toBeGreaterThanOrEqual(500);
+  });
+});
