@@ -18,7 +18,9 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 1 : 0,
+  // Sin reintentos: un reintento convertía un e2e inestable en un verde engañoso. Si uno falla,
+  // se corrige la causa (#946); la cátedra exige el mismo resultado en tres corridas.
+  retries: 0,
   workers: isCI ? 1 : undefined,
   reporter: isCI ? [["github"], ["list"], ["html", { open: "never" }]] : "list",
   use: {

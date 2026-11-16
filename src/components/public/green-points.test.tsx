@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -47,8 +47,11 @@ describe("PublicGreenPoints", () => {
     expect(screen.getByTestId("green-points-map-markers")).toHaveTextContent("Punto verde Plaza Mitre");
     expect(screen.getByTestId("green-points-map-markers")).not.toHaveTextContent("Punto verde Estación Centro");
 
-    await user.click(screen.getByRole("combobox", { name: "Tipo de residuo" }));
-    await user.click(screen.getByRole("option", { name: "Domiciliarios" }));
+    const wasteSelect = screen.getByRole("combobox", { name: "Tipo de residuo" });
+    await waitFor(() => expect(wasteSelect).toBeEnabled());
+    await user.click(wasteSelect);
+    // El popup del select se monta de forma asíncrona (portal + posicionamiento): se espera la opción.
+    await user.click(await screen.findByRole("option", { name: "Domiciliarios" }));
 
     expect(within(list).getByText("Punto verde Estación Centro")).toBeVisible();
     expect(within(list).queryByText("Punto verde Plaza Mitre")).not.toBeInTheDocument();

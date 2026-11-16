@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
@@ -20,6 +20,11 @@ import { resetTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { resetTreeFixtures } from "@/lib/tree-fixtures";
 import { resetVehicleFixtures } from "@/lib/vehicles-fixtures";
 import { resetZoneFixtures } from "@/lib/zones-fixtures";
+
+// `findBy*` y `waitFor` esperan 1 s por defecto. Un popup de Radix/Base UI o una respuesta de
+// MSW pueden tardar más con la máquina cargada: es un tope, no una pausa (retornan en cuanto
+// el elemento aparece), así que subirlo no vuelve más lentos a los tests que pasan (#946).
+configure({ asyncUtilTimeout: 10_000 });
 
 function navigate(href: string, replace = false) {
   window.history[replace ? "replaceState" : "pushState"](null, "", href);

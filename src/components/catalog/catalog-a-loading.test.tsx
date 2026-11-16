@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { delay, http } from "msw";
+import { http } from "msw";
 import { setupServer } from "msw/node";
 
 import { handlers } from "@/mocks/handlers";
@@ -25,7 +25,13 @@ afterEach(() => { server.resetHandlers(); window.localStorage.clear(); });
 afterAll(() => server.close());
 
 // Un resolver que sólo espera y no responde deja pasar la petición al handler real.
-const delayed = (path: string, ms = 250) => http.get(path, async () => { await delay(ms); });
+// La respuesta queda retenida hasta que `expectBusy` termina de comprobar el estado «cargando»:
+// con un retardo fijo (250 ms) un runner cargado lo agotaba antes de la aserción y el test
+// fallaba al azar. El gate se renueva en cada test.
+let releaseLoading: () => void = () => {};
+let loadingGate: Promise<void> = Promise.resolve();
+beforeEach(() => { loadingGate = new Promise<void>((resolve) => { releaseLoading = resolve; }); });
+const delayed = (path: string) => http.get(path, async () => { await loadingGate; });
 
 const visibleLoadingText = () => screen.queryAllByText(/Cargando(\.\.\.|…)/);
 
@@ -36,6 +42,7 @@ function expectBusy(region: HTMLElement) {
   expect(message).toHaveClass("sr-only");
   expect(region.querySelector('[data-slot="skeleton"]')).not.toBeNull();
   expect(visibleLoadingText()).toHaveLength(0);
+  releaseLoading();
 }
 
 const gone = (name: string) => waitFor(() => expect(screen.queryByRole("region", { name })).toBeNull(), { timeout: 3000 });
@@ -169,7 +176,7 @@ describe("Catalogo A loading skeletons (#589)", () => {
 
   it("explains the disabled container actions while the services lookup is pending", async () => {
     const user = userEvent.setup();
-    server.use(delayed("*/api/services", 600));
+    server.use(delayed("*/api/services"));
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
     const table = await screen.findByRole("table", { name: "Inventario de contenedores registrados" }, { timeout: 3000 });
     await user.click(within(table).getAllByRole("button", { name: /^Ver detalle de / })[0]);
@@ -177,6 +184,7 @@ describe("Catalogo A loading skeletons (#589)", () => {
     const dialog = await screen.findByRole("dialog");
     const status = await within(dialog).findByText("Verificando servicios en curso…");
     expect(status).toHaveAttribute("role", "status");
+    releaseLoading();
     await waitFor(() => expect(within(dialog).queryByText("Verificando servicios en curso…")).toBeNull(), { timeout: 3000 });
   });
 
