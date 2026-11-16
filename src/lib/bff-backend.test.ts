@@ -6,7 +6,7 @@ import { forwardResponse } from "./bff-route";
 import { createSessionCookie } from "@/test/session";
 
 const backendOrigin = "https://backend.internal";
-const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
 
 function backendRequest() {
   const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin });

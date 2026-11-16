@@ -25,7 +25,7 @@ import { loginAs } from "@/test/session";
 
 const invalidIds = ["..", "a/b", "a?b=c", "a#b", "%2e%2e"];
 const backendOrigin = "https://backend.internal";
-const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
 
 type RouteContext = { params: Promise<Record<string, string>> };
 type RouteHandler = (request: Request, context: RouteContext) => Promise<Response>;
