@@ -260,7 +260,7 @@ jobs:
   # Cada shard arranca solo el frontend mock (E2E_TARGET=mock): el servidor real-m1
   # y el fake M1 los usa únicamente el job "e2e real-m1".
   e2e-shard:
-    name: e2e shard ${{ matrix.shard }}/8
+    name: e2e shard ${{ matrix.shard }}/10
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
@@ -270,7 +270,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -283,9 +283,9 @@ jobs:
 
       # `--shard` corta bloques contiguos y los specs pesados caían juntos (un shard tardaba
       # el doble que otro). scripts/ci/e2e-shard.cjs reparte los tests por duración medida
-      # (scripts/ci/e2e-durations.json, #981): con 8 shards el más lento termina antes que
-      # con los 10 de antes en round-robin, y la corrida pide 2 runners menos. Cada shard
-      # paga ~1 min fijo (setup, `next dev` y el warm-up), así que más shards no rinden.
+      # (scripts/ci/e2e-durations.json, #981). Cada shard paga ~1 min fijo (setup, `next dev`
+      # y el warm-up) y el mismo bloque de tests varía ±25 % entre runners: con 8 shards el
+      # más lento tardaba más que con 10, así que se quedan 10.
       - name: Playwright smoke and accessibility suite
         run: |
           grep=$(node scripts/ci/e2e-shard.cjs --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }})

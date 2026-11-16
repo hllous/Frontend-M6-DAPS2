@@ -61,7 +61,7 @@ restarting to confirm you're talking to the new process, not the old one.
 
 The mock backend keeps mutated fixture state in memory for the life of
 the server process. Playwright runs serially in CI (file-alphabetical
-order within each of 8 shards, each with its own server, split by
+order within each of 10 shards, each with its own server, split by
 measured duration by `scripts/ci/e2e-shard.cjs`; a spec with `describe.serial`
 or `mode: "serial"` always stays whole in one shard), so a spec that
 reuses a fixture ID another spec file already mutates will pass locally
