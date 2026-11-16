@@ -1,0 +1,35 @@
+# Decisiones técnicas — ADRs
+
+Registro de las decisiones de arquitectura y tecnología del módulo. Cada archivo es un **ADR** (Architecture Decision Record).
+
+## Qué es un ADR
+
+Un documento corto que explica **por qué** se tomó una decisión técnica, en qué contexto, y qué consecuencias trae. Sirve para que un integrante que llega meses después entienda el razonamiento, y para no reabrir discusiones ya cerradas.
+
+Los ADRs no se reescriben una vez aceptados. Si una decisión cambia, se escribe un ADR nuevo que la reemplaza, y el viejo se marca como *Superseded by ADR-XXX* o recibe una nota de corrección fechada, como en [ADR-001](adr-001-stack-tecnologico.md) y [ADR-002](adr-002-auth-provisoria.md).
+
+## Formato
+
+Cada ADR nuevo sigue la plantilla [MADR](https://adr.github.io/madr/) de [`_template-adr.md`](_template-adr.md) (desde el ADR-014). Los ADR 001 a 013 conservan la plantilla anterior, porque un ADR aceptado no se reescribe. Numeración correlativa: `adr-001-*.md`, `adr-002-*.md`, etc.
+
+## Índice
+
+| Nº | Título | Estado | Fecha |
+|---|---|---|---|
+| [001](adr-001-stack-tecnologico.md) | Stack tecnológico del módulo | Aceptado | 2026-08-20 |
+| [002](adr-002-auth-provisoria.md) | Autenticación provisoria mientras M1 no publica su contrato de JWT | Aceptado (roles superados por ADR-008; nota del 2026-11-06) | 2026-09-02 |
+| [003](adr-003-divergencias-enums.md) | Resolución de las divergencias de enums con el acuerdo publicado | Aceptado | 2026-09-02 |
+| [004](adr-004-jwt-m1-y-puerto-identidad.md) | JWT de usuario emitido por M1 y consulta a identidad desacoplada por puerto | Aceptado | 2026-09-01 |
+| [005](adr-005-alineacion-frontend-sesion-y-seguridad.md) | Alineación de arquitectura de sesión BFF, separación de actores y postura de seguridad con el Frontend | Aceptado | 2026-09-03 |
+| [006](adr-006-rabbitmq-como-bus.md) | RabbitMQ como bus de eventos (reemplaza a Kafka) | Reemplazado parcialmente por ADR-007 | 2026-09-27 |
+| [007](adr-007-contrato-de-integracion-del-core.md) | Contrato de integración del Core (sobre, topología, reintentos, catálogo y token) | Aceptado | 2026-10-07 |
+| [008](adr-008-roles-m6-adaptados-desde-m1.md) | Roles de M6 adaptados desde el rol único de M1 y asignados localmente | Aceptado | 2026-10-21 |
+| [009](adr-009-rest-m6-a-m1-consultas-de-identidad.md) | REST de M6 a M1 solo para consultas de identidad, con el module-token del Core (excepción a ADR-006) | Aceptado | 2026-11-05 |
+| [010](adr-010-rate-limit-global.md) | Límite de tasa global con topes propios | Aceptado | 2026-11-08 |
+| [011](adr-011-errores-problem-details-rfc-9457.md) | Errores en Problem Details (RFC 9457) con los campos históricos como extensión | Aceptado | 2026-11-09 |
+| [012](adr-012-concurrencia-optimista-etag.md) | Concurrencia optimista con ETag e If-Match | Aceptado | 2026-11-09 |
+| [013](adr-013-idempotency-key.md) | `Idempotency-Key` opcional en los POST de creación | Aceptado | 2026-11-09 |
+| [014](adr-014-patron-state-maquinas-de-estado.md) | Patrón State: máquinas de estado como tablas de transiciones | Aceptado | 2026-11-10 |
+| [015](adr-015-patron-outbox-inbox.md) | Patrón Outbox/Inbox para la mensajería con el bus | Aceptado | 2026-11-10 |
+| [016](adr-016-patron-adapter-puerto-de-identidad.md) | Patrón Adapter: puerto de identidad hacia M1 | Aceptado | 2026-11-10 |
+| [017](adr-017-herramientas-analisis-estatico-y-seguridad.md) | Herramientas de análisis estático y de seguridad (SonarCloud, Trivy y ZAP) | Aceptado | 2026-11-15 |
