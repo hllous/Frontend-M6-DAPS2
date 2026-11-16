@@ -13,6 +13,7 @@ import type {
   ViolationNotice,
 } from "./environmental-reports";
 import type { Attachment } from "./services";
+import { matchesSearch } from "./fixture-search";
 import {
   ingestSanctionOutcome,
   type SanctionOutcomeIngestionResult,
@@ -350,7 +351,6 @@ export function createEnvironmentalReportFixture(input: CreateEnvironmentalRepor
 }
 
 export function filterEnvironmentalReportFixtures(query: EnvironmentalReportQuery): EnvironmentalReport[] {
-  const search = query.search?.trim().toLowerCase();
   return environmentalReportFixtures.filter((report) => {
     const day = argentinaDay(report.updatedAt);
     if (query.from && (!day || day < query.from)) return false;
@@ -361,7 +361,8 @@ export function filterEnvironmentalReportFixtures(query: EnvironmentalReportQuer
     if (query.priority && report.priority !== query.priority) return false;
     if (query.publicId && report.publicId !== query.publicId) return false;
     if (query.ticketId && report.ticketId !== query.ticketId) return false;
-    if (search && ![report.id, report.address ?? "", report.description ?? "", report.publicId ?? "", report.caseNumber ?? "", report.ticketId ?? ""].some((value) => value.toLowerCase().includes(search))) return false;
+    // Como el Backend: dirección, expediente (EXP-…) o reclamo de M2 (TK-…).
+    if (!matchesSearch(query.search, [report.address, report.caseNumber, report.publicId])) return false;
     return true;
   });
 }

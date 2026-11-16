@@ -1,4 +1,5 @@
 import type { Tree, TreeQuery } from "./trees";
+import { matchesSearch } from "./fixture-search";
 
 const INITIAL_TREES: Tree[] = [
   { id: "tree-1", surveyCode: "ARB-00442", zoneId: "zone-1", species: "Jacarandá", address: "Av. Cabildo 2100", lat: -34.5622, lng: -58.4562, heightM: 12.4, diameterCm: 48, active: true, lastSurvey: { surveyedAt: "2026-08-20T09:00:00.000Z", healthStatus: "WEAKENED", riskLevel: "HIGH", riskType: "FALLING_BRANCH", suggestedIntervention: "SAFETY_PRUNING" } },
@@ -17,7 +18,7 @@ export function filterTreeFixtures(query: TreeQuery): Tree[] {
   return treeFixtures.filter((item) => {
     if (query.active !== undefined && item.active !== query.active) return false;
     if (query.zoneId && item.zoneId !== query.zoneId) return false;
-    if (query.search && !`${item.species} ${item.address ?? ""}`.toLowerCase().includes(query.search.toLowerCase())) return false;
+    if (!matchesSearch(query.search, [item.surveyCode, item.species, item.address])) return false;
     return true;
   });
 }

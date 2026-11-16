@@ -1,5 +1,6 @@
 import type { Route, RouteQuery, RouteReferenceReport, RouteStop } from "./routes";
 import { zoneFixtures } from "./zones-fixtures";
+import { matchesSearch } from "./fixture-search";
 
 const INITIAL_ROUTE_FIXTURES: Route[] = [
   {
@@ -143,13 +144,7 @@ export function filterRouteFixtures(query: RouteQuery): Route[] {
   return routeFixtures.filter((route) => {
     if (query.active !== undefined && route.active !== query.active) return false;
     if (query.zoneId && !route.stops.some((stop) => stop.zoneId === query.zoneId)) return false;
-    if (
-      query.search &&
-      !route.name.toLowerCase().includes(query.search.toLowerCase()) &&
-      !route.code.toLowerCase().includes(query.search.toLowerCase())
-    ) {
-      return false;
-    }
+    if (!matchesSearch(query.search, [route.code, route.name])) return false;
     return true;
   });
 }

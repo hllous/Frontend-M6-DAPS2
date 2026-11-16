@@ -4,8 +4,11 @@ import { InfoIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 
-/** Marco de la sección pública: sin shell del personal, sin navegación ni pulso de sesión. */
-export function PublicShell({ children }: { children: React.ReactNode }) {
+/**
+ * Marco de la sección pública: sin shell del personal, sin navegación ni pulso de sesión.
+ * `demo` muestra el aviso de datos de prueba: solo en modo mock, nunca con el Backend real (#950).
+ */
+export function PublicShell({ children, demo = false }: { children: React.ReactNode; demo?: boolean }) {
   return (
     <div className="min-h-dvh bg-[var(--color-canvas)]">
       <header className="border-b bg-[var(--color-institutional)] text-[var(--color-on-institutional)]">
@@ -23,12 +26,14 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-        <Alert variant="info">
-          <InfoIcon aria-hidden="true" />
-          <AlertDescription>
-            Entorno de demostración: los datos que ves no son los del servicio municipal real.
-          </AlertDescription>
-        </Alert>
+        {demo ? (
+          <Alert variant="info">
+            <InfoIcon aria-hidden="true" />
+            <AlertDescription>
+              Entorno de demostración: los datos que ves no son los del servicio municipal real.
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {children}
       </main>
     </div>
