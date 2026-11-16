@@ -3,6 +3,7 @@ import {
   clickCatalogRowAction,
   expectCatalogAMutation,
   openCatalogRowDetail,
+  searchCatalogContainers,
 } from "./support/catalog-a-controls";
 import { expect, test } from "@playwright/test";
 import { loginViaApi } from "./support/auth";
@@ -39,7 +40,7 @@ test.describe("Emptying (crew) and relocation (Office) dispatch #123", () => {
     await page.goto("/app/catalog/containers");
 
     // Filter to our test container
-    await page.getByLabel("Buscar contenedor").fill(code);
+    await searchCatalogContainers(page, code);
     const row = page.locator("tr", { hasText: code });
     await expect(row).toBeVisible();
 
@@ -102,7 +103,7 @@ test.describe("Emptying (crew) and relocation (Office) dispatch #123", () => {
     await expect(createDialog).not.toBeVisible();
 
     // Filter to our test container
-    await page.getByLabel("Buscar contenedor").fill(code);
+    await searchCatalogContainers(page, code);
     const row = page.locator("tr", { hasText: code });
     await expect(row).toBeVisible();
     await expect(row.getByText("Activo")).toBeVisible();
