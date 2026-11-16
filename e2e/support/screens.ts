@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 import { loginViaApi } from "./auth";
 import type { ScenarioId } from "../../src/lib/scenarios";
@@ -55,6 +55,7 @@ export async function openAuditScreen(page: Page, screen: AuditScreen, size: { w
   await page.locator("h1, h2").filter({ hasText: screen.heading }).first().waitFor({ state: "visible" });
   await page.locator('[aria-busy="true"]').first().waitFor({ state: "detached" }).catch(() => undefined);
   await page.mouse.move(0, 0);
+  await expect(page).toHaveTitle(/.+/);
   // Las transiciones de entrada mezclan colores y dan contrastes transitorios a axe.
   await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined))));
 }

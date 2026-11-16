@@ -7,6 +7,8 @@ import { chooseDate, chooseOption } from "./support/reports-indicators";
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 async function expectNoViolations(page: Page) {
+  // El título llega con el streaming de metadatos de Next: axe no debe correr antes.
+  await expect(page).toHaveTitle(/.+/);
   const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
 }
