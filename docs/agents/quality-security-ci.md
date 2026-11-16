@@ -10,6 +10,7 @@ Guía de los análisis de calidad y seguridad del Frontend: qué corre, cómo le
 | `unit-coverage` | `ci.yml` | Después de los shards | Combina los blobs con `vitest --merge-reports --coverage` y sube `coverage-lcov` (`coverage/lcov.info`) |
 | `sonar` | `ci.yml` | Después de `unit-coverage` | Análisis de SonarCloud con esa cobertura. Se saltea sin `SONAR_TOKEN` (forks) |
 | `trivy` | `trivy.yml` | PR y push a `develop`, `test`, `main` | Dependencias (SBOM del lockfile), secretos, imagen del `Dockerfile` y configuración |
+| `mutation shard N/16` y `mutation score` | `mutation.yml` | A demanda y cada lunes 06:00 UTC | Stryker sobre `src/lib` y las rutas BFF, repartido en 16 jobs; `mutation score` junta los reportes y falla bajo el umbral (`break` en `stryker.config.json`) |
 | `zap baseline (Vercel)` y `zap active (build del CI)` | `dast.yml` | A demanda y cada lunes 06:00 UTC | ZAP pasivo contra Vercel y activo contra la app construida en el CI |
 
 La cobertura se mide y no frena nada: no hay umbral. El gate de Sonar todavía no es un check requerido (Opción C; ver el ADR).
@@ -20,6 +21,7 @@ La cobertura se mide y no frena nada: no hay umbral. El gate de Sonar todavía n
 - **SonarCloud:** [dashboard del Frontend](https://sonarcloud.io/summary/overall?id=hllous_Frontend-M6-DAPS2). Los PRs se analizan solo si el plan lo permite; la rama principal siempre. Para subir a mano un análisis, `workflow_dispatch` de `ci.yml` con `sonar_branch_name`.
 - **Exclusiones de Sonar:** viven en `sonar-project.properties`. La lista de componentes de shadcn repite `coverage.exclude` de `vitest.config.ts`: si cambiás una, cambiá la otra. Un componente de shadcn que modifiques a mano sale de la lista para que se analice.
 - **Trivy:** un check rojo en el PR o en `main` significa HIGH/CRITICAL con fix disponible; la tabla está en el log del job. Todo (incluidas las sin fix) está en Code Scanning, categorías `trivy-deps`, `trivy-fs`, `trivy-image` y `trivy-config`. Una sin fix se documenta con justificación y mitigación en `.trivyignore`; las que tienen fix se corrigen, no se ignoran. No frena el merge: Vercel despliega por su integración.
+- **Mutation testing:** reportes HTML y JSON por shard en los artifacts `mutation-report-N` y el resumen por archivo en `mutation-summary`; los mutantes que sobreviven se leen en el HTML. `pnpm mutation` corre todo en local (tarda horas); `pnpm mutation:shard <i> <n>` corre una parte. Decisión y alcance en [ADR-0009](../adr/0009-mutation-testing-con-stryker.md).
 - **ZAP:** reportes HTML y JSON como artifacts del run (vencen). La corrida final está archivada en `docs/security/`. Cada Medium lleva su justificación en `docs/security/zap.md`.
 
 ## Qué hacer ante un hallazgo

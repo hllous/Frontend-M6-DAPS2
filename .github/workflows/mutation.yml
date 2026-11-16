@@ -4,8 +4,6 @@ name: Mutation testing
 # mide aparte. Manual y semanal; los reportes HTML quedan como artifacts.
 on:
   workflow_dispatch:
-  push: # TEMPORAL-MEDICION
-    branches: [infra/966-mutation-testing-stryker]
   schedule:
     - cron: '0 6 * * 1'
 
