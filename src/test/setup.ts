@@ -9,6 +9,7 @@ import { resetEnvironmentalReportFixtures } from "@/lib/environmental-report-fix
 import { resetGreenPointFixtures } from "@/lib/green-point-fixtures";
 import { resetGreenSpaceFixtures } from "@/lib/green-space-fixtures";
 import { resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
+import { resetRecordVersions } from "@/lib/record-versions";
 import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetRouteFixtures } from "@/lib/routes-fixtures";
 import { resetServiceFrequencyFixtures } from "@/lib/service-frequency-fixtures";
@@ -122,6 +123,8 @@ beforeEach(() => {
   resetTreeFixtures();
   resetVehicleFixtures();
   resetZoneFixtures();
+  // Las versiones leídas (ETag) son de la pestaña: con los fixtures reiniciados, se olvidan como tras recargar.
+  resetRecordVersions();
 });
 
 // #397 field-draft owner for component tests
