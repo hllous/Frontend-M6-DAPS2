@@ -124,7 +124,8 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
       message: "El sistema no responde. Reintente en unos segundos.",
       error: "Service Unavailable",
     });
-    expect(backendFetch).toHaveBeenCalledTimes(1);
+    // Un GET con falla de red tiene un único reintento acotado (DEF-33, ADR-0009).
+    expect(backendFetch).toHaveBeenCalledTimes(2);
   });
 
   it.each(["field-crew-leader-route", "office-duty-queue"])("rechaza un payload inválido para %s", async (scenarioId) => {
