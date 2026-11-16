@@ -8,11 +8,11 @@ Guía de los análisis de calidad y seguridad del Frontend: qué corre, cómo le
 | --- | --- | --- | --- |
 | `unit` (4 shards) | `ci.yml` | PR y push a `develop`, `test`, `main` | Vitest con cobertura v8; cada shard sube un reporte `blob` (`vitest-blob-N`) |
 | `unit-coverage` | `ci.yml` | Después de los shards | Combina los blobs con `vitest --merge-reports --coverage` y sube `coverage-lcov` (`coverage/lcov.info`) |
-| `sonar` | `ci.yml` | Después de `unit-coverage` | Análisis de SonarCloud con esa cobertura. Se saltea sin `SONAR_TOKEN` (forks) |
+| `sonar` | `ci.yml` | Después de `unit-coverage` | Análisis de SonarCloud con esa cobertura. Espera el Quality Gate (`sonar.qualitygate.wait=true`) y falla si da rojo. Se saltea sin `SONAR_TOKEN` (forks) |
 | `trivy` | `trivy.yml` | PR y push a `develop`, `test`, `main` | Dependencias (SBOM del lockfile), secretos, imagen del `Dockerfile` y configuración |
 | `zap baseline (Vercel)` y `zap active (build del CI)` | `dast.yml` | A demanda y cada lunes 06:00 UTC | ZAP pasivo contra Vercel y activo contra la app construida en el CI |
 
-La cobertura se mide y no frena nada: no hay umbral. El gate de Sonar todavía no es un check requerido (Opción C; ver el ADR).
+La cobertura se mide y no frena nada: no hay umbral. El job `sonar` falla si el Quality Gate de SonarCloud da rojo. Para que frene el merge, el check `sonar` tiene que figurar como requerido en la protección de `develop` (lo configura el líder; ver el ADR).
 
 ## Cómo leer los resultados
 
