@@ -1,59 +1,40 @@
 # Módulo 6 — Ambiente e Higiene · Frontend
 
-[![CI](https://github.com/hllous/Frontend-M6-DAPS2/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/hllous/Frontend-M6-DAPS2/actions/workflows/ci.yml)
+[![CI](https://github.com/hllous/Frontend-M6-DAPS2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hllous/Frontend-M6-DAPS2/actions/workflows/ci.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=hllous_Frontend-M6-DAPS2&metric=alert_status)](https://sonarcloud.io/summary/overall?id=hllous_Frontend-M6-DAPS2)
 [![Cobertura](https://sonarcloud.io/api/project_badges/measure?project=hllous_Frontend-M6-DAPS2&metric=coverage)](https://sonarcloud.io/summary/overall?id=hllous_Frontend-M6-DAPS2)
 
-Aplicación web interna para planificar y ejecutar servicios municipales de Ambiente, Higiene y Servicios Urbanos. Está dirigida al personal de Oficina y al personal de Campo, con vistas de escritorio y uso móvil.
+Aplicación web interna del **Módulo 6** de Municipalidad UADE (Desarrollo de Aplicaciones II, 2.º cuatrimestre 2026, **Grupo 04**) para planificar y ejecutar servicios de Ambiente, Higiene y Servicios Urbanos, para personal de Oficina y de Campo.
 
-## Stack
+Next.js 16 · React 19 · TypeScript · Tailwind CSS 4.
 
-- Next.js 16 (App Router), React 19 y TypeScript
-- Tailwind CSS 4
-- Node.js 22 para CI y la imagen Docker
-- Zod para validar datos en los límites de los adaptadores
+## Levantar el sistema completo
 
-## Funcionalidad
+El sistema completo (frontend, backend, base de datos, broker y M1 falso) se levanta siguiendo el **[README del backend](https://github.com/hllous/Backend-M6-DAPS2#levantar-el-sistema-en-local)**.
 
-- Programación, asignación y ejecución de Servicios ROUTE y POINT.
-- Catálogos de zonas, recorridos, frecuencias, cuadrillas, vehículos, contenedores, puntos verdes, espacios verdes y arbolado.
-- Expedientes e inspecciones de control ambiental, evidencia y derivaciones a otros módulos.
-- Mapa operativo y tablero de indicadores.
+## Ver solo la interfaz, sin backend
 
-## Ejecución local
+Requiere [Node.js 22](https://nodejs.org/). Usa datos de ejemplo y no llama al backend:
 
 ```bash
-pnpm install --frozen-lockfile
+corepack enable
+pnpm install
 pnpm dev
 ```
 
-La aplicación queda en `http://localhost:3000`; el health check local es `/api/health`. La configuración se describe en [`.env.example`](.env.example). El modo local predeterminado usa escenarios y fixtures (`M6_AUTH_MODE=mock`).
+Abrí <http://localhost:3000>.
 
-Si vas a usar variables locales, copiá `.env.example` a `.env.local` y ajustá los valores. Cuando el backend local usa el puerto 3000, iniciá el frontend en otro puerto, por ejemplo `pnpm dev --port 3001`.
+## Versión desplegada
 
-Para conectarse al backend, configurar `M6_AUTH_MODE=real-m1`, `M1_BASE_URL`, `M6_BACKEND_ORIGIN` y `M6_SESSION_SECRET`. `real-m1` es el único modo de un entorno desplegado; `mock` es solo para desarrollo local y tests. Son variables del servidor: el navegador llama a los Route Handlers del BFF de Next.js y nunca recibe el JWT. El modo `real-m1` acepta credenciales de M1 en el servidor y consulta `GET /me` para los roles de M6. Para probarlo localmente con el M1 falso y el Backend MSW, seguí la [guía de desarrollo de ingreso real](docs/agents/real-m1-development.md). Ver también [contratos](CONTRACTS.md) y [ADR-0004](docs/adr/0004-owned-bff-session-the-m1-jwt-never-reaches-the-browser.md).
-
-## Docker
-
-```bash
-docker build -t m6-frontend .
-# Crear .env.local a partir de .env.example antes de este comando.
-docker run --env-file .env.local -p 3000:3000 m6-frontend
-```
-
-La imagen usa la salida `standalone` de Next.js. Para operar contra el backend, la configuración de sesión y autenticación debe estar disponible en el contenedor.
-
-## Estructura
-
-```text
-src/app/app/       # espacios de trabajo y páginas
-src/app/api/       # Route Handlers del BFF
-src/lib/           # sesiones, adaptadores, esquemas y reglas de dominio
-src/components/    # interfaz y flujos operativos
-e2e/               # recorridos Playwright y accesibilidad
-docs/              # contratos, decisiones y guías
-```
+<https://m6-ambiente-higiene.vercel.app>
 
 ## Documentación
 
-El índice está en [`docs/README.md`](docs/README.md). Ahí se separan documentación de producto, dominio, contratos, diseño, operación y guías de trabajo.
+| | Dónde |
+|---|---|
+| Manual de usuario | [`docs/manual-de-usuario/`](docs/manual-de-usuario/manual-de-usuario.md) |
+| Decisiones técnicas (ADR) | [`docs/adr/`](docs/adr/) |
+| Contratos con el backend | [`CONTRACTS.md`](CONTRACTS.md) |
+| Índice completo | [`docs/README.md`](docs/README.md) |
+
+Plan de pruebas, matriz de trazabilidad, informes y registro de defectos del módulo: [`docs/QA/` del backend](https://github.com/hllous/Backend-M6-DAPS2/tree/main/docs/QA).
