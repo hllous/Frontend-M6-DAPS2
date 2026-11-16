@@ -147,6 +147,10 @@ jobs:
       # aserciones. La instrumentación v8 vuelve más lentos los tests con jsdom y varios
       # superaban el timeout de 5 s: se sube solo acá, con la bandera, no en la config.
       - name: Unit and component tests
+        env:
+          # Cada shard mide solo una cuarta parte del código: los umbrales de cobertura
+          # se exigen una sola vez, sobre el reporte combinado (job unit-coverage, #975).
+          COVERAGE_THRESHOLDS: "off"
         run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob --testTimeout=30000
 
       - name: Upload Vitest blob report
@@ -157,10 +161,11 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
-  # Combina los blobs de los 4 shards en un solo lcov. Vive fuera del job agregador `test`
-  # y de la branch protection: solo mide, no decide si el PR se puede mergear. Solo alimenta
-  # a Sonar, y el plan Free de SonarCloud analiza PRs y la rama principal (main): se saltea
-  # en pushes a develop/test.
+  # Combina los blobs de los 4 shards en un solo lcov y exige los umbrales de cobertura de
+  # vitest.config.ts (#975). Entra en `needs` del job agregador `test`, así que un PR que baja
+  # la cobertura no se puede mergear. También alimenta a Sonar, y el plan Free de SonarCloud
+  # analiza PRs y la rama principal (main): se saltea en pushes a develop/test, y el agregador
+  # lo acepta salteado solo en ese caso.
   unit-coverage:
     name: unit coverage
     needs: [changes, unit-shard]
@@ -180,7 +185,8 @@ jobs:
           merge-multiple: true
           path: .vitest/blob
 
-      - name: Merge reports and build lcov
+      # Falla si la cobertura combinada baja de coverage.thresholds (vitest.config.ts, #975).
+      - name: Merge reports, build lcov and enforce coverage thresholds
         run: pnpm exec vitest run --merge-reports --coverage
 
       - name: Upload coverage
@@ -231,21 +237,30 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-24.04
-    needs: [changes, lint, unit-shard]
+    needs: [changes, lint, unit-shard, unit-coverage]
     if: ${{ !cancelled() }}
     steps:
-      - name: Require lint and every unit shard to succeed
+      - name: Require lint, every unit shard and the coverage thresholds to succeed
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           LINT_RESULT: ${{ needs.lint.result }}
           SHARDS_RESULT: ${{ needs.unit-shard.result }}
+          COVERAGE_RESULT: ${{ needs.unit-coverage.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
         run: |
           if [ "$CHANGES_RESULT" = "success" ] && [ "$DOCS_ONLY" = "true" ]; then
             exit 0
           fi
           test "$LINT_RESULT" = "success"
           test "$SHARDS_RESULT" = "success"
+          # unit-coverage solo se saltea en pushes a develop/test (ver su `if`): ahí no hay umbral que exigir.
+          if [ "$EVENT_NAME" = "push" ] && [ "$REF" != "refs/heads/main" ]; then
+            test "$COVERAGE_RESULT" = "success" || test "$COVERAGE_RESULT" = "skipped"
+          else
+            test "$COVERAGE_RESULT" = "success"
+          fi
 
   # Smoke journeys, failure journeys, and axe/WCAG checks run against deterministic
   # mock scenarios and fixture data only — no production or Tier 2 data ever enters
