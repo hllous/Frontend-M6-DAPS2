@@ -5,14 +5,20 @@ import { PublicLanding } from "./public-landing";
 import { PublicShell } from "./public-shell";
 
 describe("PublicShell", () => {
-  it("shows the demo notice and a way back to the staff login, without the staff shell", () => {
+  it("shows a way back to the staff login, without the staff shell nor the demo notice by default", () => {
     render(<PublicShell><p>contenido</p></PublicShell>);
 
-    expect(screen.getByText(/Entorno de demostración/)).toBeVisible();
+    expect(screen.queryByText(/Entorno de demostración/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ingreso del personal" })).toHaveAttribute("href", "/login");
     expect(screen.getByRole("link", { name: /Consulta ciudadana/ })).toHaveAttribute("href", "/consulta");
     expect(screen.getByText("contenido")).toBeVisible();
     expect(screen.queryByRole("navigation", { name: /principal/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the demo notice only when serving mock data", () => {
+    render(<PublicShell demo><p>contenido</p></PublicShell>);
+
+    expect(screen.getByText(/Entorno de demostración/)).toBeVisible();
   });
 });
 
