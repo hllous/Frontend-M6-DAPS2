@@ -1,5 +1,5 @@
 /**
- * Concurrencia optimista del lado del navegador (ADR-012 del backend; `docs/adr/0009-concurrencia-optimista-y-timeout-del-bff.md`).
+ * Concurrencia optimista del lado del navegador (ADR-012 del backend; `docs/adr/0010-concurrencia-optimista-y-timeout-del-bff.md`).
  *
  * Guarda, por registro, la última versión que la pestaña leyó y la manda como `If-Match` al guardar o transicionar ese
  * registro. Si otra persona lo cambió en el medio, el backend responde 412 y la interfaz avisa sin pisar nada.

@@ -57,7 +57,7 @@ describe("authenticated zones [id]/references BFF route", () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const id = "ceec08ae-67e7-4739-9677-150f5085bb1a";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id }));
-    // Una falla de red en un GET se reintenta una vez (DEF-33, ADR-0009): las dos llamadas fallan.
+    // Una falla de red en un GET se reintenta una vez (DEF-33, ADR-0010): las dos llamadas fallan.
     if (failure === "network") backendFetch.mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new Error("offline"));
     else backendFetch.mockResolvedValueOnce(Response.json(failure === "malformed" ? { data: [] } : {}, { status: failure === "http" ? 503 : 200 }));
     const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });

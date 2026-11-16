@@ -21,7 +21,7 @@ const BACKEND_PATH_ID_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
 /**
  * Plazo total de un pedido del BFF al backend (criterio de testing: timeout efectivo de 5 s). Cubre la respuesta y la
  * lectura del cuerpo, y lo comparte el único reintento de un `GET`. Al vencer, el `fetch` se aborta y el pedido termina
- * en el 503 de `BackendUnavailableError`. No se sube por el arranque en frío de Render: ver `docs/adr/0009-concurrencia-optimista-y-timeout-del-bff.md`.
+ * en el 503 de `BackendUnavailableError`. No se sube por el arranque en frío de Render: ver `docs/adr/0010-concurrencia-optimista-y-timeout-del-bff.md`.
  */
 export const BACKEND_TIMEOUT_MS = 5_000;
 export const BACKEND_UNAVAILABLE_MESSAGE = "El sistema no responde. Reintente en unos segundos.";

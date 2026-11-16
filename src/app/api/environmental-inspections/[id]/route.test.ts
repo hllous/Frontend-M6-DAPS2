@@ -124,7 +124,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
       message: "El sistema no responde. Reintente en unos segundos.",
       error: "Service Unavailable",
     });
-    // Un GET con falla de red tiene un único reintento acotado (DEF-33, ADR-0009).
+    // Un GET con falla de red tiene un único reintento acotado (DEF-33, ADR-0010).
     expect(backendFetch).toHaveBeenCalledTimes(2);
   });
 
