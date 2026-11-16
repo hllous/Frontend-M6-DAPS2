@@ -41,6 +41,7 @@ jobs:
   changes:
     name: changes
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -84,6 +85,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -110,6 +112,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -131,6 +134,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -166,6 +170,7 @@ jobs:
     needs: [changes, unit-shard]
     if: ${{ !cancelled() && needs.unit-shard.result == 'success' && (github.event_name != 'push' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -199,6 +204,7 @@ jobs:
     needs: unit-coverage
     if: ${{ !cancelled() && needs.unit-coverage.result == 'success' }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
@@ -231,6 +237,7 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     needs: [changes, lint, unit-shard]
     if: ${{ !cancelled() }}
     steps:
@@ -257,6 +264,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       E2E_TARGET: mock
     strategy:
@@ -273,12 +281,32 @@ jobs:
       - name: Setup Playwright Chromium
         uses: ./.github/actions/setup-playwright
 
+      # Caché de Turbopack de `next dev` (#981): sin ella cada shard compila en frío todas
+      # las rutas en e2e/global-setup.ts antes del primer test. Turbopack valida el
+      # contenido de cada archivo, así que una caché de otro commit solo ahorra trabajo.
+      # La guarda un solo shard para no subir diez copias iguales.
+      - name: Restore Turbopack dev cache
+        id: next-dev-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .next-e2e-mock/dev/cache
+          key: next-dev-e2e-mock-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-dev-e2e-mock-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
       # `--shard` corta bloques contiguos y los specs pesados caían juntos (un shard tardaba
       # el doble que otro); scripts/ci/e2e-shard.cjs reparte los tests en round-robin.
       - name: Playwright smoke and accessibility suite
         run: |
           grep=$(node scripts/ci/e2e-shard.cjs --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }})
           pnpm exec playwright test --project=chromium --grep "$grep"
+
+      - name: Save Turbopack dev cache
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.next-dev-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: .next-e2e-mock/dev/cache
+          key: ${{ steps.next-dev-cache.outputs.cache-primary-key }}
 
       - name: Upload Playwright report
         if: ${{ failure() }}
@@ -293,6 +321,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       E2E_TARGET: real-m1
     steps:
@@ -305,8 +334,25 @@ jobs:
       - name: Setup Playwright Chromium
         uses: ./.github/actions/setup-playwright
 
+      # Misma caché de Turbopack que en e2e-shard, para el servidor real-m1 (#981).
+      - name: Restore Turbopack dev cache
+        id: next-dev-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .next-e2e-real-m1/dev/cache
+          key: next-dev-e2e-real-m1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-dev-e2e-real-m1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
       - name: Playwright real-m1 login suite
         run: pnpm exec playwright test --project=real-m1
+
+      - name: Save Turbopack dev cache
+        if: ${{ !cancelled() && steps.next-dev-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: .next-e2e-real-m1/dev/cache
+          key: ${{ steps.next-dev-cache.outputs.cache-primary-key }}
 
       - name: Upload Playwright report
         if: ${{ failure() }}
@@ -319,6 +365,7 @@ jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     needs: [changes, e2e-shard, e2e-real-m1]
     if: ${{ !cancelled() }}
     steps:
@@ -340,6 +387,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -454,6 +502,7 @@ jobs:
   docs:
     name: docs
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
