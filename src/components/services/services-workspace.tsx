@@ -404,10 +404,9 @@ export function ServicesWorkspace({
         }
       } catch (cause) {
         if (!isCurrent) return;
-        const msg =
-          cause instanceof RangeError ? cause.message : cause instanceof ServiceRequestError
-            ? "No se pudieron cargar los servicios. Intente nuevamente."
-            : "No se pudieron cargar los servicios. Intente nuevamente.";
+        const msg = cause instanceof RangeError
+          ? cause.message
+          : "No se pudieron cargar los servicios. Intente nuevamente.";
         if (keepCurrentWorkspace) {
           setIsRefreshing(false);
           setRefreshError(msg);
