@@ -322,4 +322,65 @@ describe("SuspendServiceDialog", () => {
     expect(uploadAttempts).toBe(1);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+
+  async function saveOfflineSuspension(user: User, serviceReader: () => Response) {
+    server.use(
+      http.post("*/api/services/:serviceId/suspend", () => HttpResponse.error()),
+      http.get("*/api/services/:serviceId", serviceReader),
+    );
+    render(<ControlledSuspendServiceDialog onOpenChange={vi.fn()} onSuspended={vi.fn()} />);
+    await chooseReason(user, "Desperfecto vehicular");
+    await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+    expect((await screen.findAllByText(/Sin conexión\. Se guardó en este dispositivo/)).length).toBeGreaterThan(0);
+  }
+
+  it("keeps the draft and the form when resubmitting while still offline", async () => {
+    const user = userEvent.setup();
+    await saveOfflineSuspension(user, () => HttpResponse.json(service));
+
+    await user.click(screen.getByRole("button", { name: "Reenviar" }));
+
+    expect((await screen.findAllByText(/Sin conexión\. Se guardó en este dispositivo/))[0]).toBeVisible();
+    expect(screen.getByLabelText(/^Nota/)).toHaveValue("Desperfecto en el vehículo asignado.");
+    expect(localStorage.length).toBeGreaterThan(0);
+  });
+
+  it("clears the form and the draft when the crew discards it after a conflict", async () => {
+    const user = userEvent.setup();
+    await saveOfflineSuspension(user, () => HttpResponse.json({ ...service, updatedAt: "2099-01-01T00:00:00.000Z", crewName: "Otra cuadrilla" }));
+
+    await user.click(screen.getByRole("button", { name: "Reenviar" }));
+    await user.click(await screen.findByRole("button", { name: "Descartar lo cargado" }));
+
+    await waitFor(() => expect(screen.getByLabelText(/^Nota/)).toHaveValue(""));
+    expect(localStorage.length).toBe(0);
+    expect(screen.getByRole("button", { name: "Suspender servicio" })).toBeVisible();
+  });
+
+  it("keeps the draft for later when the crew preserves it after a conflict", async () => {
+    const user = userEvent.setup();
+    await saveOfflineSuspension(user, () => HttpResponse.json({ ...service, updatedAt: "2099-01-01T00:00:00.000Z", crewName: "Otra cuadrilla" }));
+
+    await user.click(screen.getByRole("button", { name: "Reenviar" }));
+    await user.click(await screen.findByRole("button", { name: "Conservar para después" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Conservar para después" })).not.toBeInTheDocument());
+    expect(screen.getByLabelText(/^Nota/)).toHaveValue("Desperfecto en el vehículo asignado.");
+    expect(localStorage.length).toBeGreaterThan(0);
+  });
+
+  it("shows the backend rejection of the suspension and keeps the dialog open", async () => {
+    server.use(http.post("*/api/services/:serviceId/suspend", () => HttpResponse.json(errorResponse(409, "El servicio ya no está en curso."), { status: 409 })));
+    const onSuspended = vi.fn();
+    const user = userEvent.setup();
+    render(<ControlledSuspendServiceDialog onOpenChange={vi.fn()} onSuspended={onSuspended} />);
+    await chooseReason(user, "Desperfecto vehicular");
+    await user.type(screen.getByLabelText(/^Nota/), "Desperfecto en el vehículo asignado.");
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+
+    expect(await screen.findByText("El servicio ya no está en curso.")).toBeVisible();
+    expect(onSuspended).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
 });

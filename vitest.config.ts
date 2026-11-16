@@ -27,8 +27,12 @@ export default defineConfig({
       ".codex*/**",
       ".orca/**",
     ],
-    // Solo se activa con `--coverage` (CI: unit-shard y unit-coverage). Mide, no exige
-    // umbrales (#923). Las exclusiones se repiten en `sonar.coverage.exclusions` de
+    // Solo se activa con `--coverage` (CI: unit-shard y unit-coverage). Los umbrales (#975)
+    // se exigen solo sobre el informe completo: cada shard corre con
+    // `COVERAGE_THRESHOLDS=off` porque ve una parte del código y no puede cumplirlos; el
+    // job `unit-coverage` los aplica al fusionar los blobs. Los valores son la cobertura
+    // medida redondeada hacia abajo: se suben cuando sube la cobertura, nunca se bajan.
+    // Las exclusiones se repiten en `sonar.coverage.exclusions` de
     // sonar-project.properties: si cambia una, cambia la otra.
     coverage: {
       provider: "v8",
@@ -55,6 +59,9 @@ export default defineConfig({
       ],
       reporter: ["lcov", "text-summary"],
       reportsDirectory: "./coverage",
+      thresholds: process.env.COVERAGE_THRESHOLDS === "off"
+        ? undefined
+        : { lines: 92, statements: 90, functions: 87, branches: 83 },
     },
   },
 });
