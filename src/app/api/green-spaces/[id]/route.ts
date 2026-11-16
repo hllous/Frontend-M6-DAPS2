@@ -1,12 +1,11 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { greenSpaceFixtures } from "@/lib/green-space-fixtures";
 import { updateGreenSpaceInputSchema } from "@/lib/green-spaces";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -33,12 +32,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const greenSpace = greenSpaceFixtures.find((item) => item.id === id);
     return greenSpace ? NextResponse.json(greenSpace) : errorResponse(404, "Espacio verde no encontrado.", path);
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo cargar el espacio verde.");
+    return handleRouteError(error, path, "No se pudo cargar el espacio verde.");
   }
 }
 
@@ -66,12 +60,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     Object.assign(greenSpace, parsed.data);
     return NextResponse.json(greenSpace);
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo actualizar el espacio verde.");
+    return handleRouteError(error, path, "No se pudo actualizar el espacio verde.");
   }
 }
 
@@ -93,11 +82,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     greenSpace.active = false;
     return NextResponse.json(greenSpace);
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo dar de baja el espacio verde.");
+    return handleRouteError(error, path, "No se pudo dar de baja el espacio verde.");
   }
 }

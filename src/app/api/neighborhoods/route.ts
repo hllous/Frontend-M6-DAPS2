@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { backendMode, backendQuery, errorResponse, forwardResponse, mapSessionError } from "@/lib/bff-route";
+import { backendMode, backendQuery, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { fetchBackend } from "@/lib/bff-backend";
 import { filterNeighborhoodFixtures } from "@/lib/neighborhoods-fixtures";
 import { booleanParam, MAX_SEARCH_LENGTH } from "@/lib/input-limits";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 /** Catálogo de barrios de M9, leído por el backend de M6 (cacheado). El BFF no llama al Core ni tiene su token. */
 export async function GET(request: Request) {
@@ -25,11 +24,6 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(filterNeighborhoodFixtures(query));
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudieron cargar los barrios.");
+    return handleRouteError(error, path, "No se pudieron cargar los barrios.");
   }
 }
