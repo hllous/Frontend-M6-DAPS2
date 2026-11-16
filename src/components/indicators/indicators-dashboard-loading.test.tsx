@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { delay, http, HttpResponse } from "msw";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { coverageIndicatorFixture } from "@/lib/indicator-fixtures";
@@ -39,8 +39,10 @@ function expectBusy(region: HTMLElement) {
 
 describe("IndicatorsDashboard loading skeletons (#591)", () => {
   it("shows the family cards as a busy region with a skeleton until the families arrive", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
     server.use(http.get("*/api/indicators/:family", async () => {
-      await delay(1000);
+      await gate;
       return HttpResponse.json(coverageIndicatorFixture);
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
@@ -48,8 +50,9 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     const band = screen.getByRole("region", { name: "Requiere atención" });
     expectBusy(band);
     expect(band.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+    release();
 
-    await waitFor(() => expect(band).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    await waitFor(() => expect(band).toHaveAttribute("aria-busy", "false"));
     expect(within(band).queryByRole("status")).toBeNull();
     expect(band.querySelector('[data-slot="skeleton"]')).toBeNull();
   });
@@ -77,8 +80,10 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
   });
 
   it("keeps the catalog filters in place while the options load: no spinner, no extra bar", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
     server.use(http.get("*/api/service-types", async () => {
-      await delay(800);
+      await gate;
       return HttpResponse.json({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 });
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
@@ -92,14 +97,17 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expect(filter).toBeDisabled();
     expect(filter.querySelector('[data-slot="spinner"], svg.animate-spin')).toBeNull();
     expect(filter).not.toHaveAttribute("aria-busy");
+    release();
 
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Opciones de Tipo de servicio" })).toBeNull(), { timeout: 4000 });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Opciones de Tipo de servicio" })).toBeNull());
   });
 
   it("shows the narrow summary as a busy region with a skeleton until the family arrives", async () => {
     vi.stubGlobal("matchMedia", vi.fn().mockImplementation(() => ({ matches: true, media: "(max-width: 760px)", onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() })));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
     server.use(http.get("*/api/indicators/:family", async () => {
-      await delay(1000);
+      await gate;
       return HttpResponse.json(coverageIndicatorFixture);
     }));
     render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
@@ -110,7 +118,9 @@ describe("IndicatorsDashboard loading skeletons (#591)", () => {
     expectBusy(summary);
     expect(summary.querySelector('[data-slot="skeleton"]')).not.toBeNull();
 
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Resumen de Cobertura", busy: true })).toBeNull(), { timeout: 4000 });
+    release();
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Resumen de Cobertura", busy: true })).toBeNull());
   });
 });
 

@@ -21,7 +21,7 @@ it("maps a stalled upstream request to timeout", async () => {
   const response = await fetch("http://localhost/api/address-search?q=Corrientes", { headers: { cookie } });
   expect(response.status).toBe(504);
   expect(await response.json()).toMatchObject({ outcome: "timeout", message: "No se encontró esa dirección. Márquela en el mapa." });
-}, 10000);
+});
 
 it("maps a transport failure to upstream_error", async () => {
   server.use(http.get(georefUrl, () => HttpResponse.error()));

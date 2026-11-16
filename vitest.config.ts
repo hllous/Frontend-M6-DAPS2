@@ -10,6 +10,12 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Tests de componente con jsdom + MSW + userEvent tardan varios segundos cuando la
+    // máquina está cargada (Vitest abre un worker por archivo) y el límite por defecto de
+    // 5 s los cortaba al azar (#946). El CI ya usaba 30 s; ahora es el mismo valor en todos
+    // lados, para que `pnpm test` local y el CI den el mismo resultado.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     exclude: [
       ...configDefaults.exclude,
       "e2e/**",

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { delay, http, HttpResponse } from "msw";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { coverageIndicatorFixture } from "@/lib/indicator-fixtures";
 import { scenarios } from "@/lib/scenarios";
@@ -62,8 +62,10 @@ describe("Atajos de período", () => {
     await userEvent.setup().click(await screen.findByRole("menuitem", { name: "Cobertura" }));
     const card = screen.getByRole("region", { name: "Resumen de Cobertura" });
     await within(card).findByText("82,2 %");
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
     server.use(http.get("*/api/indicators/coverage", async () => {
-      await delay(500);
+      await gate;
       return HttpResponse.json({ ...coverageIndicatorFixture, totals: { ...coverageIndicatorFixture.totals, coveragePct: 42 } });
     }));
     const user = userEvent.setup();
@@ -72,7 +74,8 @@ describe("Atajos de período", () => {
     expect(within(card).getByText("82,2 %")).toBeVisible();
     expect(within(card).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Detalle de Cobertura" })).toHaveAttribute("aria-busy", "true");
-    await waitFor(() => expect(card).toHaveTextContent("42"), { timeout: 3000 });
+    release();
+    await waitFor(() => expect(card).toHaveTextContent("42"));
   });
 
   it("conserva los datos y ofrece reintentar si falla la actualización", async () => {

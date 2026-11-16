@@ -41,6 +41,7 @@ jobs:
   changes:
     name: changes
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -84,6 +85,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -110,6 +112,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -131,6 +134,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -144,14 +148,14 @@ jobs:
 
       # Cobertura v8 sin umbrales (#923): cada shard deja un blob con resultados y datos de
       # cobertura; el job unit-coverage los combina. No cambia qué tests corren ni sus
-      # aserciones. La instrumentación v8 vuelve más lentos los tests con jsdom y varios
-      # superaban el timeout de 5 s: se sube solo acá, con la bandera, no en la config.
+      # aserciones. El timeout de 30 s por test vive en vitest.config.ts (#946), igual que
+      # en local: la instrumentación v8 y los runners cargados vuelven lentos los tests con jsdom.
       - name: Unit and component tests
         env:
           # Cada shard mide solo una cuarta parte del código: los umbrales de cobertura
           # se exigen una sola vez, sobre el reporte combinado (job unit-coverage, #975).
           COVERAGE_THRESHOLDS: "off"
-        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob --testTimeout=30000
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob
 
       - name: Upload Vitest blob report
         uses: actions/upload-artifact@v7
@@ -171,6 +175,7 @@ jobs:
     needs: [changes, unit-shard]
     if: ${{ !cancelled() && needs.unit-shard.result == 'success' && (github.event_name != 'push' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -205,6 +210,7 @@ jobs:
     needs: unit-coverage
     if: ${{ !cancelled() && needs.unit-coverage.result == 'success' }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
@@ -237,6 +243,7 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     needs: [changes, lint, unit-shard, unit-coverage]
     if: ${{ !cancelled() }}
     steps:
@@ -272,6 +279,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       E2E_TARGET: mock
     strategy:
@@ -289,7 +297,10 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       # `--shard` corta bloques contiguos y los specs pesados caían juntos (un shard tardaba
-      # el doble que otro); scripts/ci/e2e-shard.cjs reparte los tests en round-robin.
+      # el doble que otro). scripts/ci/e2e-shard.cjs reparte los tests por duración medida
+      # (scripts/ci/e2e-durations.json, #981). Cada shard paga ~1 min fijo (setup, `next dev`
+      # y el warm-up) y el mismo bloque de tests varía ±25 % entre runners: con 8 shards el
+      # más lento tardaba más que con 10, así que se quedan 10.
       - name: Playwright smoke and accessibility suite
         run: |
           grep=$(node scripts/ci/e2e-shard.cjs --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }})
@@ -308,6 +319,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       E2E_TARGET: real-m1
     steps:
@@ -334,6 +346,7 @@ jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     needs: [changes, e2e-shard, e2e-real-m1]
     if: ${{ !cancelled() }}
     steps:
@@ -355,6 +368,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -469,6 +483,7 @@ jobs:
   docs:
     name: docs
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:

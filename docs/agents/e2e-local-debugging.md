@@ -61,8 +61,8 @@ restarting to confirm you're talking to the new process, not the old one.
 
 The mock backend keeps mutated fixture state in memory for the life of
 the server process. Playwright runs serially in CI (file-alphabetical
-order within each of 10 shards, each with its own server, split
-round-robin by `scripts/ci/e2e-shard.cjs`; a spec with `describe.serial`
+order within each of 10 shards, each with its own server, split by
+measured duration by `scripts/ci/e2e-shard.cjs`; a spec with `describe.serial`
 or `mode: "serial"` always stays whole in one shard), so a spec that
 reuses a fixture ID another spec file already mutates will pass locally
 under parallel workers and fail in CI — grep
@@ -73,6 +73,19 @@ restart in between: if two otherwise-identical local runs disagree,
 suspect leftover state first. Reset the mock data (below), then run every
 spec file relevant to the change in a single command rather than
 iterating call-by-call.
+
+## Refresh the e2e shard durations
+
+`scripts/ci/e2e-shard.cjs` weighs each test by its CI duration in
+`scripts/ci/e2e-durations.json`; a test missing from it weighs the median.
+Stale numbers only unbalance the shards, they never drop or repeat a test.
+When one shard runs much longer than the rest, refresh the file from one or
+more green `ci.yml` runs:
+
+```bash
+gh run view <run-id> --log > run.log
+node scripts/ci/update-e2e-durations.cjs run.log
+```
 
 ## Reset the mock data without restarting
 

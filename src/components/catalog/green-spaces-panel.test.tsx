@@ -81,7 +81,7 @@ describe("GreenSpacesPanel", () => {
     expect(within(confirmation).getByRole("button", { name: /Conservar el espacio verde/ })).toBeVisible();
     await user.click(within(confirmation).getByRole("button", { name: /Dar de baja el espacio verde Plaza editada desde panel/ }));
     expect(await screen.findByText(/dado de baja/)).toBeVisible();
-  }, 10_000);
+  });
 
   it("keeps management controls hidden for Field actors", async () => {
     const user = userEvent.setup();
