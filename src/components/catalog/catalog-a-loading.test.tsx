@@ -45,7 +45,7 @@ function expectBusy(region: HTMLElement) {
   releaseLoading();
 }
 
-const gone = (name: string) => waitFor(() => expect(screen.queryByRole("region", { name })).toBeNull(), { timeout: 3000 });
+const gone = (name: string) => waitFor(() => expect(screen.queryByRole("region", { name })).toBeNull());
 
 describe("Catalogo A loading skeletons (#589)", () => {
   it("shows the tree list as a busy region until the trees arrive", async () => {
@@ -54,7 +54,7 @@ describe("Catalogo A loading skeletons (#589)", () => {
 
     expectBusy(await screen.findByRole("region", { name: "Árboles registrados" }));
 
-    expect(await screen.findByRole("table", { name: "Catálogo de árboles" }, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "Catálogo de árboles" })).toBeInTheDocument();
     await gone("Árboles registrados");
   });
 
@@ -77,7 +77,7 @@ describe("Catalogo A loading skeletons (#589)", () => {
 
     expectBusy(await screen.findByRole("region", { name: "Solicitudes de intervención" }));
 
-    expect(await screen.findAllByRole("button", { name: /Ver detalle/ }, { timeout: 3000 })).not.toHaveLength(0);
+    expect(await screen.findAllByRole("button", { name: /Ver detalle/ })).not.toHaveLength(0);
     await gone("Solicitudes de intervención");
   });
 
@@ -101,7 +101,7 @@ describe("Catalogo A loading skeletons (#589)", () => {
 
     expectBusy(await screen.findByRole("region", { name: "Relevamientos del árbol" }));
 
-    expect(await screen.findAllByRole("button", { name: /Ver detalle/ }, { timeout: 3000 })).not.toHaveLength(0);
+    expect(await screen.findAllByRole("button", { name: /Ver detalle/ })).not.toHaveLength(0);
     await gone("Relevamientos del árbol");
   });
 
@@ -124,7 +124,7 @@ describe("Catalogo A loading skeletons (#589)", () => {
 
     expectBusy(await screen.findByRole("region", { name: "Espacios verdes registrados" }));
 
-    expect(await screen.findByRole("table", { name: "Espacios verdes registrados" }, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "Espacios verdes registrados" })).toBeInTheDocument();
     await gone("Espacios verdes registrados");
   });
 
@@ -134,7 +134,7 @@ describe("Catalogo A loading skeletons (#589)", () => {
 
     expectBusy(await screen.findByRole("region", { name: "Puntos verdes registrados" }));
 
-    expect(await screen.findByRole("table", { name: "Catálogo de puntos verdes" }, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "Catálogo de puntos verdes" })).toBeInTheDocument();
     await gone("Puntos verdes registrados");
   });
 
@@ -157,7 +157,7 @@ describe("Catalogo A loading skeletons (#589)", () => {
 
     expectBusy(await screen.findByRole("region", { name: "Contenedores registrados" }));
 
-    expect(await screen.findByRole("table", { name: "Inventario de contenedores registrados" }, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "Inventario de contenedores registrados" })).toBeInTheDocument();
     await gone("Contenedores registrados");
   });
 
@@ -178,14 +178,14 @@ describe("Catalogo A loading skeletons (#589)", () => {
     const user = userEvent.setup();
     server.use(delayed("*/api/services"));
     render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
-    const table = await screen.findByRole("table", { name: "Inventario de contenedores registrados" }, { timeout: 3000 });
+    const table = await screen.findByRole("table", { name: "Inventario de contenedores registrados" });
     await user.click(within(table).getAllByRole("button", { name: /^Ver detalle de / })[0]);
 
     const dialog = await screen.findByRole("dialog");
     const status = await within(dialog).findByText("Verificando servicios en curso…");
     expect(status).toHaveAttribute("role", "status");
     releaseLoading();
-    await waitFor(() => expect(within(dialog).queryByText("Verificando servicios en curso…")).toBeNull(), { timeout: 3000 });
+    await waitFor(() => expect(within(dialog).queryByText("Verificando servicios en curso…")).toBeNull());
   });
 
   it("holds the whole first page of mobile cards while the lists load", async () => {

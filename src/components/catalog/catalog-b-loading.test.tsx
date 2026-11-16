@@ -43,7 +43,7 @@ function expectBusy(region: HTMLElement) {
   releaseLoading();
 }
 
-const gone = (name: string) => waitFor(() => expect(screen.queryByRole("region", { name })).toBeNull(), { timeout: 3000 });
+const gone = (name: string) => waitFor(() => expect(screen.queryByRole("region", { name })).toBeNull());
 
 describe("Catalogo B loading skeletons (#590)", () => {
   it("crews: busy table skeleton, then the rows", async () => {
@@ -118,7 +118,7 @@ describe("Catalogo B loading skeletons (#590)", () => {
     await user.click(within(row).getByRole("button", { name: /^barrios$/i }));
     const dialog = await screen.findByRole("dialog");
     expectBusy(within(dialog).getByRole("region", { name: "Barrios de la zona" }));
-    await waitFor(() => expect(within(dialog).queryByRole("region", { name: "Barrios de la zona" })).toBeNull(), { timeout: 3000 });
+    await waitFor(() => expect(within(dialog).queryByRole("region", { name: "Barrios de la zona" })).toBeNull());
     expect(await within(dialog).findByRole("list", { name: "Barrios" })).toBeVisible();
   });
 
@@ -141,13 +141,13 @@ describe("Catalogo B loading skeletons (#590)", () => {
   it("crews: unresolved zone cells show a skeleton, not a loading message, until the zones arrive", async () => {
     server.use(delayed("*/api/zones*"));
     render(<CrewCatalogPanel scenario={scenarios.officeDutyQueue} />);
-    await waitFor(() => expect(screen.queryByRole("region", { name: "Listado de cuadrillas" })).toBeNull(), { timeout: 3000 });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Listado de cuadrillas" })).toBeNull());
     const rows = screen.getAllByRole("row").slice(1);
     expect(rows.length).toBeGreaterThan(0);
     expect(document.querySelectorAll('[data-slot="zone-name-skeleton"]').length).toBeGreaterThan(0);
     expect(visibleLoadingText()).toHaveLength(0);
     releaseLoading();
-    await waitFor(() => expect(document.querySelectorAll('[data-slot="zone-name-skeleton"]')).toHaveLength(0), { timeout: 3000 });
+    await waitFor(() => expect(document.querySelectorAll('[data-slot="zone-name-skeleton"]')).toHaveLength(0));
   });
 
   it("zones: the reference check before deactivating is announced as a status", async () => {
@@ -159,6 +159,6 @@ describe("Catalogo B loading skeletons (#590)", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("status")).toHaveTextContent("Verificando…");
     releaseLoading();
-    await waitFor(() => expect(within(dialog).queryByRole("status")).toBeNull(), { timeout: 3000 });
+    await waitFor(() => expect(within(dialog).queryByRole("status")).toBeNull());
   });
 });
