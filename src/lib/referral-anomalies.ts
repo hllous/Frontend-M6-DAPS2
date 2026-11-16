@@ -1,3 +1,4 @@
+import { compareStrings } from "./utils";
 import type { Referral } from "./referrals";
 import type { Service } from "./services";
 
@@ -29,7 +30,7 @@ function normalizedLocation(value: string | null): string {
 function closureSectionsKey(sections: Array<{ streetName: string; fromCross: string; toCross: string }>): string {
   return JSON.stringify(sections
     .map((section) => JSON.stringify([section.streetName, section.fromCross, section.toCross].map(normalizedLocation)))
-    .sort());
+    .sort(compareStrings));
 }
 
 function hasSameDuplicateCriteria(referral: Referral, candidate: Referral): boolean {

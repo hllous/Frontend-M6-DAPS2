@@ -1,9 +1,9 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { findServiceFixture, serviceHistoryEntry } from "@/lib/bff-service-mock";
+import { authorize, backendMode, errorResponse, forwardResponse, requireCrewScope, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
-  serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import {
@@ -12,8 +12,7 @@ import {
   toSuspendServiceBackendInput,
 } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -34,21 +33,8 @@ export async function POST(
     // Permission check: only actors with service:execute capability (Crew Leader of the assigned crew)
     authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para suspender el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = suspendServiceRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(
-        400,
-        parsed.error.issues.map((i) => i.message).join(" "),
-        path,
-      );
-    }
+    const parsed = await parseJsonBody(request, suspendServiceRequestSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     const input = parsed.data;
 
@@ -68,10 +54,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId && service.crewId !== scenario.actor.crewId) {
       return errorResponse(403, "Solo la cuadrilla asignada al servicio puede suspenderlo.", path);
@@ -93,23 +77,12 @@ export async function POST(
       statusNote: statusNote ?? null,
       history: [
         ...service.history,
-        {
-          label: "Suspendido",
-          at: new Date().toISOString().slice(0, 16).replace("T", " "),
-          done: true,
-        },
+        serviceHistoryEntry("Suspendido"),
       ],
     });
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudo suspender el servicio.");
+    return handleRouteError(error, path, "No se pudo suspender el servicio.");
   }
 }

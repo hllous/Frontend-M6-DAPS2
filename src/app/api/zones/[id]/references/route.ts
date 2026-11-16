@@ -1,12 +1,11 @@
-import { backendMode, errorResponse, mapSessionError } from "@/lib/bff-route";
+import { backendMode, errorResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import type { ZoneReferenceReport } from "@/lib/zones";
 
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { AuthUnavailableError, getRequiredSession } from "@/lib/session";
 import { getZoneFixture, getZoneReferences } from "@/lib/zones-fixtures";
 
 
@@ -79,13 +78,6 @@ export async function GET(
     const report = getZoneReferences(id);
     return NextResponse.json(report);
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudieron verificar las referencias de la zona.");
+    return handleRouteError(error, path, "No se pudieron verificar las referencias de la zona.");
   }
 }

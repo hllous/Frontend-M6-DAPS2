@@ -1,4 +1,4 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -46,14 +46,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(paginateRouteFixtures(filterRouteFixtures(query), query.page, query.pageSize));
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudieron cargar los recorridos.");
+    return handleRouteError(error, path, "No se pudieron cargar los recorridos.");
   }
 }
 
@@ -65,17 +58,8 @@ export async function POST(request: Request) {
 
     authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede crear recorridos.", capability: "route:manage", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = createRouteInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
-    }
+    const parsed = await parseJsonBody(request, createRouteInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/routes", "route:manage", {

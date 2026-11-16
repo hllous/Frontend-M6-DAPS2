@@ -21,6 +21,14 @@ on:
     branches: [develop, test, main]
   push:
     branches: [develop, test, main]
+  # Subir a mano un análisis de Sonar (#923). `sonar_branch_name` fuerza el nombre de la rama
+  # analizada (p. ej. main) y solo se usa en disparos manuales.
+  workflow_dispatch:
+    inputs:
+      sonar_branch_name:
+        description: "Forzar sonar.branch.name (vacío = el de la rama del disparo)"
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -28,12 +36,14 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   changes:
     name: changes
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
     steps:
@@ -132,8 +142,90 @@ jobs:
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
+      # Cobertura v8 sin umbrales (#923): cada shard deja un blob con resultados y datos de
+      # cobertura; el job unit-coverage los combina. No cambia qué tests corren ni sus
+      # aserciones. La instrumentación v8 vuelve más lentos los tests con jsdom y varios
+      # superaban el timeout de 5 s: se sube solo acá, con la bandera, no en la config.
       - name: Unit and component tests
-        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob --testTimeout=30000
+
+      - name: Upload Vitest blob report
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: .vitest/blob/
+          include-hidden-files: true
+          retention-days: 7
+
+  # Combina los blobs de los 4 shards en un solo lcov. Vive fuera del job agregador `test`
+  # y de la branch protection: solo mide, no decide si el PR se puede mergear. Solo alimenta
+  # a Sonar, y el plan Free de SonarCloud analiza PRs y la rama principal (main): se saltea
+  # en pushes a develop/test.
+  unit-coverage:
+    name: unit coverage
+    needs: [changes, unit-shard]
+    if: ${{ !cancelled() && needs.unit-shard.result == 'success' && (github.event_name != 'push' || github.ref == 'refs/heads/main') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download Vitest blob reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: vitest-blob-*
+          merge-multiple: true
+          path: .vitest/blob
+
+      - name: Merge reports and build lcov
+        run: pnpm exec vitest run --merge-reports --coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-lcov
+          path: coverage/
+          retention-days: 7
+
+  # Análisis de SonarCloud con la cobertura combinada. El gate no bloquea todavía
+  # (sonar.qualitygate.wait=false) y el job no es un check requerido. Sin SONAR_TOKEN
+  # (PRs desde forks) los pasos se saltean y el job termina en verde. Proyecto y
+  # exclusiones en sonar-project.properties.
+  sonar:
+    name: sonar
+    needs: unit-coverage
+    if: ${{ !cancelled() && needs.unit-coverage.result == 'success' }}
+    runs-on: ubuntu-24.04
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Skip notice
+        if: ${{ env.SONAR_TOKEN == '' }}
+        run: echo "SONAR_TOKEN no está disponible; se omite el análisis de SonarCloud."
+
+      - name: Checkout
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-lcov
+          path: coverage
+
+      - name: SonarCloud scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=false
+            ${{ inputs.sonar_branch_name && format('-Dsonar.branch.name={0}', inputs.sonar_branch_name) || '' }}
 
   test:
     name: test
@@ -284,7 +376,7 @@ jobs:
           LYCHEE_SHA256: 1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
         run: |
           asset=lychee-x86_64-unknown-linux-gnu.tar.gz
-          curl -sSfL "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_TAG}/${asset}" -o "${asset}"
+          curl --proto "=https" --tlsv1.2 -sSfL "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_TAG}/${asset}" -o "${asset}"
           echo "${LYCHEE_SHA256}  ${asset}" | sha256sum --check
           tar -xzf "${asset}" --strip-components=1 "${asset%.tar.gz}/lychee"
 

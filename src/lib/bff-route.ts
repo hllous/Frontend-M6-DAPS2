@@ -5,6 +5,7 @@ import { fetchBackend, isJsonMediaType, pathId } from "./bff-backend";
 import { getScenario, type Capability, type OperationalScenario } from "./scenarios";
 
 import { bffPathForResponse } from "./bff-response-path";
+import { recordTelemetryEvent } from "./telemetry";
 import {
   AuthUnavailableError,
   BackendUnavailableError,
@@ -220,6 +221,41 @@ export function mapSessionError(error: unknown, path: string, fallbackMessage: s
     return errorResponse(503, error.message, path);
   }
   return errorResponse(500, fallbackMessage, path);
+}
+
+/**
+ * Respuesta de error común del `catch` de los Route Handlers: sesión inactiva (401, con telemetría),
+ * autenticación no disponible (503) o el mapeo de `mapSessionError`.
+ */
+export function handleRouteError(error: unknown, path: string, fallbackMessage: string): NextResponse {
+  if (error instanceof InvalidSessionError) {
+    recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
+    return errorResponse(401, "La sesión no está activa.", path);
+  }
+  if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+  return mapSessionError(error, path, fallbackMessage);
+}
+
+/**
+ * Lee el cuerpo JSON y lo valida con `schema`. Devuelve `{ data }` o el error 400 de Problem Details
+ * (JSON inválido, o los mensajes del esquema unidos por espacios).
+ */
+export async function parseJsonBody<S extends z.ZodType>(
+  request: Request,
+  schema: S,
+  path: string,
+): Promise<{ data: z.output<S> } | NextResponse> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
+  }
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+  }
+  return { data: parsed.data };
 }
 
 export function forwardResponse(response: Response, path = bffPathForResponse(response) ?? ""): NextResponse {

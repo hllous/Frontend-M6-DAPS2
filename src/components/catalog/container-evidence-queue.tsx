@@ -28,6 +28,7 @@ import {
 } from "@/lib/evidence-limits";
 import { containersAdapter, ContainerRequestError } from "@/lib/containers";
 import { EvidenceUploadField } from "./evidence-upload-field";
+import { randomUuid } from "@/lib/random-id";
 
 export interface QueuedEvidenceFile {
   id: string;
@@ -78,13 +79,11 @@ export function useEvidenceQueue() {
       }
 
       newQueued.push({
-        id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `file-${randomUuid()}`,
         file,
         localFilename: file.name,
         idempotencyKey:
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          randomUuid(),
         status: "pending",
       });
     }

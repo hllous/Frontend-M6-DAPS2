@@ -1,11 +1,11 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { findServiceFixture } from "@/lib/bff-service-mock";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
   addZoneResultFixture,
   getZoneResultsByServiceId,
-  serviceFixtures,
 } from "@/lib/services-fixtures";
 import {
   recordZoneResultInputSchema,
@@ -14,6 +14,7 @@ import {
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { randomInt } from "@/lib/random-id";
 
 
 
@@ -41,10 +42,8 @@ export async function GET(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId) {
       if (service.crewId !== scenario.actor.crewId) {
@@ -77,21 +76,8 @@ export async function POST(
 
     authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para registrar resultados de zona. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = recordZoneResultInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(
-        400,
-        parsed.error.issues.map((i) => i.message).join(" "),
-        path,
-      );
-    }
+    const parsed = await parseJsonBody(request, recordZoneResultInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     const input = parsed.data;
 
@@ -111,10 +97,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId) {
       if (service.crewId !== scenario.actor.crewId) {
@@ -148,7 +132,7 @@ export async function POST(
     }
 
     const newResult: ZoneResult = {
-      id: `ZR-${serviceId}-${Math.floor(100 + Math.random() * 900)}`,
+      id: `ZR-${serviceId}-${randomInt(100, 999)}`,
       serviceId,
       zoneId: input.zoneId,
       status: input.status,

@@ -1,5 +1,6 @@
 "use client";
 
+import { compareStrings } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -62,7 +63,7 @@ export function useTreeReferences(ids: readonly string[]): TreeReferences {
   const [resolved, setResolved] = useState<ReadonlyMap<string, Tree | undefined>>(() => new Map());
   const requested = useRef(new Set<string>());
   const mounted = useRef(true);
-  const idsKey = JSON.stringify([...new Set(ids)].sort());
+  const idsKey = JSON.stringify([...new Set(ids)].sort(compareStrings));
 
   useEffect(() => {
     mounted.current = true;

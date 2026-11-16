@@ -92,7 +92,7 @@ export default defineConfig({
                   M6_AUTH_MODE: "real-m1",
                   M1_BASE_URL: `http://127.0.0.1:${FAKE_M1_PORT}/api/v1/`,
                   M1_FAKE_ENABLED: "true",
-                  M6_BACKEND_ORIGIN: "http://m6-demo-backend.invalid",
+                  M6_BACKEND_ORIGIN: "https://m6-demo-backend.invalid",
                   M6_REAL_M1_MOCK_BACKEND: "true",
                   M6_NEXT_DIST_DIR: ".next-e2e-real-m1",
                   NODE_OPTIONS: "--import=./scripts/msw-real-m1-backend.mjs",
