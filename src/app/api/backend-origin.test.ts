@@ -160,7 +160,7 @@ const mutationCases: MutationCase[] = [
     invoke: async () => {
       const cookie = createSessionCookie("field-crew-leader-route", {
         mode: "real-m1",
-        accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+        accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature",
         backendOrigin: "https://backend.internal",
       });
       delete process.env.M6_BACKEND_ORIGIN;
@@ -183,7 +183,7 @@ beforeEach(() => {
   delete process.env.M6_BACKEND_ORIGIN;
   backendCookie = createSessionCookie("office-duty-queue", {
     mode: "real-m1",
-    accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+    accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature",
     backendOrigin: "https://backend.internal",
   });
   delete process.env.M6_BACKEND_ORIGIN;

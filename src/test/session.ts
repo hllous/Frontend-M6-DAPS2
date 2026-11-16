@@ -16,7 +16,7 @@ import type { M6Role } from "@/lib/m6-roles";
 import { getScenario, isScenarioId, type ScenarioCrew, type ScenarioId } from "@/lib/scenarios";
 
 /** Access token falso de M1 (vence en 2099) que los tests de BFF reenvían al backend mockeado. */
-export const TEST_ACCESS_TOKEN = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+export const TEST_ACCESS_TOKEN = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
 
 export type LoginAsOptions = {
   mode?: SupportedAuthMode;
