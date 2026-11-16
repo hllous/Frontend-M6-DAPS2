@@ -1,3 +1,5 @@
+import { parseCatalogSort } from "@/lib/catalog-sort";
+import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
 import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
@@ -55,10 +57,13 @@ export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const query = parseQuery(new URL(request.url));
+    const url = new URL(request.url);
+    const sort = parseCatalogSort("crews", url.searchParams);
+    if (!sort.ok) return errorResponse(400, sort.message, path);
+    const query = { ...parseQuery(url), ...sort.value };
     const scenario = getScenario(session);
     if (backendMode(session)) {
-      if (scenario.actor.kind !== "FIELD") return forwardResponse(await fetchBackend(request, `/crews${backendQuery(query, ["active", "crewType", "defaultShift", "zoneId", "specialty", "page", "pageSize"])}`));
+      if (scenario.actor.kind !== "FIELD") return forwardResponse(await fetchBackend(request, `/crews${backendQuery(query, ["active", "crewType", "defaultShift", "zoneId", "specialty", "page", "pageSize", "sort", "order"])}`));
 
       const crewId = session.crew?.id;
       if (!crewId) return errorResponse(403, "La sesión no tiene una cuadrilla asignada.", path);
@@ -87,7 +92,7 @@ export async function GET(request: Request) {
       });
     }
     const scopedQuery = scenario.actor.kind === "FIELD" ? { ...query, crewId: scenario.actor.crewId } : query;
-    return NextResponse.json(paginateCrewFixtures(filterCrewFixtures(scopedQuery), query.page, query.pageSize));
+    return NextResponse.json(paginateCrewFixtures(sortCatalogFixtures(filterCrewFixtures(scopedQuery), query, "name", { crewType: crewTypeSchema.options, defaultShift: shiftSchema.options }), query.page, query.pageSize));
   } catch (error) {
     return handleRouteError(error, path, "No se pudieron cargar las cuadrillas.");
   }

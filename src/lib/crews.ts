@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { appendSortParams, type CatalogSortQuery } from "./catalog-sort";
 import { externalIdInput, externalIdListInput } from "@/lib/input-limits";
 import { tolerantRecords } from "./tolerant-records";
 
@@ -27,7 +28,7 @@ export const crewSchema = z.object({
 });
 const crewWireSchema = crewSchema;
 export type Crew = z.infer<typeof crewSchema>;
-export type CrewQuery = { active?: boolean; crewType?: CrewType; defaultShift?: Shift; zoneId?: string; specialty?: CrewSpecialty; page?: number; pageSize?: number };
+export type CrewQuery = CatalogSortQuery<"crews"> & { active?: boolean; crewType?: CrewType; defaultShift?: Shift; zoneId?: string; specialty?: CrewSpecialty; page?: number; pageSize?: number };
 export type CrewsPage = { crews: Crew[]; page: number; pageSize: number; total: number; totalPages: number };
 
 export const createCrewInputSchema = z.object({
@@ -60,6 +61,7 @@ function queryString(query: CrewQuery) {
   if (query.specialty) params.set("specialty", query.specialty);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  appendSortParams(params, query);
   const value = params.toString(); return value ? `?${value}` : "";
 }
 async function requestJson(path: string, init?: RequestInit) {

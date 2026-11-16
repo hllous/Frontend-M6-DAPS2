@@ -1,3 +1,5 @@
+import { parseCatalogSort } from "@/lib/catalog-sort";
+import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
 import { backendMode, backendQuery, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
@@ -43,14 +45,17 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const query = parseGreenSpaceQuery(new URL(request.url));
+    const url = new URL(request.url);
+    const sort = parseCatalogSort("green-spaces", url.searchParams);
+    if (!sort.ok) return errorResponse(400, sort.message, path);
+    const query = { ...parseGreenSpaceQuery(url), ...sort.value };
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/green-spaces${backendQuery(query, ["active", "spaceType", "zoneId", "page", "pageSize"])}`);
+      const backendResponse = await fetchBackend(request, `/green-spaces${backendQuery(query, ["active", "spaceType", "zoneId", "page", "pageSize", "sort", "order"])}`);
             return forwardResponse(backendResponse);
     }
 
-    return NextResponse.json(paginateGreenSpaceFixtures(filterGreenSpaceFixtures(query), query.page, query.pageSize));
+    return NextResponse.json(paginateGreenSpaceFixtures(sortCatalogFixtures(filterGreenSpaceFixtures(query), query, "name", { spaceType: greenSpaceTypeSchema.options }), query.page, query.pageSize));
   } catch (error) {
     return handleRouteError(error, path, "No se pudieron cargar los espacios verdes.");
   }

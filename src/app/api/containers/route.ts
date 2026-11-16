@@ -1,3 +1,5 @@
+import { parseCatalogSort } from "@/lib/catalog-sort";
+import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
 import { backendMode, backendQuery, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
@@ -45,15 +47,18 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const query = parseContainerQuery(new URL(request.url));
+    const url = new URL(request.url);
+    const sort = parseCatalogSort("containers", url.searchParams);
+    if (!sort.ok) return errorResponse(400, sort.message, path);
+    const query = { ...parseContainerQuery(url), ...sort.value };
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers${backendQuery(query, ["status", "containerType", "zoneId", "search", "page", "pageSize"])}`);
+      const backendResponse = await fetchBackend(request, `/containers${backendQuery(query, ["status", "containerType", "zoneId", "search", "page", "pageSize", "sort", "order"])}`);
             return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(
-      paginateContainerFixtures(filterContainerFixtures(query), query.page, query.pageSize),
+      paginateContainerFixtures(sortCatalogFixtures(filterContainerFixtures(query), query, "code", { containerType: containerTypeSchema.options, status: containerStatusSchema.options }), query.page, query.pageSize),
     );
   } catch (error) {
     return handleRouteError(error, path, "No se pudieron cargar los contenedores.");
