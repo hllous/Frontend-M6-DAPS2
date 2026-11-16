@@ -1,9 +1,8 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
 import { createVehicleInputSchema, type VehicleQuery, vehicleTypeSchema } from "@/lib/vehicles";
 import { addVehicleFixture, filterVehicleFixtures, paginateVehicleFixtures } from "@/lib/vehicles-fixtures";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
@@ -36,12 +35,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(paginateVehicleFixtures(filterVehicleFixtures(query), query.page, query.pageSize));
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudieron cargar los vehículos.");
+    return handleRouteError(error, path, "No se pudieron cargar los vehículos.");
   }
 }
 
@@ -49,10 +43,8 @@ export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = requireOfficeCapability(request);
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = createVehicleInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, createVehicleInputSchema, path);
+    if (parsed instanceof Response) return parsed;
     if (backendMode(session)) {
       const response = await fetchBackend(request, "/vehicles", "vehicle:manage", {
         method: "POST",

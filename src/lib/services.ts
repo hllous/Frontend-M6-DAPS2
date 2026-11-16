@@ -617,37 +617,59 @@ async function parseServicio(raw: unknown, message: string): Promise<Service> {
   return completarEtiquetas(parsed.data);
 }
 
+/** `fetch` autenticado de `/api/services*`: registra la telemetría de fallo de red y relanza. */
+async function fetchServicesApi(...args: Parameters<typeof authenticatedFetch>): Promise<Response> {
+  try {
+    return await authenticatedFetch(...args);
+  } catch (cause) {
+    if (cause instanceof NetworkFailureError) {
+      recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+    }
+    throw cause;
+  }
+}
+
+/** Traduce el cuerpo de una respuesta no exitosa en `ServiceRequestError` o, si no es válido, `ServiceContractError`. */
+function throwServiceResponseError(payload: unknown, malformedMessage: string): never {
+  const parsedError = errorResponseSchema.safeParse(payload);
+  if (!parsedError.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+    throw new ServiceContractError(malformedMessage, { cause: parsedError.error });
+  }
+  const message = Array.isArray(parsedError.data.message)
+    ? parsedError.data.message.join(" ")
+    : parsedError.data.message;
+  throw new ServiceRequestError(message, parsedError.data.statusCode);
+}
+
+/** Pide un Servicio a `/api/services*`: respuesta de error traducida, sobre `{ data }` abierto y esquema validado. */
+async function requestServicio(
+  path: string,
+  init: RequestInit | undefined,
+  malformedMessage: string,
+): Promise<Service> {
+  const response = await fetchServicesApi(path, init);
+  const payload = await readJsonBody(response);
+  if (!response.ok) throwServiceResponseError(payload, malformedMessage);
+  return parseServicio(unwrapData(payload), malformedMessage);
+}
+
+/** Abre el sobre `{ data }` de una respuesta; si el cuerpo ya es el recurso (tiene `id`), lo devuelve tal cual. */
+function unwrapData(payload: unknown): unknown {
+  return payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+    ? (payload as { data: unknown }).data
+    : payload;
+}
+
 export const servicesAdapter = {
   async list(query: ServiceQuery = {}): Promise<ServicesPage> {
     // Se arranca el catalogo junto con el listado y no despues: encadenarlos dejaba
     // la pantalla en el esqueleto de carga durante dos viajes de ida y vuelta.
     void catalogoDeEtiquetas();
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services${buildServicesQueryString(query)}`);
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
+    const response = await fetchServicesApi(`/api/services${buildServicesQueryString(query)}`);
     const payload = await readJsonBody(response);
 
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de servicios. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de servicios. Reintente en unos segundos.");
 
     const parsed = servicesEnvelopeSchema.safeParse(payload);
     if (!parsed.success) {
@@ -669,32 +691,10 @@ export const servicesAdapter = {
 
   async get(id: string): Promise<Service> {
     void catalogoDeEtiquetas();
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${id}`);
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
+    const response = await fetchServicesApi(`/api/services/${id}`);
     const payload = await readJsonBody(response);
 
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de servicio. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de servicio. Reintente en unos segundos.");
 
     return parseServicio(payload, "No se pudo obtener información válida del detalle de servicio. Reintente en unos segundos.");
   },
@@ -708,42 +708,17 @@ export const servicesAdapter = {
       );
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch("/api/services", {
+    const response = await fetchServicesApi("/api/services", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
 
     const payload = await readJsonBody(response);
 
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de servicios. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de servicios. Reintente en unos segundos.");
 
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
+    const raw = unwrapData(payload);
 
     return parseServicio(raw, "No se pudo obtener información válida de la creación de servicio. Reintente en unos segundos.");
   },
@@ -757,44 +732,11 @@ export const servicesAdapter = {
       );
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/assign-crew`, {
+    return requestServicio(`/api/services/${serviceId}/assign-crew`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de la asignación de servicio. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la asignación de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la asignación de servicio. Reintente en unos segundos.");
   },
 
   async start(serviceId: string): Promise<Service> {
@@ -812,42 +754,9 @@ export const servicesAdapter = {
       );
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/start`, {
+    return requestServicio(`/api/services/${serviceId}/start`, {
         method: "POST",
-      });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida del inicio de servicio. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida del inicio de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida del inicio de servicio. Reintente en unos segundos.");
   },
 
   async suspend(serviceId: string, input: SuspendServiceInput): Promise<Service> {
@@ -859,81 +768,17 @@ export const servicesAdapter = {
       );
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/suspend`, {
+    return requestServicio(`/api/services/${serviceId}/suspend`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de la suspensión de servicio. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la suspensión de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la suspensión de servicio. Reintente en unos segundos.");
   },
 
   async resume(serviceId: string): Promise<Service> {
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/resume`, {
+    return requestServicio(`/api/services/${serviceId}/resume`, {
         method: "POST",
-      });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de la reanudación de servicio. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la reanudación de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la reanudación de servicio. Reintente en unos segundos.");
   },
 
   async reschedule(serviceId: string, input: RescheduleServiceInput): Promise<Service> {
@@ -945,43 +790,11 @@ export const servicesAdapter = {
       );
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/reschedule`, {
+    return requestServicio(`/api/services/${serviceId}/reschedule`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de la reprogramación de servicio. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la reprogramación de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la reprogramación de servicio. Reintente en unos segundos.");
   },
 
   async cancel(serviceId: string, input: CancelServiceInput): Promise<Service> {
@@ -993,43 +806,11 @@ export const servicesAdapter = {
       );
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/cancel`, {
+    return requestServicio(`/api/services/${serviceId}/cancel`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de la cancelación de servicio. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la cancelación de servicio. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la cancelación de servicio. Reintente en unos segundos.");
   },
 
   async confirmReschedule(serviceId: string, input: ConfirmRescheduleInput): Promise<Service> {
@@ -1041,71 +822,18 @@ export const servicesAdapter = {
       );
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/confirm-reschedule`, {
+    return requestServicio(`/api/services/${serviceId}/confirm-reschedule`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
-      });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de la confirmación de reprogramación. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la confirmación de reprogramación. Reintente en unos segundos.");
+      }, "No se pudo obtener información válida de la confirmación de reprogramación. Reintente en unos segundos.");
   },
 
   async getZoneResults(serviceId: string): Promise<ZoneResult[]> {
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/zone-results`);
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
+    const response = await fetchServicesApi(`/api/services/${serviceId}/zone-results`);
     const payload = await readJsonBody(response);
 
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de resultados de zona. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de resultados de zona. Reintente en unos segundos.");
 
     const parsed = z.array(zoneResultSchema).safeParse(payload);
     if (!parsed.success) {
@@ -1128,41 +856,17 @@ export const servicesAdapter = {
       );
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/zone-results`, {
+    const response = await fetchServicesApi(`/api/services/${serviceId}/zone-results`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
 
     const payload = await readJsonBody(response);
 
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida del registro de zona. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida del registro de zona. Reintente en unos segundos.");
 
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
+    const raw = unwrapData(payload);
 
     const parsed = zoneResultSchema.safeParse(raw);
     if (!parsed.success) {
@@ -1225,38 +929,17 @@ export const servicesAdapter = {
       formData.append("serviceId", params.serviceId);
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch("/api/evidence", {
+    const response = await fetchServicesApi("/api/evidence", {
         method: "POST",
         headers: {
           "Idempotency-Key": key,
         },
         body: formData,
       });
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
 
     const payload = await readJsonBody(response);
 
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de la carga de evidencia. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la carga de evidencia. Reintente en unos segundos.");
 
     const parsed = attachmentSchema.safeParse(payload);
     if (!parsed.success) {
@@ -1285,39 +968,7 @@ export const servicesAdapter = {
       requestInit.body = JSON.stringify(parsedInput.data);
     }
 
-    let response: Response;
-    try {
-      response = await authenticatedFetch(`/api/services/${serviceId}/complete`, requestInit);
-    } catch (cause) {
-      if (cause instanceof NetworkFailureError) {
-        recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
-      }
-      throw cause;
-    }
-
-    const payload = await readJsonBody(response);
-
-    if (!response.ok) {
-      const parsedError = errorResponseSchema.safeParse(payload);
-      if (!parsedError.success) {
-        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
-        throw new ServiceContractError(
-          "No se pudo obtener información válida de la finalización de servicio. Reintente en unos segundos.",
-          { cause: parsedError.error },
-        );
-      }
-      const message = Array.isArray(parsedError.data.message)
-        ? parsedError.data.message.join(" ")
-        : parsedError.data.message;
-      throw new ServiceRequestError(message, parsedError.data.statusCode);
-    }
-
-    const raw =
-      payload && typeof payload === "object" && "data" in payload && !("id" in payload)
-        ? (payload as { data: unknown }).data
-        : payload;
-
-    return parseServicio(raw, "No se pudo obtener información válida de la finalización de servicio. Reintente en unos segundos.");
+    return requestServicio(`/api/services/${serviceId}/complete`, requestInit, "No se pudo obtener información válida de la finalización de servicio. Reintente en unos segundos.");
   },
 };
 

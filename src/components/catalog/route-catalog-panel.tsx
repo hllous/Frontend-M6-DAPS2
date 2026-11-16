@@ -1499,9 +1499,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               </span>
             </DialogDescription>
               <Alert variant="warning" className="text-left">
-                <AlertDescription>{stalenessWarningReason === "unavailable"
-                  ? "Si guarda, reemplaza las paradas actuales."
-                  : "Si guarda, reemplaza las paradas actuales."}</AlertDescription>
+                <AlertDescription>Si guarda, reemplaza las paradas actuales.</AlertDescription>
               </Alert>
           </DialogHeader>
           <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">

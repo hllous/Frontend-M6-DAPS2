@@ -1,9 +1,9 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { findServiceFixture, serviceHistoryEntry } from "@/lib/bff-service-mock";
+import { authorize, backendMode, errorResponse, forwardResponse, requireCrewScope, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
-  serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { streetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
@@ -12,8 +12,7 @@ import {
 } from "@/lib/services";
 import { resolveStreetClosureDependency } from "@/lib/street-closure-requests";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -48,10 +47,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     const closureDependency = resolveStreetClosureDependency(
       streetClosureRequestFixtures.filter(
@@ -108,11 +105,7 @@ export async function POST(
       );
     }
 
-    const historyEntry = {
-      label: "En curso",
-      at: new Date().toISOString().slice(0, 16).replace("T", " "),
-      done: true,
-    };
+    const historyEntry = serviceHistoryEntry("En curso");
 
     const updated = updateServiceFixture(service.id, {
       status: "IN_PROGRESS",
@@ -121,13 +114,6 @@ export async function POST(
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudo iniciar el servicio.");
+    return handleRouteError(error, path, "No se pudo iniciar el servicio.");
   }
 }

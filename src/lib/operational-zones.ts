@@ -223,9 +223,9 @@ function ringCenter(ring: MapCoordinate[]): MapCoordinate {
 
 export function polygonCenter(coordinates: MapPolygon[]): MapCoordinate {
   const outerRings = coordinates.map((polygon) => polygon[0] ?? []);
-  const largestOuterRing = outerRings.reduce((largest, ring) =>
+  const largestOuterRing = outerRings.reduce<MapCoordinate[]>((largest, ring) =>
     Math.abs(ringDoubleArea(ring)) > Math.abs(ringDoubleArea(largest)) ? ring : largest,
-  );
+  []);
   return ringCenter(largestOuterRing);
 }
 

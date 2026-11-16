@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -46,10 +46,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     authorize(session, { capability: "environmentalInspection:schedule", throwOnError: true });
     const scenario = getScenario(session);
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede programar inspecciones.", path);
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = environmentalInspectionScheduleInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, environmentalInspectionScheduleInputSchema, path);
+    if (parsed instanceof Response) return parsed;
     if (backendMode(session)) {
       // El backend solo acepta serviceId/inspectorId al programar (CreateInspectionDto
       // con forbidNonWhitelisted): la fecha, la ventana, el checklist y la zona van al
