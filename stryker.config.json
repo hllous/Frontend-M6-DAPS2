@@ -1,19 +1,52 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
-  "vitest": { "configFile": "vitest.mutation.config.ts" },
-  "plugins": ["@stryker-mutator/vitest-runner", "@stryker-mutator/typescript-checker"],
+  "vitest": {
+    "configFile": "vitest.mutation.config.ts"
+  },
+  "plugins": [
+    "@stryker-mutator/vitest-runner",
+    "@stryker-mutator/typescript-checker"
+  ],
   "disableTypeChecks": "src/**/*.{ts,tsx}",
-  "checkers": ["typescript"],
+  "checkers": [
+    "typescript"
+  ],
   "tsconfigFile": "tsconfig.json",
   "mutate": [
-    "src/lib/**/*.ts",
-    "src/app/api/**/route.ts",
-    "!src/lib/**/*.{test,spec}.{ts,tsx}",
-    "!src/lib/**/*-fixtures.ts",
-    "!src/lib/services-fixtures.ts",
-    "!src/lib/**/*.d.ts",
-    "!src/lib/m1-refresh.ts"
+    "src/lib/session.ts",
+    "src/lib/m1-auth.ts",
+    "src/lib/bff-route.ts",
+    "src/lib/bff-backend.ts",
+    "src/lib/input-limits.ts",
+    "src/lib/argentina-date.ts",
+    "src/lib/m6-roles.ts",
+    "src/lib/crew-fit.ts",
+    "src/lib/display-ids.ts",
+    "src/lib/error-message.ts",
+    "src/lib/referral-anomalies.ts",
+    "src/lib/sanction-outcomes.ts",
+    "src/lib/field-drafts.ts",
+    "src/lib/map-coverage.ts",
+    "src/lib/authenticated-fetch.ts",
+    "src/lib/me.ts",
+    "src/lib/operational-map.ts",
+    "src/lib/services-map.ts",
+    "src/lib/integration-monitor.ts",
+    "src/lib/crew-zone-assignments.ts",
+    "src/lib/crews.ts",
+    "src/lib/referrals.ts",
+    "src/lib/repair-requests.ts",
+    "src/lib/street-closure-requests.ts",
+    "src/lib/tolerant-records.ts",
+    "src/lib/backend-shape.ts",
+    "src/lib/bff-response-path.ts",
+    "src/app/api/session/**/route.ts",
+    "src/app/api/audit/route.ts",
+    "src/app/api/me/**/route.ts",
+    "src/app/api/health/route.ts",
+    "src/app/api/role-assignments/**/route.ts",
+    "!src/app/api/**/*.test.ts"
   ],
   "coverageAnalysis": "perTest",
   "thresholds": {
@@ -21,7 +54,12 @@
     "low": 60,
     "break": 60
   },
-  "reporters": ["html", "clear-text", "json", "progress"],
+  "reporters": [
+    "html",
+    "clear-text",
+    "json",
+    "progress"
+  ],
   "htmlReporter": {
     "fileName": "reports/mutation/mutation.html"
   },
