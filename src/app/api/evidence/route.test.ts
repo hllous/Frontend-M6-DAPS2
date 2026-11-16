@@ -59,7 +59,7 @@ function sizedMultipartRequest(cookie: string, fileBytes: number, contentLength:
 
 const backendSessionSettings = {
   mode: "real-m1" as const,
-  accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+  accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature",
   backendOrigin: "https://backend.internal",
 };
 
@@ -569,7 +569,7 @@ describe("POST /api/evidence BFF route", () => {
 
   it("forwards only the UploadEvidenceDto fields to the backend (no fileName or fileSize)", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch");
-    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "crew-real", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "crew-real", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" });
     backendFetch.mockClear();
     let sentKeys: string[] = [];
     backendFetch.mockImplementation(async (input, init) => {

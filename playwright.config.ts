@@ -32,12 +32,12 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: "**/real-m1-login.spec.ts",
+      testIgnore: ["**/real-m1-login.spec.ts", "**/login-rate-limit.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "real-m1",
-      testMatch: "**/real-m1-login.spec.ts",
+      testMatch: ["**/real-m1-login.spec.ts", "**/login-rate-limit.spec.ts"],
       use: { ...devices["Desktop Chrome"], baseURL: realM1BaseURL },
     },
   ],

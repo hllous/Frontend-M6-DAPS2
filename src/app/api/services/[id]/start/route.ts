@@ -13,12 +13,13 @@ import {
 import { resolveStreetClosureDependency } from "@/lib/street-closure-requests";
 import { getScenario } from "@/lib/scenarios";
 import { getRequiredSession } from "@/lib/session";
+import { versionedService } from "@/lib/bff-mock-versions";
 
 
 
 
 
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -117,3 +118,5 @@ export async function POST(
     return handleRouteError(error, path, "No se pudo iniciar el servicio.");
   }
 }
+
+export const POST = versionedService(handlePOST);

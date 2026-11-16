@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { AUDIT_SCREENS, AUDIT_WIDTHS, openAuditScreen } from "./support/screens";
 
 // Scoped to actual WCAG success criteria rather than axe's opinionated "best-practice"
 // rule set (e.g. page-has-heading-one, region), which the acceptance criterion's
@@ -108,4 +109,20 @@ test.describe("automated WCAG checks @smoke", () => {
     await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCSS("background-color", "oklab(0 0 0 / 0.1)");
     await expect(sheet.getByRole("button", { name: "Cerrar" })).toBeVisible();
   });
+});
+
+// Recorrido de las pantallas principales a 360, 768 y 1280 px (criterio de la cátedra: axe sin
+// violaciones críticas WCAG 2.2 AA). Falla ante cualquier violación critical o serious.
+test.describe("axe en las pantallas principales a 360, 768 y 1280 px (CA-HU32-1)", () => {
+  for (const size of AUDIT_WIDTHS) {
+    for (const screen of AUDIT_SCREENS) {
+      test(`${screen.id} a ${size.name} px no tiene violaciones critical ni serious`, async ({ page }) => {
+        await openAuditScreen(page, screen, size);
+        const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+        const blocking = results.violations.filter((violation) => violation.impact === "critical" || violation.impact === "serious");
+        expect(blocking, JSON.stringify(blocking.map((violation) => ({ id: violation.id, impact: violation.impact, nodes: violation.nodes.map((node) => node.target) })), null, 2)).toEqual([]);
+        expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
+      });
+    }
+  }
 });

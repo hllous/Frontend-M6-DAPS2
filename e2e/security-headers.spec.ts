@@ -40,6 +40,88 @@ test.describe("security headers @smoke", () => {
   });
 });
 
+test.describe("headers on every kind of response @smoke", () => {
+  const expectHardened = (headers: Record<string, string>) => {
+    expect(headers["x-content-type-options"]).toBe("nosniff");
+    expect(headers["x-frame-options"]).toBe("DENY");
+    expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+  };
+
+  test("a 404 page", async ({ request }) => {
+    const response = await request.get("/no-existe-esta-pagina");
+    expect(response.status()).toBe(404);
+    expectHardened(response.headers());
+  });
+
+  test("the redirect of a protected page without a session", async ({ request }) => {
+    const response = await request.get("/app", { maxRedirects: 0 });
+    expect([302, 307, 308]).toContain(response.status());
+    expectHardened(response.headers());
+  });
+
+  test("a BFF error response", async ({ request }) => {
+    const response = await request.get("/api/zones");
+    expect(response.status()).toBe(401);
+    expectHardened(response.headers());
+  });
+
+  test("HSTS is not sent over plain-HTTP development (it is unit-tested for production in next.config.test.mjs)", async ({ request, baseURL }) => {
+    test.skip(baseURL?.startsWith("https://") ?? false, "contra HTTPS se espera HSTS");
+    expect((await request.get("/login")).headers()["strict-transport-security"]).toBeUndefined();
+  });
+});
+
+test.describe("BFF CORS and error hygiene @smoke", () => {
+  test("never answers with a wildcard or reflected CORS origin, even with credentials", async ({ request }) => {
+    for (const path of ["/api/health", "/api/zones", "/api/session"]) {
+      const response = await request.get(path, { headers: { origin: "https://evil.example" } });
+      const headers = response.headers();
+      expect(headers["access-control-allow-origin"], path).toBeUndefined();
+      expect(headers["access-control-allow-credentials"], path).toBeUndefined();
+    }
+  });
+
+  test("a cross-origin preflight is not approved", async ({ request }) => {
+    const response = await request.fetch("/api/session/login", {
+      method: "OPTIONS",
+      headers: { origin: "https://evil.example", "access-control-request-method": "POST", "access-control-request-headers": "content-type" },
+    });
+    expect(response.headers()["access-control-allow-origin"]).toBeUndefined();
+    expect(response.headers()["access-control-allow-methods"]).toBeUndefined();
+  });
+
+  test("errors carry no stack trace or internal detail", async ({ request }) => {
+    const unauthenticated = await request.get("/api/zones");
+    const malformed = await request.post("/api/session/login", {
+      data: "{no es json",
+      headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+    });
+
+    for (const response of [unauthenticated, malformed]) {
+      const text = await response.text();
+      expect(text).not.toMatch(/at [\w.<>]+ \(|node_modules|\.tsx?:\d+|stack|ECONN|prisma/i);
+      expect(text).not.toMatch(/[A-Za-z]:\\|\/home\/|\/app\/src/);
+    }
+  });
+});
+
+test.describe("session cookies @smoke", () => {
+  test("are HttpOnly and SameSite=Lax; Secure is added on every non-loopback host and in production", async ({ page, context }) => {
+    await loginViaApi(page, "office-duty-queue");
+    await page.goto("/login");
+    const cookies = await context.cookies();
+    const session = cookies.find((cookie) => cookie.name === "m6_session");
+
+    expect(session).toBeDefined();
+    expect(session?.httpOnly).toBe(true);
+    expect(session?.sameSite).toBe("Lax");
+    // La marca de "ya ingresó" tampoco es legible desde scripts.
+    expect(cookies.find((cookie) => cookie.name === "m6_signed_in")?.httpOnly ?? true).toBe(true);
+    expect(await page.evaluate(() => document.cookie)).not.toContain("m6_session");
+  });
+});
+
 async function collectCspViolations(page: Page) {
   const violations: string[] = [];
   await page.addInitScript(() => {
