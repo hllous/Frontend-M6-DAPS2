@@ -14,19 +14,17 @@
   ],
   "tsconfigFile": "tsconfig.json",
   "mutate": [
-    "src/lib/crew-fit.ts",
-    "src/lib/display-ids.ts",
-    "src/lib/error-message.ts",
-    "src/lib/argentina-date.ts",
-    "src/lib/m6-roles.ts",
-    "src/lib/input-limits.ts",
-    "src/lib/map-coverage.ts"
+    "src/lib/**/*.ts",
+    "src/app/api/**/route.ts",
+    "!src/lib/**/*.{test,spec}.{ts,tsx}",
+    "!src/lib/**/*-fixtures.ts",
+    "!src/lib/**/*.d.ts"
   ],
   "coverageAnalysis": "perTest",
   "thresholds": {
     "high": 80,
     "low": 60,
-    "break": 60
+    "break": 65
   },
   "reporters": [
     "html",
@@ -52,11 +50,12 @@
     "/playwright-report",
     "/test-results",
     "/reports",
-    "/docs"
+    "/docs",
+    "/.stryker-tmp"
   ],
   "concurrency": 4,
-  "dryRunTimeoutMinutes": 15,
   "timeoutMS": 10000,
   "incremental": true,
-  "incrementalFile": "reports/mutation/incremental.json"
+  "incrementalFile": "reports/mutation/incremental.json",
+  "dryRunTimeoutMinutes": 30
 }
