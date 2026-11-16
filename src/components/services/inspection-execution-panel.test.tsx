@@ -333,4 +333,80 @@ describe("InspectionExecutionPanel", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent(/cambi/);
     expect(completionAttempts).toBe(1);
   });
+
+  async function saveOfflineDraft(user: ReturnType<typeof userEvent.setup>, extra: Parameters<typeof server.use>) {
+    server.use(
+      http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())),
+      http.post("*/api/environmental-inspections/INS-TEST-1/complete", () => HttpResponse.error()),
+      ...extra,
+    );
+    render(<InspectionExecutionPanel service={service} canExecute />);
+    await screen.findByRole("heading", { name: "Inspección ambiental" });
+    await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto/ }));
+    await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "Sin infracción constatada.");
+    await user.click(screen.getByRole("button", { name: /Completar inspecci/ }));
+    await screen.findByText(/Sin enviar\. Reenvíe cuando vuelva la conexión/);
+  }
+
+  it("keeps the draft and says it is still unsent when the connection has not come back", async () => {
+    const user = userEvent.setup();
+    await saveOfflineDraft(user, [
+      http.get("*/api/services/SVC-INS-1", () => HttpResponse.json(service)),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: /Reenviar/ }));
+
+    expect(await screen.findByText(/Sin enviar\. Reenvíe cuando vuelva la conexión/)).toBeVisible();
+    expect(screen.getByRole("textbox", { name: /Conclus/ })).toHaveValue("Sin infracción constatada.");
+  });
+
+  it("clears the form and the draft when the crew discards what it loaded after a conflict", async () => {
+    const user = userEvent.setup();
+    await saveOfflineDraft(user, [
+      http.get("*/api/services/SVC-INS-1", () => HttpResponse.json({ ...service, updatedAt: "2026-09-07T13:00:00.000Z", crewName: "Cuadrilla C" })),
+    ]);
+    expect(localStorage.length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: /Reenviar/ }));
+    await user.click(await screen.findByRole("button", { name: "Descartar lo cargado" }));
+
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /Conclus/ })).toHaveValue(""));
+    expect(screen.getByRole("checkbox", { name: /Verificar la fuente/ })).not.toBeChecked();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("keeps the draft for later when the crew preserves it after a conflict", async () => {
+    const user = userEvent.setup();
+    await saveOfflineDraft(user, [
+      http.get("*/api/services/SVC-INS-1", () => HttpResponse.json({ ...service, updatedAt: "2026-09-07T13:00:00.000Z", crewName: "Cuadrilla C" })),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: /Reenviar/ }));
+    await user.click(await screen.findByRole("button", { name: "Conservar para después" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Conservar para después" })).not.toBeInTheDocument());
+    expect(screen.getByRole("textbox", { name: /Conclus/ })).toHaveValue("Sin infracción constatada.");
+    expect(localStorage.length).toBeGreaterThan(0);
+  });
+
+  it("shows the backend rejection of the completion without losing the form", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("*/api/environmental-inspections/INS-TEST-1", () => HttpResponse.json(inspectionResponse())),
+      http.post("*/api/environmental-inspections/INS-TEST-1/complete", () => HttpResponse.json(
+        { statusCode: 422, error: "Unprocessable Entity", message: "La inspección ya fue cerrada por otra persona.", timestamp: "2026-09-07T09:00:00.000Z", path: "/api/environmental-inspections/INS-TEST-1/complete" },
+        { status: 422 },
+      )),
+    );
+    render(<InspectionExecutionPanel service={service} canExecute />);
+    await screen.findByRole("heading", { name: "Inspección ambiental" });
+    await user.click(screen.getByRole("checkbox", { name: /Verificar la fuente/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Registrar el impacto/ }));
+    await user.type(screen.getByRole("textbox", { name: /Conclus/ }), "Sin infracción constatada.");
+    await user.click(screen.getByRole("button", { name: /Completar inspecci/ }));
+
+    expect((await screen.findAllByText(/La inspección ya fue cerrada por otra persona\./)).length).toBeGreaterThan(0);
+    expect(screen.getByRole("textbox", { name: /Conclus/ })).toHaveValue("Sin infracción constatada.");
+  });
 });
