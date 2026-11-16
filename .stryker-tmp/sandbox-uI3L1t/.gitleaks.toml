@@ -1,0 +1,20 @@
+# Configuración de gitleaks (job `secrets` del CI, #964).
+# Parte de las reglas por defecto. Cada excepción va por VALOR exacto (o un patrón
+# que solo describe valores de prueba), nunca por archivo: una credencial real en
+# los mismos archivos se sigue detectando.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Valores de prueba que no son secretos (revisados el 16/11/2026)"
+regexTarget = "secret"
+regexes = [
+  # JWT estructurales de los tests: "header" y "signature" son literales y el
+  # payload solo trae exp/sub. No están firmados con ninguna clave.
+  '''^header\.eyJ[A-Za-z0-9_-]+\.signature$''',
+  # Referencia a la variable de entorno en src/lib/demo-jwt.ts (eliminado), no un valor.
+  '''^environment\.M6_JWT_SECRET$''',
+  # Clave de juguete de src/lib/public-bff.test.ts.
+  '''^test-placeholder-key-0123456789abcdef-xyz$''',
+]

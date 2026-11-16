@@ -1,0 +1,1089 @@
+// @ts-nocheck
+import { z } from "zod";
+
+import { formatCalendarDay, todayInArgentina } from "./argentina-date";
+import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import {
+  streetClosureRequestsAdapter,
+  type StreetClosureRequest,
+} from "./street-closure-requests";
+import { catalogoDeEtiquetas, componerTituloDeServicio } from "./service-labels";
+import { serviceTypeCategorySchema } from "./service-types";
+import { recordTelemetryEvent } from "./telemetry";
+import { MAX_EXTERNAL_ID_LENGTH, MAX_NOTES_LENGTH, MAX_TICKET_ID_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { droppedRecords, tolerantRecords } from "./tolerant-records";
+
+export const serviceModeSchema = z.enum(["ROUTE", "POINT"]);
+export type ServiceMode = z.infer<typeof serviceModeSchema>;
+
+export const serviceStatusSchema = z.enum([
+  "SCHEDULED",
+  "RESCHEDULED",
+  "IN_PROGRESS",
+  "SUSPENDED",
+  "COMPLETED",
+  "PARTIALLY_COMPLETED",
+  "CANCELLED",
+]);
+export type ServiceStatus = z.infer<typeof serviceStatusSchema>;
+
+export const serviceOriginSchema = z.enum([
+  "PLANNED",
+  "TICKET",
+  "WEATHER_ALERT",
+  "INSPECTION",
+  "MANUAL",
+]);
+export type ServiceOrigin = z.infer<typeof serviceOriginSchema>;
+
+export const statusEventSchema = z.object({
+  label: z.string(),
+  at: z.string(),
+  done: z.boolean(),
+});
+export type StatusEvent = z.infer<typeof statusEventSchema>;
+
+export const coordinatesSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+export type Coordinates = z.infer<typeof coordinatesSchema>;
+
+export const attachmentSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  filename: z.string(),
+  contentType: z.string(),
+  uploadedAt: z.string(),
+});
+export type Attachment = z.infer<typeof attachmentSchema>;
+
+export const zoneResultStatusSchema = z.enum(["SERVICED", "PARTIAL", "NOT_SERVICED"]);
+export type ZoneResultStatus = z.infer<typeof zoneResultStatusSchema>;
+
+export const notServicedReasonSchema = z.enum([
+  "VEHICLE_BREAKDOWN",
+  "CREW_UNAVAILABLE",
+  "BLOCKED_ACCESS",
+  "STREET_CLOSURE",
+  "WEATHER",
+  "EXCESS_VOLUME",
+  "SECURITY_INCIDENT",
+  "OTHER",
+]);
+export type NotServicedReason = z.infer<typeof notServicedReasonSchema>;
+
+export const zoneResultSchema = z.object({
+  id: z.string(),
+  // El backend no repite el id del servicio dentro de cada resultado: ya esta en el
+  // recurso padre o en la ruta con la que se pidio. Se completa cuando se conoce.
+  serviceId: z.string().optional(),
+  zoneId: z.string(),
+  status: zoneResultStatusSchema,
+  reason: notServicedReasonSchema.nullable().optional(),
+  notes: z.string().nullable().optional(),
+  proposedDate: z.string().nullable().optional(),
+  attachments: z.array(attachmentSchema).optional().default([]),
+  recordedAt: z.string(),
+});
+export type ZoneResult = z.infer<typeof zoneResultSchema>;
+
+export const serviceSchema = z.object({
+  id: z.string(),
+  serviceTypeId: z.string(),
+  serviceTypeName: z.string().optional().default("Servicio urbano"),
+  serviceTypeCategory: serviceTypeCategorySchema.optional(),
+  title: z.string(),
+  mode: serviceModeSchema,
+  status: serviceStatusSchema,
+  statusReason: z.string().nullable().optional(),
+  statusNote: z.string().nullable().optional(),
+  origin: serviceOriginSchema,
+  zoneIds: z.array(z.string()).min(1),
+  zoneNames: z.array(z.string()).optional().default([]),
+  zoneResults: z.array(zoneResultSchema).optional(),
+  routeId: z.string().nullable().optional(),
+  routeName: z.string().nullable().optional(),
+  targetType: z.string().nullable().optional(),
+  targetId: z.string().nullable().optional(),
+  targetRef: z.string().nullable().optional(),
+  inspectionId: z.string().nullable().optional(),
+  weatherAlertId: z.string().nullable().optional(),
+  // El backend la serializa como ISO a medianoche UTC (`2026-12-07T00:00:00.000Z`); se
+  // guarda como día (YYYY-MM-DD), que es lo que comparan los filtros, los choques de
+  // agenda y la ventana horaria, y lo que se manda al reprogramar.
+  scheduledDate: z.string().transform((value) => value.slice(0, 10)),
+  windowFrom: z.string().nullable().optional(),
+  windowTo: z.string().nullable().optional(),
+  crewId: z.string().nullable().optional(),
+  crewName: z.string().nullable().optional(),
+  vehicleId: z.string().nullable().optional(),
+  vehiclePlate: z.string().nullable().optional(),
+  ticketId: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  coordinates: coordinatesSchema.optional().default({ x: 50, y: 50 }),
+  attachments: z.array(attachmentSchema).optional().default([]),
+  history: z.array(statusEventSchema).optional().default([]),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export type Service = z.infer<typeof serviceSchema>;
+
+/**
+ * Lo que responde el backend: las zonas vienen como `zones: [{ zoneId, sequence }]`
+ * y no hay `title`. Se aplanan los ids respetando el `sequence`, que es el orden en
+ * que un recorrido recorre las zonas, y el título lo compone parseServicio() con los
+ * catálogos. Las fixtures del modo mock ya traen `zoneIds` y `title`, y pasan igual.
+ */
+const serviceWireSchema = z.preprocess((value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const record = value as Record<string, unknown>;
+  if ("zoneIds" in record || !Array.isArray(record.zones)) return value;
+  const { zones, ...rest } = record;
+  const ordenadas = [...(zones as { zoneId?: unknown; sequence?: unknown }[])].sort(
+    (a, b) => Number(a?.sequence ?? 0) - Number(b?.sequence ?? 0),
+  );
+  const zoneResults = Array.isArray(record.zoneResults)
+    ? (record.zoneResults as Record<string, unknown>[]).map((resultado) => ({ serviceId: record.id, ...resultado }))
+    : record.zoneResults;
+  return { ...rest, zoneIds: ordenadas.map((zona) => zona?.zoneId), zoneResults };
+}, serviceSchema.extend({ title: z.string().optional() }));
+
+export const OVERRIDE_NOTE_MIN = 10;
+export const OVERRIDE_NOTE_MAX = 500;
+
+// El backend la exige cuando la cuadrilla o el vehículo ya están tomados en esa franja (409 sin ella),
+// tanto al programar con cuadrilla como en assign-crew.
+const overrideNoteSchema = z
+  .string()
+  .trim()
+  .min(OVERRIDE_NOTE_MIN, `La justificación debe tener al menos ${OVERRIDE_NOTE_MIN} caracteres.`)
+  .max(OVERRIDE_NOTE_MAX, `La justificación admite hasta ${OVERRIDE_NOTE_MAX} caracteres.`)
+  .optional();
+
+export const createServiceInputSchema = z
+  .object({
+    title: z.string().optional(),
+    serviceTypeId: z.string().min(1, "Debe seleccionar un tipo de servicio"),
+    origin: serviceOriginSchema,
+    ticketId: z.string().max(MAX_TICKET_ID_LENGTH, `El ticketId no puede superar los ${MAX_TICKET_ID_LENGTH} caracteres.`).optional(),
+    inspectionId: z.string().optional(),
+    weatherAlertId: z.string().max(MAX_EXTERNAL_ID_LENGTH, `El weatherAlertId no puede superar los ${MAX_EXTERNAL_ID_LENGTH} caracteres.`).optional(),
+    routeId: z.string().optional(),
+    zoneIds: z.array(z.string()).min(1, "Debe incluir al menos una zona"),
+    targetType: z.enum(["CONTAINER", "TREE", "GREEN_SPACE", "GREEN_POINT"]).optional(),
+    targetId: z.string().optional(),
+    targetRef: z.string().optional(),
+    crewId: z.string().optional(),
+    vehicleId: z.string().optional(),
+    scheduledDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+    timeWindow: z.object({
+      start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
+      end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
+    }),
+    notes: z.string().max(MAX_NOTES_LENGTH, `Las notas no pueden superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
+    overrideNote: overrideNoteSchema,
+  })
+  .superRefine((data, ctx) => {
+    if (data.origin === "TICKET" && (!data.ticketId || !data.ticketId.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ticketId"],
+        message: "El ticketId es obligatorio para origen TICKET",
+      });
+    }
+    if (data.origin !== "TICKET" && data.ticketId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ticketId"],
+        message: "ticketId solo está permitido para origen TICKET",
+      });
+    }
+    if (data.origin === "INSPECTION" && (!data.inspectionId || !data.inspectionId.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["inspectionId"],
+        message: "El inspectionId es obligatorio para origen INSPECTION",
+      });
+    } else if (data.origin === "INSPECTION" && !z.uuid().safeParse(data.inspectionId?.trim()).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["inspectionId"],
+        message: "El inspectionId debe ser el UUID de la inspección.",
+      });
+    }
+    if (data.origin === "WEATHER_ALERT" && (!data.weatherAlertId || !data.weatherAlertId.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["weatherAlertId"],
+        message: "El weatherAlertId es obligatorio para origen WEATHER_ALERT",
+      });
+    }
+  });
+
+export type CreateServiceInput = z.infer<typeof createServiceInputSchema>;
+
+export class BackendServiceZoneSelectionError extends Error {
+  constructor() {
+    super("La programación sin recorrido ni objetivo admite exactamente una zona.");
+    this.name = "BackendServiceZoneSelectionError";
+  }
+}
+
+export function toCreateServiceBackendInput(input: CreateServiceInput) {
+  // El backend exige targetType y targetId juntos, e ignora zoneId cuando hay bien: un objetivo sin
+  // targetId (p. ej. una dirección escrita a mano) se manda como ubicación suelta, con zoneId, y el
+  // texto se conserva en las notas para no perderlo.
+  const hasTarget = Boolean(input.targetType && input.targetId);
+  const zoneIsDerived = Boolean(input.routeId) || hasTarget;
+  if (!zoneIsDerived && input.zoneIds.length !== 1) {
+    throw new BackendServiceZoneSelectionError();
+  }
+  const looseTarget = !hasTarget && !input.routeId ? input.targetRef?.trim() : undefined;
+  const notes = [looseTarget ? `Objetivo: ${looseTarget}` : undefined, input.notes].filter(Boolean).join(" — ") || undefined;
+
+  return {
+    serviceTypeId: input.serviceTypeId,
+    scheduledDate: input.scheduledDate,
+    origin: input.origin,
+    routeId: input.routeId,
+    targetType: hasTarget ? input.targetType : undefined,
+    targetId: hasTarget ? input.targetId : undefined,
+    ...(!zoneIsDerived ? { zoneId: input.zoneIds[0] } : {}),
+    crewId: input.crewId || undefined,
+    vehicleId: input.vehicleId || undefined,
+    windowFrom: input.timeWindow.start,
+    windowTo: input.timeWindow.end,
+    ticketId: input.ticketId,
+    // El backend da 400 si el vínculo llega con otro origen, y guarda null si viene vacío.
+    inspectionId: input.origin === "INSPECTION" ? input.inspectionId?.trim() || undefined : undefined,
+    weatherAlertId: input.origin === "WEATHER_ALERT" ? input.weatherAlertId?.trim() || undefined : undefined,
+    notes,
+    overrideNote: input.overrideNote,
+  };
+}
+
+export const containerLocationSchema = z.object({
+  address: z.string().trim().min(1, "La nueva dirección es obligatoria."),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
+  zoneId: z.string().trim().min(1).optional(),
+});
+export type ContainerLocation = z.infer<typeof containerLocationSchema>;
+
+export const completeServiceInputSchema = z.object({
+  containerLocation: containerLocationSchema.optional(),
+});
+export type CompleteServiceInput = z.infer<typeof completeServiceInputSchema>;
+
+export type ServiceTypeCatalogItem = {
+  id: string;
+  code: string;
+  name: string;
+  mode: ServiceMode;
+  category: string;
+  requiresVehicle?: boolean;
+};
+
+export const SERVICE_TYPE_CATALOG: ServiceTypeCatalogItem[] = [
+  { id: "st-waste-route", code: "ST-REC", name: "Recolección de residuos", mode: "ROUTE", category: "WASTE", requiresVehicle: true },
+  { id: "st-street-cleaning", code: "ST-BAR", name: "Barrido mecánico", mode: "ROUTE", category: "CLEANING", requiresVehicle: true },
+  { id: "st-tree-pruning", code: "ST-POD", name: "Poda y arbolado", mode: "POINT", category: "GREEN_SPACES", requiresVehicle: false },
+  { id: "st-container-repair", code: "ST-CON-REP", name: "Mantenimiento de contenedores", mode: "POINT", category: "CONTAINERS", requiresVehicle: true },
+  { id: "st-container-survey", code: "ST-CON-SRV", name: "Relevamiento de contenedores", mode: "POINT", category: "CONTAINERS", requiresVehicle: false },
+  { id: "st-dump-clearing", code: "ST-BAS", name: "Limpieza de microbasural", mode: "POINT", category: "CLEANING", requiresVehicle: true },
+  { id: "st-green-inspection", code: "ST-PV-INS", name: "Inspección de puntos verdes", mode: "POINT", category: "GREEN_SPACES", requiresVehicle: false },
+  { id: "st-env-inspection", code: "ST-AMB-INS", name: "Inspección ambiental", mode: "POINT", category: "ENVIRONMENT", requiresVehicle: false },
+];
+
+export type RouteCatalogItem = {
+  id: string;
+  code: string;
+  name: string;
+  zoneIds: string[];
+  zoneNames: string[];
+};
+
+export const ROUTE_CATALOG: RouteCatalogItem[] = [
+  { id: "route-1", code: "R-01", name: "Recorrido 1 Centro", zoneIds: ["zone-3"], zoneNames: ["Zona Centro"] },
+  { id: "route-2", code: "R-02", name: "Recorrido 2 Sur", zoneIds: ["zone-2"], zoneNames: ["Zona Sur"] },
+  { id: "route-3", code: "R-03", name: "Recorrido 3 Norte", zoneIds: ["zone-1"], zoneNames: ["Zona Norte"] },
+  { id: "route-4", code: "R-04", name: "Recorrido 4 Norte", zoneIds: ["zone-1"], zoneNames: ["Zona Norte"] },
+];
+
+export const assignCrewInputSchema = z.object({
+  crewId: z.string().min(1, "Debe seleccionar una cuadrilla"),
+  vehicleId: z.string().nullable().optional(),
+  overrideNote: overrideNoteSchema,
+});
+
+export type AssignCrewInput = z.infer<typeof assignCrewInputSchema>;
+
+export const SUSPEND_NOTE_MAX_LENGTH = 500;
+
+const suspendServiceNoteSchema = z
+  .string()
+  .max(
+    SUSPEND_NOTE_MAX_LENGTH,
+    `La nota de suspensión no puede superar los ${SUSPEND_NOTE_MAX_LENGTH} caracteres.`,
+  )
+  .trim();
+
+// The Field form keeps the note required; the BFF accepts the backend's optional note contract.
+export const suspendServiceInputSchema = z.object({
+  reason: notServicedReasonSchema,
+  note: suspendServiceNoteSchema.min(1, "La nota es obligatoria para suspender el servicio"),
+});
+export const suspendServiceRequestSchema = z.object({
+  reason: notServicedReasonSchema,
+  note: suspendServiceNoteSchema.optional(),
+});
+export type SuspendServiceInput = z.infer<typeof suspendServiceInputSchema>;
+export type SuspendServiceRequest = z.infer<typeof suspendServiceRequestSchema>;
+
+export function toSuspendServiceBackendInput(input: SuspendServiceRequest) {
+  const note = input.note?.trim();
+  return {
+    reason: NOT_SERVICED_REASON_LABEL[input.reason],
+    ...(note ? { note } : {}),
+  };
+}
+
+export const rescheduleServiceInputSchema = z.object({
+  reason: reasonInput("El motivo es obligatorio para reprogramar el servicio"),
+});
+export type RescheduleServiceInput = z.infer<typeof rescheduleServiceInputSchema>;
+
+export const cancelServiceInputSchema = z.object({
+  reason: reasonInput("El motivo es obligatorio para cancelar el servicio"),
+});
+export type CancelServiceInput = z.infer<typeof cancelServiceInputSchema>;
+
+export const confirmRescheduleInputSchema = z.object({
+  scheduledDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD")
+    .refine(
+      (value) => !/^\d{4}-\d{2}-\d{2}$/.test(value) || value >= todayInArgentina(),
+      "La nueva fecha no puede ser anterior a hoy.",
+    ),
+  timeWindow: z.object({
+    start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
+    end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
+  }),
+});
+export type ConfirmRescheduleInput = z.infer<typeof confirmRescheduleInputSchema>;
+
+export function toConfirmRescheduleBackendInput(input: ConfirmRescheduleInput) {
+  return {
+    scheduledDate: input.scheduledDate,
+    windowFrom: input.timeWindow.start,
+    windowTo: input.timeWindow.end,
+  };
+}
+
+export const recordZoneResultInputSchema = z
+  .object({
+    zoneId: z.string().min(1, "Debe seleccionar una zona"),
+    status: zoneResultStatusSchema,
+    reason: notServicedReasonSchema.nullable().optional(),
+    notes: z.string().nullable().optional(),
+    proposedDate: z.string().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.status !== "SERVICED" && !data.reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "El motivo es obligatorio para resultados parciales o no atendidos",
+      });
+    }
+    if (data.status === "SERVICED" && data.reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "No debe especificarse motivo para zonas atendidas",
+      });
+    }
+  });
+export type RecordZoneResultInput = z.infer<typeof recordZoneResultInputSchema>;
+
+export const evidenceOwnerTypeSchema = z.enum([
+  "ZONE_RESULT",
+  "SERVICE",
+  "INSPECTION",
+  "CONTAINER",
+]);
+export type EvidenceOwnerType = z.infer<typeof evidenceOwnerTypeSchema>;
+
+export const ZONE_RESULT_STATUS_LABEL: Record<ZoneResultStatus, string> = {
+  SERVICED: "Atendida",
+  PARTIAL: "Parcial",
+  NOT_SERVICED: "No atendida",
+};
+
+export const NOT_SERVICED_REASON_LABEL: Record<NotServicedReason, string> = {
+  VEHICLE_BREAKDOWN: "Desperfecto vehicular",
+  CREW_UNAVAILABLE: "Cuadrilla no disponible",
+  BLOCKED_ACCESS: "Acceso bloqueado",
+  STREET_CLOSURE: "Corte de calle / Obra",
+  WEATHER: "Condición meteorológica",
+  EXCESS_VOLUME: "Exceso de volumen",
+  SECURITY_INCIDENT: "Incidente de seguridad",
+  OTHER: "Otro motivo",
+};
+
+export const serviceQuerySchema = z.object({
+  status: z.union([serviceStatusSchema, z.array(serviceStatusSchema)]).optional(),
+  mode: serviceModeSchema.optional(),
+  origin: serviceOriginSchema.optional(),
+  serviceTypeId: z.string().min(1).optional(),
+  vehicleId: z.string().min(1).optional(),
+  ticketId: z.string().min(1).optional(),
+  zoneId: z.string().min(1).optional(),
+  crewId: z.string().min(1).optional(),
+  scheduledFrom: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).optional(),
+  scheduledTo: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).optional(),
+  search: z.string().optional(),
+  timeFrom: z.string().optional(),
+  timeTo: z.string().optional(),
+  page: z.number().int().optional(),
+  pageSize: z.number().int().optional(),
+});
+
+export type ServiceQuery = {
+  status?: ServiceStatus | ServiceStatus[];
+  mode?: ServiceMode;
+  origin?: ServiceOrigin;
+  zoneId?: string;
+  crewId?: string;
+  serviceTypeId?: string;
+  vehicleId?: string;
+  ticketId?: string;
+  search?: string;
+  timeFrom?: string;
+  timeTo?: string;
+  scheduledFrom?: string;
+  scheduledTo?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type ServicesPage = {
+  services: Service[];
+  /** Records of this page dropped for an unknown enum value (not the same as `total` exceeding the rows shown). */
+  dropped?: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export class ServiceContractError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "ServiceContractError";
+  }
+}
+
+export class ServiceRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "ServiceRequestError";
+    this.status = status;
+  }
+}
+
+export class ServiceStartBlockedError extends ServiceRequestError {
+  readonly streetClosureRequest: StreetClosureRequest;
+
+  constructor(message: string, streetClosureRequest: StreetClosureRequest) {
+    super(message, 409);
+    this.name = "ServiceStartBlockedError";
+    this.streetClosureRequest = streetClosureRequest;
+  }
+}
+
+export const STATUS_LABEL: Record<ServiceStatus, string> = {
+  SCHEDULED: "Programado",
+  RESCHEDULED: "A reprogramar",
+  IN_PROGRESS: "En curso",
+  SUSPENDED: "Suspendido",
+  COMPLETED: "Completado",
+  PARTIALLY_COMPLETED: "Parcial",
+  CANCELLED: "Cancelado",
+};
+
+// Lifecycle-aware order for sorting: early -> active -> suspended -> completed -> cancelled
+export const STATUS_ORDER: Record<ServiceStatus, number> = {
+  SCHEDULED: 0,
+  RESCHEDULED: 1,
+  IN_PROGRESS: 2,
+  SUSPENDED: 3,
+  COMPLETED: 4,
+  PARTIALLY_COMPLETED: 5,
+  CANCELLED: 6,
+};
+
+export const servicesEnvelopeSchema = z.object({
+  data: tolerantRecords(serviceWireSchema, "services"),
+  meta: z.object({
+    total: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+    totalPages: z.number(),
+    // Set by the BFF, which parses (and so drops) before re-serializing.
+    dropped: z.number().int().nonnegative().optional(),
+  }),
+});
+
+const errorResponseSchema = z.object({
+  statusCode: z.number(),
+  message: z.union([z.string(), z.array(z.string())]),
+  error: z.string(),
+  timestamp: z.string(),
+  path: z.string(),
+});
+
+function buildServicesQueryString(query: ServiceQuery): string {
+  const params = new URLSearchParams();
+  if (query.status) {
+    if (Array.isArray(query.status)) {
+      query.status.forEach((st) => params.append("status", st));
+    } else {
+      params.set("status", query.status);
+    }
+  }
+  if (query.mode) params.set("mode", query.mode);
+  if (query.origin) params.set("origin", query.origin);
+  if (query.zoneId) params.set("zoneId", query.zoneId);
+  if (query.crewId) params.set("crewId", query.crewId);
+  if (query.serviceTypeId) params.set("serviceTypeId", query.serviceTypeId);
+  if (query.vehicleId) params.set("vehicleId", query.vehicleId);
+  if (query.ticketId) params.set("ticketId", query.ticketId);
+  if (query.search) params.set("search", query.search);
+  if (query.timeFrom) params.set("timeFrom", query.timeFrom);
+  if (query.timeTo) params.set("timeTo", query.timeTo);
+  if (query.scheduledFrom) params.set("scheduledFrom", query.scheduledFrom);
+  if (query.scheduledTo) params.set("scheduledTo", query.scheduledTo);
+  if (query.page !== undefined) params.set("page", String(query.page));
+  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : "";
+}
+
+async function readJsonBody(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (cause) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+    throw new ServiceContractError("No se pudo obtener información válida de servicios. Reintente en unos segundos.", { cause });
+  }
+}
+
+/**
+ * Completa lo que el backend no manda: el título del servicio y los nombres de sus
+ * zonas y de su cuadrilla, resueltos contra los catálogos. Es el único lugar donde se parsea una
+ * respuesta de servicio, así que el listado, el detalle y cada transición devuelven
+ * el mismo título y no se degrada después de una acción.
+ */
+async function completarEtiquetas(wire: z.infer<typeof serviceWireSchema>): Promise<Service> {
+  const { serviceTypes, zones, crews, vehicles } = await catalogoDeEtiquetas();
+  const nombresDeZona = wire.zoneIds.map((zoneId) => zones.get(zoneId)).filter((nombre): nombre is string => Boolean(nombre));
+  const tipo = serviceTypes.get(wire.serviceTypeId);
+  const nombreDeTipo = tipo?.name;
+  return {
+    ...wire,
+    serviceTypeName: nombreDeTipo ?? wire.serviceTypeName,
+    serviceTypeCategory: tipo?.category ?? wire.serviceTypeCategory,
+    zoneNames: wire.zoneNames.length > 0 ? wire.zoneNames : nombresDeZona,
+    crewName: wire.crewName ?? (wire.crewId ? crews.get(wire.crewId) ?? null : null),
+    vehiclePlate: wire.vehiclePlate ?? (wire.vehicleId ? vehicles.get(wire.vehicleId) ?? null : null),
+    title: wire.title ?? componerTituloDeServicio(wire, { serviceType: nombreDeTipo, zones: nombresDeZona }),
+  };
+}
+
+async function parseServicio(raw: unknown, message: string): Promise<Service> {
+  const parsed = serviceWireSchema.safeParse(raw);
+  if (!parsed.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+    throw new ServiceContractError(message, { cause: parsed.error });
+  }
+  return completarEtiquetas(parsed.data);
+}
+
+/** `fetch` autenticado de `/api/services*`: registra la telemetría de fallo de red y relanza. */
+async function fetchServicesApi(...args: Parameters<typeof authenticatedFetch>): Promise<Response> {
+  try {
+    return await authenticatedFetch(...args);
+  } catch (cause) {
+    if (cause instanceof NetworkFailureError) {
+      recordTelemetryEvent({ name: "request_network_failure", resource: "services" });
+    }
+    throw cause;
+  }
+}
+
+/** Traduce el cuerpo de una respuesta no exitosa en `ServiceRequestError` o, si no es válido, `ServiceContractError`. */
+function throwServiceResponseError(payload: unknown, malformedMessage: string): never {
+  const parsedError = errorResponseSchema.safeParse(payload);
+  if (!parsedError.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+    throw new ServiceContractError(malformedMessage, { cause: parsedError.error });
+  }
+  const message = Array.isArray(parsedError.data.message)
+    ? parsedError.data.message.join(" ")
+    : parsedError.data.message;
+  throw new ServiceRequestError(message, parsedError.data.statusCode);
+}
+
+/** Pide un Servicio a `/api/services*`: respuesta de error traducida, sobre `{ data }` abierto y esquema validado. */
+async function requestServicio(
+  path: string,
+  init: RequestInit | undefined,
+  malformedMessage: string,
+): Promise<Service> {
+  const response = await fetchServicesApi(path, init);
+  const payload = await readJsonBody(response);
+  if (!response.ok) throwServiceResponseError(payload, malformedMessage);
+  return parseServicio(unwrapData(payload), malformedMessage);
+}
+
+/** Abre el sobre `{ data }` de una respuesta; si el cuerpo ya es el recurso (tiene `id`), lo devuelve tal cual. */
+function unwrapData(payload: unknown): unknown {
+  return payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+    ? (payload as { data: unknown }).data
+    : payload;
+}
+
+export const servicesAdapter = {
+  async list(query: ServiceQuery = {}): Promise<ServicesPage> {
+    // Se arranca el catalogo junto con el listado y no despues: encadenarlos dejaba
+    // la pantalla en el esqueleto de carga durante dos viajes de ida y vuelta.
+    void catalogoDeEtiquetas();
+    const response = await fetchServicesApi(`/api/services${buildServicesQueryString(query)}`);
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de servicios. Reintente en unos segundos.");
+
+    const parsed = servicesEnvelopeSchema.safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError("No se pudo obtener información válida de servicios. Reintente en unos segundos.", {
+        cause: parsed.error,
+      });
+    }
+
+    return {
+      services: await Promise.all(parsed.data.data.map(completarEtiquetas)),
+      dropped: droppedRecords(parsed.data.data) + (parsed.data.meta.dropped ?? 0),
+      page: parsed.data.meta.page,
+      pageSize: parsed.data.meta.pageSize,
+      total: parsed.data.meta.total,
+      totalPages: parsed.data.meta.totalPages,
+    };
+  },
+
+  async get(id: string): Promise<Service> {
+    void catalogoDeEtiquetas();
+    const response = await fetchServicesApi(`/api/services/${id}`);
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de servicio. Reintente en unos segundos.");
+
+    return parseServicio(payload, "No se pudo obtener información válida del detalle de servicio. Reintente en unos segundos.");
+  },
+
+  async create(input: CreateServiceInput): Promise<Service> {
+    const parsedInput = createServiceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para programar el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    const response = await fetchServicesApi("/api/services", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      });
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de servicios. Reintente en unos segundos.");
+
+    const raw = unwrapData(payload);
+
+    return parseServicio(raw, "No se pudo obtener información válida de la creación de servicio. Reintente en unos segundos.");
+  },
+
+  async assignCrew(serviceId: string, input: AssignCrewInput): Promise<Service> {
+    const parsedInput = assignCrewInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para la asignación de recursos son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    return requestServicio(`/api/services/${serviceId}/assign-crew`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }, "No se pudo obtener información válida de la asignación de servicio. Reintente en unos segundos.");
+  },
+
+  async start(serviceId: string): Promise<Service> {
+    const dependency = await streetClosureRequestsAdapter.getForService(serviceId);
+    if (dependency.outcome === "blocked") {
+      throw new ServiceStartBlockedError(
+        "No se puede iniciar el Servicio: la solicitud de corte de calle sigue pendiente de respuesta de Tránsito.",
+        dependency.request!,
+      );
+    }
+    if (dependency.outcome === "rejected") {
+      throw new ServiceStartBlockedError(
+        "Tránsito rechazó el corte de calle. Oficina debe elegir explícitamente entre reprogramar o cancelar el Servicio.",
+        dependency.request!,
+      );
+    }
+
+    return requestServicio(`/api/services/${serviceId}/start`, {
+        method: "POST",
+      }, "No se pudo obtener información válida del inicio de servicio. Reintente en unos segundos.");
+  },
+
+  async suspend(serviceId: string, input: SuspendServiceInput): Promise<Service> {
+    const parsedInput = suspendServiceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para suspender el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    return requestServicio(`/api/services/${serviceId}/suspend`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }, "No se pudo obtener información válida de la suspensión de servicio. Reintente en unos segundos.");
+  },
+
+  async resume(serviceId: string): Promise<Service> {
+    return requestServicio(`/api/services/${serviceId}/resume`, {
+        method: "POST",
+      }, "No se pudo obtener información válida de la reanudación de servicio. Reintente en unos segundos.");
+  },
+
+  async reschedule(serviceId: string, input: RescheduleServiceInput): Promise<Service> {
+    const parsedInput = rescheduleServiceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para reprogramar el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    return requestServicio(`/api/services/${serviceId}/reschedule`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }, "No se pudo obtener información válida de la reprogramación de servicio. Reintente en unos segundos.");
+  },
+
+  async cancel(serviceId: string, input: CancelServiceInput): Promise<Service> {
+    const parsedInput = cancelServiceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para cancelar el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    return requestServicio(`/api/services/${serviceId}/cancel`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }, "No se pudo obtener información válida de la cancelación de servicio. Reintente en unos segundos.");
+  },
+
+  async confirmReschedule(serviceId: string, input: ConfirmRescheduleInput): Promise<Service> {
+    const parsedInput = confirmRescheduleInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para confirmar la nueva fecha del servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    return requestServicio(`/api/services/${serviceId}/confirm-reschedule`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }, "No se pudo obtener información válida de la confirmación de reprogramación. Reintente en unos segundos.");
+  },
+
+  async getZoneResults(serviceId: string): Promise<ZoneResult[]> {
+    const response = await fetchServicesApi(`/api/services/${serviceId}/zone-results`);
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de resultados de zona. Reintente en unos segundos.");
+
+    const parsed = z.array(zoneResultSchema).safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "No se pudo obtener información válida de resultados de zona. Reintente en unos segundos.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async recordZoneResult(serviceId: string, input: RecordZoneResultInput): Promise<ZoneResult> {
+    const parsedInput = recordZoneResultInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para registrar el resultado de zona son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    const response = await fetchServicesApi(`/api/services/${serviceId}/zone-results`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      });
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida del registro de zona. Reintente en unos segundos.");
+
+    const raw = unwrapData(payload);
+
+    const parsed = zoneResultSchema.safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "No se pudo obtener información válida del registro de zona. Reintente en unos segundos.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  // Zone-result attachments are listed separately from GET /services/:id/zone-results.
+  async getZoneResultEvidence(zoneResultId: string): Promise<Attachment[]> {
+    const response = await authenticatedFetch(
+      `/api/evidence?ownerType=ZONE_RESULT&ownerId=${encodeURIComponent(zoneResultId)}`,
+    );
+    const payload = await readJsonBody(response);
+    if (!response.ok) {
+      const parsedError = errorResponseSchema.safeParse(payload);
+      if (!parsedError.success) {
+        recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+        throw new ServiceContractError("La respuesta de error de evidencia no respeta el contrato.", {
+          cause: parsedError.error,
+        });
+      }
+      const message = Array.isArray(parsedError.data.message)
+        ? parsedError.data.message.join(" ") : parsedError.data.message;
+      throw new ServiceRequestError(message, parsedError.data.statusCode);
+    }
+    const parsed = z.array(attachmentSchema).safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError("La lista de evidencia de zona no respeta el contrato.", {
+        cause: parsed.error,
+      });
+    }
+    return parsed.data;
+  },
+
+  async uploadEvidence(params: {
+    file: File;
+    ownerType: EvidenceOwnerType;
+    ownerId: string;
+    serviceId?: string;
+    idempotencyKey?: string;
+  }): Promise<Attachment> {
+    const key =
+      params.idempotencyKey ||
+      (typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idemp-${Date.now()}`);
+    const formData = new FormData();
+    formData.append("file", params.file);
+    formData.append("fileName", params.file.name);
+    formData.append("ownerType", params.ownerType);
+    formData.append("ownerId", params.ownerId);
+    if (params.ownerType === "ZONE_RESULT" && params.serviceId) {
+      formData.append("serviceId", params.serviceId);
+    }
+
+    const response = await fetchServicesApi("/api/evidence", {
+        method: "POST",
+        headers: {
+          "Idempotency-Key": key,
+        },
+        body: formData,
+      });
+
+    const payload = await readJsonBody(response);
+
+    if (!response.ok) throwServiceResponseError(payload, "No se pudo obtener información válida de la carga de evidencia. Reintente en unos segundos.");
+
+    const parsed = attachmentSchema.safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "services" });
+      throw new ServiceContractError(
+        "No se pudo obtener información válida de la carga de evidencia. Reintente en unos segundos.",
+        { cause: parsed.error },
+      );
+    }
+
+    return parsed.data;
+  },
+
+  async complete(serviceId: string, input?: CompleteServiceInput): Promise<Service> {
+    const parsedInput = completeServiceInputSchema.safeParse(input ?? {});
+    if (!parsedInput.success) {
+      throw new ServiceContractError(
+        "Los datos para completar el servicio son inválidos.",
+        { cause: parsedInput.error },
+      );
+    }
+
+    const requestInit: RequestInit = { method: "POST" };
+    if (parsedInput.data.containerLocation) {
+      requestInit.headers = { "content-type": "application/json" };
+      requestInit.body = JSON.stringify(parsedInput.data);
+    }
+
+    return requestServicio(`/api/services/${serviceId}/complete`, requestInit, "No se pudo obtener información válida de la finalización de servicio. Reintente en unos segundos.");
+  },
+};
+
+function timeWindowsOverlap(
+  w1Start?: string | null,
+  w1End?: string | null,
+  w2Start?: string | null,
+  w2End?: string | null,
+): boolean {
+  if (!w1Start || !w1End || !w2Start || !w2End) {
+    return true;
+  }
+  return w1Start < w2End && w2Start < w1End;
+}
+
+const RESOURCE_HOLDING_STATUSES: ServiceStatus[] = ["SCHEDULED", "RESCHEDULED", "IN_PROGRESS", "SUSPENDED"];
+
+export function checkAssignmentConflicts({
+  service,
+  crewId,
+  vehicleId,
+  allServices,
+}: {
+  service: Service;
+  crewId?: string | null;
+  vehicleId?: string | null;
+  allServices: Service[];
+}): {
+  crewConflict: Service | null;
+  vehicleConflict: Service | null;
+} {
+  let crewConflict: Service | null = null;
+  let vehicleConflict: Service | null = null;
+
+  for (const other of allServices) {
+    if (other.id === service.id) continue;
+    // Mismo criterio que el backend: sólo ocupan recurso los servicios abiertos.
+    if (!RESOURCE_HOLDING_STATUSES.includes(other.status)) continue;
+    if (other.scheduledDate !== service.scheduledDate) continue;
+
+    const overlaps = timeWindowsOverlap(
+      service.windowFrom,
+      service.windowTo,
+      other.windowFrom,
+      other.windowTo,
+    );
+    if (!overlaps) continue;
+
+    if (!crewConflict && crewId && other.crewId === crewId) {
+      crewConflict = other;
+    }
+    if (!vehicleConflict && vehicleId && other.vehicleId === vehicleId) {
+      vehicleConflict = other;
+    }
+
+    if (crewConflict && (vehicleConflict || !vehicleId)) {
+      break;
+    }
+  }
+
+  return { crewConflict, vehicleConflict };
+}
+
+export type ServiceWindowTiming = {
+  isOutside: boolean;
+  timing: "within" | "early" | "late";
+  message: string | null;
+};
+
+export function checkServiceWindowTiming(
+  service: Service,
+  now: Date = new Date(),
+): ServiceWindowTiming {
+  if (!service.windowFrom || !service.windowTo) {
+    return { isOutside: false, timing: "within", message: null };
+  }
+
+  const currentDateStr = todayInArgentina(now);
+  const scheduledDateLabel = formatCalendarDay(service.scheduledDate);
+
+  const currentHours = String(now.getHours()).padStart(2, "0");
+  const currentMinutes = String(now.getMinutes()).padStart(2, "0");
+  const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+  if (service.scheduledDate < currentDateStr) {
+    return {
+      isOutside: true,
+      timing: "late",
+      message: `Inicio fuera de ventana horaria: la fecha programada fue el ${scheduledDateLabel} (${service.windowFrom} – ${service.windowTo}).`,
+    };
+  }
+  if (service.scheduledDate > currentDateStr) {
+    return {
+      isOutside: true,
+      timing: "early",
+      message: `Inicio fuera de ventana horaria: el servicio está programado para el ${scheduledDateLabel} (${service.windowFrom} – ${service.windowTo}).`,
+    };
+  }
+
+  if (currentTimeStr < service.windowFrom) {
+    return {
+      isOutside: true,
+      timing: "early",
+      message: `Inicio fuera de ventana horaria: la ventana programada inicia a las ${service.windowFrom} (actual: ${currentTimeStr}).`,
+    };
+  }
+
+  if (currentTimeStr > service.windowTo) {
+    return {
+      isOutside: true,
+      timing: "late",
+      message: `Inicio fuera de ventana horaria: la ventana programada finalizó a las ${service.windowTo} (actual: ${currentTimeStr}).`,
+    };
+  }
+
+  return { isOutside: false, timing: "within", message: null };
+}

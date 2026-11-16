@@ -1,0 +1,42 @@
+# ──────────────────────────────────────────────────────────────
+# Cierra los issues que un PR fusionado en develop declara con
+# "Closes/Fixes/Resolves #n". GitHub solo hace esto al fusionar en la rama
+# por defecto (main); el trabajo diario se fusiona en develop.
+# Lee el cuerpo del PR, no el mensaje del squash (que no lo incluye).
+# ──────────────────────────────────────────────────────────────
+
+name: Close linked issues
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [develop]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  close:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close issues named in the PR body
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body ?? "";
+            const pattern = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)\b/gi;
+            const numbers = [...new Set([...body.matchAll(pattern)].map((match) => Number(match[1])))];
+            for (const issue_number of numbers) {
+              const { data: issue } = await github.rest.issues.get({ ...context.repo, issue_number });
+              if (issue.pull_request || issue.state === "closed") continue;
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number,
+                body: `Hecho en #${pr.number} (squash ${pr.merge_commit_sha.slice(0, 7)} en develop).`,
+              });
+              await github.rest.issues.update({ ...context.repo, issue_number, state: "closed", state_reason: "completed" });
+              core.info(`Closed #${issue_number}`);
+            }

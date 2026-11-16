@@ -1,0 +1,39 @@
+// @ts-nocheck
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
+import { NextResponse } from "next/server";
+
+import { fetchBackend, pathId } from "@/lib/bff-backend";
+import { crewFixtures } from "@/lib/crew-fixtures";
+import { addCrewMembersInputSchema } from "@/lib/crews";
+import { AuthUnavailableError, ForbiddenSessionError, InvalidSessionError } from "@/lib/session";
+
+
+type PostContext = { params: Promise<{ id: string }> };
+
+
+
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar integrantes de cuadrillas.", capability: "crew:manage", throwOnError: true }).session; }
+
+// El backend nombra el campo userIds en POST /crews/{id}/members; adentro se sigue
+// llamando memberUserIds, asi que la traduccion queda en el borde, que es el BFF.
+export async function POST(request: Request, routeContext: PostContext) {
+  const { id } = await routeContext.params;
+  const path = new URL(request.url).pathname;
+  try {
+    const session = requireOfficeCapability(request);
+    const parsed = await parseJsonBody(request, addCrewMembersInputSchema, path);
+    if (parsed instanceof Response) return parsed;
+    if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}/members`, "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(parsed.data.userIds || parsed.data.memberUserIds ? { userIds: parsed.data.userIds ?? parsed.data.memberUserIds } : {}), ...(parsed.data.members ? { members: parsed.data.members } : {}) }) }));
+    const crew = crewFixtures.find((item) => item.id === id);
+    if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);
+    const incoming = [...(parsed.data.userIds ?? parsed.data.memberUserIds ?? []).map((userId) => ({ userId, displayName: null })), ...(parsed.data.members ?? []).map((member) => ({ userId: member.userId, displayName: member.displayName ?? null }))];
+    for (const member of incoming) if (!crew.members.some((item) => item.userId === member.userId)) crew.members.push(member);
+    crew.memberUserIds = crew.members.map((member) => member.userId);
+    return NextResponse.json(crew);
+  } catch (error) {
+    if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
+    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+    return mapSessionError(error, path, "No se pudieron agregar los integrantes.");
+  }
+}

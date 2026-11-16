@@ -1,0 +1,117 @@
+// @ts-nocheck
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { fetchBackend } from "@/lib/bff-backend";
+import {
+  AuthUnavailableError,
+  ForbiddenSessionError,
+  getRequiredSession,
+  InvalidSessionError,
+} from "@/lib/session";
+import { recordTelemetryEvent } from "@/lib/telemetry";
+import {
+  addZoneFixture,
+  findCommuneFixture,
+  filterZoneFixtures,
+  paginateZoneFixtures,
+  zoneFixtures,
+} from "@/lib/zones-fixtures";
+import { createZoneInputSchema, type Zone, type ZoneQuery } from "@/lib/zones";
+import { booleanParam, pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
+
+
+
+
+
+function parseZoneQuery(url: URL): ZoneQuery {
+  return {
+    active: booleanParam(url.searchParams, "active"),
+    search: searchParam(url.searchParams),
+    communeId: z.uuid().safeParse(url.searchParams.get("communeId")).data,
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
+  };
+}
+
+export async function GET(request: Request) {
+  const path = new URL(request.url).pathname;
+
+  try {
+    const session = getRequiredSession(request);
+    const query = parseZoneQuery(new URL(request.url));
+
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, `/zones${backendQuery(query, ["active", "search", "communeId", "page", "pageSize"])}`);
+            return forwardResponse(backendResponse);
+    }
+
+    return NextResponse.json(paginateZoneFixtures(filterZoneFixtures(query), query.page, query.pageSize));
+  } catch (error) {
+    return handleRouteError(error, path, "No se pudieron cargar las zonas.");
+  }
+}
+
+export async function POST(request: Request) {
+  const path = new URL(request.url).pathname;
+
+  try {
+    const session = getRequiredSession(request);
+
+    authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede crear zonas operativas.", capability: "zone:manage", throwOnError: true });
+
+    const parsed = await parseJsonBody(request, createZoneInputSchema, path);
+    if (parsed instanceof Response) return parsed;
+
+    if (backendMode(session)) {
+      const backendResponse = await fetchBackend(request, "/zones", "zone:manage", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsed.data),
+      });
+      return forwardResponse(backendResponse);
+    }
+
+    const existing = zoneFixtures.find(
+      (candidate) => candidate.code.toLowerCase() === parsed.data.code.toLowerCase(),
+    );
+    if (existing) {
+      return errorResponse(
+        409,
+        `Ya existe una zona operativa con el código ${parsed.data.code}.`,
+        path,
+      );
+    }
+
+    const commune = parsed.data.communeId ? findCommuneFixture(parsed.data.communeId) : null;
+    if (parsed.data.communeId && !commune) return errorResponse(400, "La comuna indicada no existe.", path);
+
+    const newZone: Zone = {
+      id: `zone-${Date.now()}`,
+      code: parsed.data.code,
+      name: parsed.data.name,
+      active: true,
+      commune,
+      neighborhood: null,
+      neighborhoodIds: [],
+    };
+    addZoneFixture(newZone);
+
+    return NextResponse.json(newZone, { status: 201 });
+  } catch (error) {
+    if (error instanceof InvalidSessionError) {
+      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
+      return errorResponse(401, "La sesión no está activa.", path);
+    }
+    if (error instanceof ForbiddenSessionError) {
+      recordTelemetryEvent({ name: "auth_forbidden", status: 403 });
+      return errorResponse(403, error.message, path, FORBIDDEN_CODES.roleRequired);
+    }
+    if (error instanceof AuthUnavailableError) {
+      return errorResponse(503, error.message, path);
+    }
+    return mapSessionError(error, path, "No se pudo crear la zona operativa.");
+  }
+}
+

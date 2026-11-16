@@ -1,0 +1,651 @@
+// @ts-nocheck
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { handlers } from "@/mocks/handlers";
+import { scenarios } from "@/lib/scenarios";
+import { createSessionCookie } from "@/test/session";
+import { paginateRouteFixtures, resetRouteFixtures, routeFixtures } from "@/lib/routes-fixtures";
+import { routesAdapter } from "@/lib/routes";
+import { resetZoneFixtures } from "@/lib/zones-fixtures";
+import { RouteCatalogPanel } from "./route-catalog-panel";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
+
+const server = setupServer(...handlers);
+
+async function chooseSelectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  accessibleName: string,
+  optionName: string | RegExp,
+) {
+  await user.click(screen.getByRole("combobox", { name: accessibleName }));
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => {
+  server.resetHandlers();
+  resetRouteFixtures();
+  resetZoneFixtures();
+  vi.restoreAllMocks();
+});
+afterAll(() => server.close());
+
+describe("RouteCatalogPanel component", () => {
+
+  it("refreshes a selected Route without interrupting stop editing or refetching the list", async () => {
+    const user = userEvent.setup();
+    let listRequestCount = 0;
+    let releaseSelectedRouteResponse!: () => void;
+    let releaseAdditionalResponses!: () => void;
+    let signalSelectedRouteRequest!: () => void;
+    const selectedRouteRequestStarted = new Promise<void>((resolve) => {
+      signalSelectedRouteRequest = resolve;
+    });
+    const selectedRouteResponseGate = new Promise<void>((resolve) => {
+      releaseSelectedRouteResponse = resolve;
+    });
+    const additionalResponsesGate = new Promise<void>((resolve) => {
+      releaseAdditionalResponses = resolve;
+    });
+
+    server.use(
+      http.get("*/api/routes", async () => {
+        listRequestCount += 1;
+        const requestNumber = listRequestCount;
+        if (requestNumber === 2) {
+          signalSelectedRouteRequest();
+          await selectedRouteResponseGate;
+        } else if (requestNumber > 2) {
+          await additionalResponsesGate;
+        }
+
+        const routes = routeFixtures.map((route) =>
+          requestNumber === 2 && route.id === "route-1"
+            ? { ...route, name: "Recorrido Casco Histórico actualizado" }
+            : route,
+        );
+        return HttpResponse.json(paginateRouteFixtures(routes));
+      }),
+    );
+
+    try {
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+      await screen.findByText("REC-001");
+      expect(listRequestCount).toBe(1);
+
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await selectedRouteRequestStarted;
+      await user.click(screen.getByTestId("edit-stops-button"));
+      await user.click(screen.getByTestId("stop-remove-1"));
+      expect(screen.queryByTestId("stop-item-1")).not.toBeInTheDocument();
+
+      releaseSelectedRouteResponse();
+      expect(
+        await screen.findByRole("heading", { name: "Recorrido Casco Histórico actualizado" }),
+      ).toBeVisible();
+      expect(screen.getByTestId("stop-sequence-builder")).toBeVisible();
+      expect(screen.getByTestId("stop-item-0")).toBeVisible();
+      expect(screen.queryByTestId("stop-item-1")).not.toBeInTheDocument();
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      expect(listRequestCount).toBe(2);
+    } finally {
+      releaseSelectedRouteResponse();
+      releaseAdditionalResponses();
+    }
+  });
+
+  it("requires acknowledgement when route references cannot be verified", async () => {
+    server.use(http.get("/api/routes/:id/references", () => HttpResponse.json({ message: "No disponible" }, { status: 503 })));
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    expect(await screen.findByTestId("deactivate-route-route-1")).toHaveAttribute("aria-haspopup", "dialog");
+    await user.click(await screen.findByTestId("deactivate-route-route-1"));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("No se pudo verificar si el recorrido está en uso.")).toBeVisible();
+    const confirm = within(dialog).getByTestId("confirm-deactivate-button");
+    expect(confirm).toBeDisabled();
+    await user.click(within(dialog).getByRole("checkbox", { name: "Dar de baja de todos modos" }));
+    expect(confirm).toBeEnabled();
+    await user.click(confirm);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(routeFixtures.find((route) => route.id === "route-1")?.active).toBe(false);
+  });
+
+  it("shows a deactivation failure as an alert and keeps the confirmation open", async () => {
+    server.use(http.delete("/api/routes/:id", () => HttpResponse.json({
+      statusCode: 500,
+      message: "No se pudo dar de baja el recorrido.",
+      error: "Internal Server Error",
+      timestamp: "2026-10-13T12:00:00.000Z",
+      path: "/api/routes/route-1",
+    }, { status: 500 })));
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await user.click(await screen.findByTestId("deactivate-route-route-1"));
+    const dialog = await screen.findByRole("dialog");
+    const confirm = within(dialog).getByTestId("confirm-deactivate-button");
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await user.click(confirm);
+    await waitFor(() =>
+      expect(within(dialog).getAllByRole("alert").map((alert) => alert.textContent)).toContain(
+        "No se pudo dar de baja el recorrido.",
+      ),
+    );
+    expect(dialog).toBeVisible();
+  });
+
+  it("renders the routes catalog with heading, search input, filters and table for Office", async () => {
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    expect(screen.getByRole("heading", { name: "Recorridos", level: 1 })).toBeInTheDocument();
+    expect(screen.getByTestId("create-route-button")).toBeVisible();
+    expect(screen.getByTestId("search-routes-input")).toBeInTheDocument();
+    expect(screen.getByLabelText("Buscar recorridos")).toBeInTheDocument();
+    expect(screen.getByTestId("active-filter-select")).toBeInTheDocument();
+    expect(screen.getByTestId("zone-filter-select")).toBeInTheDocument();
+
+    // Wait for fixtures to load
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+      expect(screen.getByText("Recorrido Casco Histórico")).toBeInTheDocument();
+      expect(screen.getByText("REC-002")).toBeInTheDocument();
+    });
+  });
+
+  it("filters routes by search query", async () => {
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Recorrido Casco Histórico")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByTestId("search-routes-input");
+    await user.type(searchInput, "Costanera");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Recorrido Casco Histórico")).not.toBeInTheDocument();
+      expect(screen.getByText("Recorrido Costanera")).toBeInTheDocument();
+    });
+  });
+
+  it("filters routes by active status", async () => {
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-003")).toBeInTheDocument();
+    });
+
+    await chooseSelectOption(user, "Estado:", "Activos");
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+      expect(screen.getByText("REC-002")).toBeInTheDocument();
+      // REC-003 is inactive, should be filtered out
+      expect(screen.queryByText("REC-003")).not.toBeInTheDocument();
+    });
+  });
+
+  it("filters routes by zoneId", async () => {
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+      expect(screen.getByText("REC-002")).toBeInTheDocument();
+    });
+
+    // Select zone-1: only REC-001 passes through zone-1
+    await chooseSelectOption(user, "Zona:", "Belgrano");
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+      expect(screen.queryByText("REC-002")).not.toBeInTheDocument();
+      expect(screen.queryByText("REC-003")).not.toBeInTheDocument();
+    });
+  });
+
+  it("allows Office to create a new route and verifies it lands on its detail view with empty stops and an obvious CTA", async () => {
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+    });
+
+    const createButton = screen.getByTestId("create-route-button");
+    await user.click(createButton);
+
+    expect(screen.getByRole("heading", { name: "Nuevo recorrido" })).toBeInTheDocument();
+
+    const codeInput = screen.getByTestId("create-route-code-input");
+    const nameInput = screen.getByTestId("create-route-name-input");
+
+    await user.type(codeInput, "REC-099");
+    await user.type(nameInput, "Recorrido Periférico Norte");
+
+    const submitButton = screen.getByTestId("submit-create-route");
+    await user.click(submitButton);
+
+    // Acceptance Criteria #2:
+    // Lands on its own detail view with an empty stops section and an obvious call-to-action
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Nuevo recorrido" })).not.toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      const detailView = screen.getByTestId("route-detail-view");
+      expect(detailView).toBeInTheDocument();
+      expect(within(detailView).getByText("REC-099")).toBeInTheDocument();
+      expect(within(detailView).getByText("Recorrido Periférico Norte")).toBeInTheDocument();
+      expect(within(detailView).getByTestId("empty-stops-section")).toBeInTheDocument();
+      const addStopsButton = within(detailView).getByTestId("add-stops-cta");
+      expect(addStopsButton).toBeVisible();
+      expect(addStopsButton).toHaveTextContent("Agregar paradas");
+    });
+  });
+
+  it("displays conflict error when attempting to create a route with duplicate code", async () => {
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("create-route-button"));
+
+    await user.type(screen.getByTestId("create-route-code-input"), "REC-001");
+    await user.type(screen.getByTestId("create-route-name-input"), "Nombre Duplicado");
+    await user.click(screen.getByTestId("submit-create-route"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("create-route-error")).toHaveTextContent(
+        "Ya existe un recorrido con el código REC-001.",
+      );
+    });
+
+    const codeInput = screen.getByTestId("create-route-code-input");
+    expect(codeInput).toHaveAttribute("aria-invalid", "true");
+    const errorId = codeInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    const fieldErrorId = errorId?.split(/\s+/).at(-1);
+    expect(fieldErrorId ? document.getElementById(fieldErrorId) : null).toHaveTextContent(
+      "Ya existe un recorrido con el código REC-001.",
+    );
+  });
+
+  it("allows Office to edit a route and enforces that code is read-only / immutable", async () => {
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByTestId("edit-route-route-1");
+    await user.click(editButton);
+
+    expect(screen.getByRole("heading", { name: "Editar recorrido" })).toBeInTheDocument();
+
+    const codeInput = screen.getByTestId("edit-route-code-readonly");
+    expect(codeInput).toHaveValue("REC-001");
+    expect(codeInput).toHaveAttribute("readonly");
+    expect(codeInput).toBeDisabled();
+
+    const nameInput = screen.getByTestId("edit-route-name-input");
+    await user.clear(nameInput);
+    await user.click(screen.getByTestId("submit-edit-route"));
+
+    await waitFor(() => expect(nameInput).toHaveAttribute("aria-invalid", "true"));
+    const errorId = nameInput.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(errorId ? document.getElementById(errorId) : null).toHaveTextContent("El nombre es obligatorio.");
+
+    await user.clear(nameInput);
+    await user.type(nameInput, "Recorrido Casco Histórico Modificado");
+
+    await user.click(screen.getByTestId("submit-edit-route"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Recorrido Casco Histórico Modificado")).toBeInTheDocument();
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+    });
+  });
+
+  it("displays warning dialog when deactivating a route referenced by active ServiceFrequency", async () => {
+    const user = userEvent.setup();
+    render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+    });
+
+    // Deactivate REC-001 (which has active ServiceFrequency in fixtures)
+    const deactivateButton = screen.getByTestId("deactivate-route-route-1");
+    await user.click(deactivateButton);
+
+    // Acceptance Criteria #3:
+    // Deactivating a Route referenced by an active ServiceFrequency is allowed but warns first
+    await waitFor(() => {
+      expect(screen.getByTestId("references-warning-dialog")).toBeInTheDocument();
+      expect(screen.getByText(/Recolección Domiciliaria/i)).toBeInTheDocument();
+      expect(screen.getByText(/Turno MAÑANA/i)).toBeInTheDocument();
+      expect(screen.getByTestId("confirm-deactivate-button")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("checkbox", { name: "Dar de baja de todos modos" })).not.toBeInTheDocument();
+
+    // Confirm deactivation
+    await user.click(screen.getByTestId("confirm-deactivate-button"));
+
+    // Verify it is deactivated in fixtures and UI
+    await waitFor(() => {
+      const fixture = routeFixtures.find((r) => r.id === "route-1");
+      expect(fixture?.active).toBe(false);
+    });
+  });
+
+  it("renders in read-only mode for Field actor without management buttons", async () => {
+    render(<RouteCatalogPanel scenario={scenarios.fieldCrewMember} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("REC-001")).toBeInTheDocument();
+    });
+
+    // Field actors cannot create, edit, or deactivate
+    expect(screen.queryByTestId("create-route-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("edit-route-route-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("edit-stops-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("deactivate-route-route-1")).not.toBeInTheDocument();
+    // But can view details
+    expect(screen.getByTestId("view-route-route-1")).toBeInTheDocument();
+  });
+
+  describe("Stop Sequence Builder #111", () => {
+    it("opens stop sequence builder from empty-stops CTA, adds zones, and saves atomically", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-003")).toBeInTheDocument();
+      });
+
+      // View details for REC-003 (which has 0 stops)
+      await user.click(screen.getByTestId("view-route-route-3"));
+
+      const detailView = screen.getByTestId("route-detail-view");
+      expect(detailView).toBeInTheDocument();
+      expect(within(detailView).getByTestId("empty-stops-section")).toBeInTheDocument();
+
+      // Click "Agregar paradas" CTA
+      const addStopsCta = within(detailView).getByTestId("add-stops-cta");
+      await user.click(addStopsCta);
+
+      // Verify sequence builder opened
+      expect(screen.getByTestId("stop-sequence-builder")).toBeInTheDocument();
+      expect(screen.getByTestId("builder-empty-stops")).toBeInTheDocument();
+      expect(screen.getByLabelText("Zona operativa")).toBeInTheDocument();
+
+      // Select zone-1 and add
+      await chooseSelectOption(user, "Zona operativa", /^Belgrano$/);
+      const durationInput = screen.getByTestId("stop-duration-input");
+      await user.clear(durationInput);
+      await user.type(durationInput, "45");
+      await user.click(screen.getByTestId("add-stop-button"));
+
+      // First stop is added
+      expect(screen.getByTestId("stop-item-0")).toBeInTheDocument();
+      expect(screen.getByText("Belgrano")).toBeInTheDocument();
+
+      // Select zone-2 and add
+      await chooseSelectOption(user, "Zona operativa", /^Palermo$/);
+      await user.clear(durationInput);
+      await user.type(durationInput, "60");
+      await user.click(screen.getByTestId("add-stop-button"));
+
+      // Second stop is added
+      expect(screen.getByTestId("stop-item-1")).toBeInTheDocument();
+      expect(screen.getByText("Palermo")).toBeInTheDocument();
+
+      // Click "Guardar secuencia" (single atomic PUT)
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      // Builder closes and detail view shows updated stops list
+      await waitFor(() => {
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+        expect(screen.getByTestId("stops-list")).toBeInTheDocument();
+      });
+
+      const stopsList = screen.getByTestId("stops-list");
+      expect(within(stopsList).getByText("Belgrano")).toBeInTheDocument();
+      expect(within(stopsList).getByText("Palermo")).toBeInTheDocument();
+      expect(within(stopsList).getByText("45 min")).toBeInTheDocument();
+      expect(within(stopsList).getByText("60 min")).toBeInTheDocument();
+    });
+
+    it("rejects duplicate zones client-side before submit matching 400-on-repeat rule", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-001")).toBeInTheDocument();
+      });
+
+      // View details for REC-001 (has zone-1 and zone-2 already)
+      await user.click(screen.getByTestId("view-route-route-1"));
+
+      // Click "Editar secuencia"
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      expect(screen.getByTestId("stop-sequence-builder")).toBeInTheDocument();
+      expect(screen.getByTestId("stop-item-0")).toBeInTheDocument();
+      expect(screen.getByTestId("stop-item-1")).toBeInTheDocument();
+
+      // Try adding zone-1 again
+      await chooseSelectOption(user, "Zona operativa", /^Belgrano/);
+      await user.click(screen.getByTestId("add-stop-button"));
+
+      // Client-side error is displayed immediately
+      expect(screen.getByTestId("stop-editor-error")).toBeInTheDocument();
+      expect(screen.getByTestId("stop-editor-error")).toHaveTextContent(
+        /Belgrano ya está en el recorrido/i,
+      );
+
+      // Still only 2 stops
+      expect(screen.queryByTestId("stop-item-2")).not.toBeInTheDocument();
+    });
+
+    it("allows reordering and removing stops, then saves atomically", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-001")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      // Initially stop 0 is Zona Norte, stop 1 is Zona Sur
+      const stop0 = screen.getByTestId("stop-item-0");
+      expect(within(stop0).getByText("Belgrano")).toBeInTheDocument();
+
+      // Move stop 0 down
+      await user.click(screen.getByTestId("stop-move-down-0"));
+
+      // Now stop 0 is Zona Sur, stop 1 is Zona Norte
+      const newStop0 = screen.getByTestId("stop-item-0");
+      expect(within(newStop0).getByText("Palermo")).toBeInTheDocument();
+
+      // Remove stop 1 (Zona Norte)
+      await user.click(screen.getByTestId("stop-remove-1"));
+
+      // Now only 1 stop remains
+      expect(screen.queryByTestId("stop-item-1")).not.toBeInTheDocument();
+
+      // Save sequence
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+        expect(screen.getByTestId("stops-list")).toBeInTheDocument();
+      });
+
+      const stopsList = screen.getByTestId("stops-list");
+      expect(within(stopsList).getByText("Palermo")).toBeInTheDocument();
+      expect(within(stopsList).queryByText("Belgrano")).not.toBeInTheDocument();
+    });
+
+    it("allows saving an empty stop sequence", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-002")).toBeInTheDocument();
+      });
+
+      // REC-002 has 1 stop
+      await user.click(screen.getByTestId("view-route-route-2"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      expect(screen.getByTestId("stop-item-0")).toBeInTheDocument();
+
+      // Remove the stop
+      await user.click(screen.getByTestId("stop-remove-0"));
+
+      expect(screen.getByTestId("builder-empty-stops")).toBeInTheDocument();
+
+      // Save empty sequence
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+        expect(screen.getByTestId("empty-stops-section")).toBeInTheDocument();
+      });
+    });
+
+    it("warns with advisory-only precheck when Route updatedAt changed since opening editor, but does not block save", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("REC-001")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      // Simulate external drift of route-1's updatedAt in backend
+      const fixture = routeFixtures.find((r) => r.id === "route-1");
+      if (fixture) {
+        fixture.updatedAt = "2026-09-05T15:30:00.000Z";
+      }
+
+      // User tries to save
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      // Advisory warning dialog is triggered
+      await waitFor(() => {
+        expect(screen.getByTestId("staleness-warning-dialog")).toBeInTheDocument();
+      });
+
+      // Copy makes clear this is advisory and not authoritative
+      expect(
+        screen.getByText(/Si guarda, reemplaza las paradas actuales/i),
+      ).toBeInTheDocument();
+
+      // User can proceed anyway
+      const confirmButton = screen.getByTestId("confirm-staleness-save-button");
+      await user.click(confirmButton);
+
+      // Save completes despite the staleness
+      await waitFor(() => {
+        expect(screen.queryByTestId("staleness-warning-dialog")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+        expect(screen.getByTestId("stops-list")).toBeInTheDocument();
+      });
+    });
+
+    it("warns when the ordered stops changed even if updatedAt is absent", async () => {
+      const user = userEvent.setup();
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await screen.findByText("REC-001");
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      const fixture = routeFixtures.find((route) => route.id === "route-1");
+      if (fixture) {
+        fixture.updatedAt = undefined;
+        const [first, second] = fixture.stops;
+        if (first && second) {
+          first.sequence = 2;
+          first.estimatedDurationMin += 5;
+          second.sequence = 1;
+        }
+      }
+
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      expect(await screen.findByTestId("staleness-warning-dialog")).toBeInTheDocument();
+      expect(screen.getByText(/Otra persona lo modificó mientras editaba/i)).toBeInTheDocument();
+    });
+
+    it("warns when the precheck GET fails and sends one PUT after the user continues", async () => {
+      const user = userEvent.setup();
+      const setStopsSpy = vi.spyOn(routesAdapter, "setStops");
+      render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+
+      await screen.findByText("REC-001");
+      await user.click(screen.getByTestId("view-route-route-1"));
+      await user.click(screen.getByTestId("edit-stops-button"));
+
+      server.use(http.get("*/api/routes/:routeId", () => HttpResponse.error()));
+      await user.click(screen.getByTestId("save-sequence-button"));
+
+      const warning = await screen.findByTestId("staleness-warning-dialog");
+      expect(within(warning).getByText(/No se pudo comprobar si otra persona lo modificó/i)).toBeInTheDocument();
+      expect(setStopsSpy).not.toHaveBeenCalled();
+
+      await user.click(screen.getByTestId("confirm-staleness-save-button"));
+      await waitFor(() => {
+        expect(setStopsSpy).toHaveBeenCalledTimes(1);
+        expect(screen.queryByTestId("staleness-warning-dialog")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("stop-sequence-builder")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  it("returns the BFF forbidden envelope for a Field write", async () => {
+    const fieldCookie = createSessionCookie("field-crew-leader-route", { mode: "mock" });
+    const response = await fetch("http://localhost/api/routes", {
+      method: "POST",
+      headers: { cookie: fieldCookie, "content-type": "application/json" },
+      body: JSON.stringify({ code: "R-NEW", name: "Nuevo" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      statusCode: 403,
+      message: "Solo el rol de Oficina puede crear recorridos.",
+      error: "Forbidden",
+      path: "/api/routes",
+    });
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<RouteCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    await waitFor(() => expect(screen.getAllByRole("row").length).toBeGreaterThan(1));
+
+    expectNoInternalJargon(container);
+  });
+});

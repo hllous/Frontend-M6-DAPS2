@@ -1,0 +1,102 @@
+/* Layout del control de capas (#720) y del rótulo de las comunas (#708). */
+.control {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+}
+
+.trigger {
+  position: relative;
+  gap: 6px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+}
+
+.filterDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.panel {
+  max-height: min(70dvh, 34rem);
+  overflow: hidden;
+}
+
+.layerToggles,
+.bulkActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.list,
+.barrioList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.communeRow,
+.barrioRow {
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.communeRow {
+  font-weight: 700;
+}
+
+.barrioRow {
+  padding-left: 24px;
+  font-weight: 400;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 3px;
+}
+
+/* Número de la comuna: sobre mapa claro en ambos temas, así que lleva fondo propio. */
+.communeLabel {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.loadError {
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}

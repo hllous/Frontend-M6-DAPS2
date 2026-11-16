@@ -1,0 +1,57 @@
+// @ts-nocheck
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
+import { NextResponse } from "next/server";
+
+import { fetchBackend } from "@/lib/bff-backend";
+import { addGreenPointFixture, filterGreenPointFixtures, greenPointFixtures, paginateGreenPointFixtures } from "@/lib/green-point-fixtures";
+import { greenPointCreateInputSchema, wasteTypeSchema, type GreenPointQuery } from "@/lib/green-points";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
+
+
+
+function parseQuery(url: URL): GreenPointQuery {
+  const active = url.searchParams.get("active");
+  const wasteType = wasteTypeSchema.safeParse(url.searchParams.get("wasteType"));
+  return { active: active === null ? undefined : active === "true", zoneId: url.searchParams.get("zoneId") ?? undefined, wasteType: wasteType.success ? wasteType.data : undefined, search: searchParam(url.searchParams), page: pageParam(url.searchParams), pageSize: pageSizeParam(url.searchParams) };
+}
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar puntos verdes.", capability: "greenPoint:manage", throwOnError: true }).session; }
+
+export async function GET(request: Request) {
+  const path = new URL(request.url).pathname;
+  try {
+    const session = getRequiredSession(request);
+    const query = parseQuery(new URL(request.url));
+    if (backendMode(session)) {
+      const response = await fetchBackend(request, `/green-points${backendQuery(query, ["active", "zoneId", "wasteType", "search", "page", "pageSize"])}`);
+      return forwardResponse(response);
+    }
+    return NextResponse.json(paginateGreenPointFixtures(filterGreenPointFixtures(query), query.page, query.pageSize));
+  } catch (error) {
+    if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
+    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+    return mapSessionError(error, path, "No se pudieron cargar los puntos verdes.");
+  }
+}
+
+export async function POST(request: Request) {
+  const path = new URL(request.url).pathname;
+  try {
+    const session = requireOfficeCapability(request);
+    const parsed = await parseJsonBody(request, greenPointCreateInputSchema, path);
+    if (parsed instanceof Response) return parsed;
+    if (backendMode(session)) {
+      const response = await fetchBackend(request, "/green-points", "greenPoint:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+      return forwardResponse(response);
+    }
+    if (greenPointFixtures.some((item) => item.code.toLowerCase() === parsed.data.code.toLowerCase())) return errorResponse(409, `Ya existe un punto verde con el código '${parsed.data.code}'.`, path);
+    const created = { id: `green-point-${Date.now()}`, ...parsed.data, address: parsed.data.address ?? null, lat: parsed.data.lat ?? null, lng: parsed.data.lng ?? null, active: parsed.data.active ?? true };
+    addGreenPointFixture(created);
+    return NextResponse.json(created, { status: 201 });
+  } catch (error) {
+    if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
+    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+    return mapSessionError(error, path, "No se pudo crear el punto verde.");
+  }
+}

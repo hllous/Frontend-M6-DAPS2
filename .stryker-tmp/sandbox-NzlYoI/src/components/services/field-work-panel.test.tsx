@@ -1,0 +1,711 @@
+// @ts-nocheck
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { FieldWorkPanel } from "./field-work-panel";
+import { scenarios } from "@/lib/scenarios";
+import { resetServiceFixtures } from "@/lib/services-fixtures";
+import { todayInArgentina } from "@/lib/argentina-date";
+import { expectNoInternalJargon } from "@/test/no-internal-jargon";
+
+const server = setupServer(
+  http.get("*/api/services", ({ request }) => {
+    const url = new URL(request.url);
+    const crewId = url.searchParams.get("crewId");
+    if (crewId === "crew-b") {
+      return HttpResponse.json({
+        data: [
+          {
+            id: "SVC-1050",
+            serviceTypeId: "st-street-cleaning",
+            serviceTypeName: "Barrido mecánico",
+            title: "Barrido mecánico — Bulevar Costero",
+            mode: "ROUTE",
+            status: "SCHEDULED",
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            zoneNames: ["Zona Centro"],
+            routeId: "route-1",
+            routeName: "Recorrido 1 Centro",
+            scheduledDate: "2026-09-05",
+            windowFrom: "08:00",
+            windowTo: "12:00",
+            crewId: "crew-b",
+            crewName: "Cuadrilla B · Fernández",
+            vehicleId: "veh-102",
+            vehiclePlate: "AE 456 FG",
+            history: [{ label: "Programado", at: "2026-09-05 06:00", done: true }],
+          },
+          {
+            id: "SVC-1054",
+            serviceTypeId: "st-container-repair",
+            serviceTypeName: "Mantenimiento de contenedores",
+            title: "Reparación de contenedor CT-0112",
+            mode: "POINT",
+            status: "SCHEDULED",
+            origin: "MANUAL",
+            zoneIds: ["zone-3"],
+            zoneNames: ["Zona Centro"],
+            scheduledDate: "2026-09-05",
+            windowFrom: "15:30",
+            windowTo: "18:00",
+            crewId: "crew-b",
+            crewName: "Cuadrilla B · Fernández",
+            vehicleId: null,
+            vehiclePlate: null,
+            history: [{ label: "Programado", at: "2026-09-05 08:00", done: true }],
+          },
+          {
+            id: "SVC-1060",
+            serviceTypeId: "st-street-cleaning",
+            serviceTypeName: "Barrido mecánico",
+            title: "Barrido mecánico — Recorrido en curso",
+            mode: "ROUTE",
+            status: "IN_PROGRESS",
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            zoneNames: ["Zona Centro"],
+            scheduledDate: "2026-09-05",
+            windowFrom: "08:00",
+            windowTo: "12:00",
+            crewId: "crew-b",
+            crewName: "Cuadrilla B · Fernández",
+            vehicleId: "veh-102",
+            vehiclePlate: "AE 456 FG",
+            history: [
+              { label: "Programado", at: "2026-09-05 06:00", done: true },
+              { label: "En curso", at: "2026-09-05 08:05", done: true },
+            ],
+          },
+        ],
+        meta: { total: 3, page: 1, pageSize: 50, totalPages: 1 },
+      });
+    }
+    return HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 0 } });
+  }),
+  http.get("*/api/street-closure-requests", () =>
+    HttpResponse.json({ data: [], meta: { total: 0, page: 1, pageSize: 100, totalPages: 1 } }),
+  ),
+  http.get("*/api/repair-requests", ({ request }) => {
+    const serviceId = new URL(request.url).searchParams.get("detectedInId");
+    return HttpResponse.json({
+      data: serviceId === "SVC-1050"
+        ? [{
+            id: "RR-1001",
+            damageType: "BROKEN_PAVEMENT",
+            address: "Bulevar Costero y Calle 12",
+            severity: "HIGH",
+            publicSafetyRisk: true,
+            detectedInType: "SERVICE",
+            detectedInId: "SVC-1050",
+            sourceContext: {
+              type: "SERVICE",
+              id: "SVC-1050",
+              label: "Barrido mecánico — Bulevar Costero",
+              href: "/app?destination=services&detail=SVC-1050",
+            },
+            status: "REQUESTED",
+            workOrderId: null,
+            requestedAt: "2026-09-05T10:15:00.000Z",
+          }]
+        : [],
+      meta: { total: serviceId === "SVC-1050" ? 1 : 0, page: 1, pageSize: 50, totalPages: 1 },
+    });
+  }),
+  http.post("*/api/repair-requests", async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({
+      id: "RR-2001",
+      ...body,
+      status: "REQUESTED",
+      sourceContext: {
+        type: "SERVICE",
+        id: "SVC-1050",
+        label: "Barrido mecánico — Bulevar Costero",
+        href: "/app?destination=services&detail=SVC-1050",
+      },
+      workOrderId: null,
+      requestedAt: "2026-09-06T10:15:00.000Z",
+    }, { status: 201 });
+  }),
+  http.post("*/api/services/:serviceId/start", ({ params }) => {
+    if (params.serviceId === "SVC-1054") {
+      return HttpResponse.json(
+        {
+          statusCode: 409,
+          message: "El tipo de servicio requiere un vehículo operativo asignado para iniciar.",
+          error: "Conflict",
+          timestamp: new Date().toISOString(),
+          path: `/api/services/${params.serviceId}/start`,
+        },
+        { status: 409 },
+      );
+    }
+    return HttpResponse.json({
+      id: params.serviceId,
+      serviceTypeId: "st-street-cleaning",
+      serviceTypeName: "Barrido mecánico",
+      title: "Barrido mecánico — Bulevar Costero",
+      mode: "ROUTE",
+      status: "IN_PROGRESS",
+      origin: "PLANNED",
+      zoneIds: ["zone-3"],
+      zoneNames: ["Zona Centro"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      crewId: "crew-b",
+      crewName: "Cuadrilla B · Fernández",
+      vehicleId: "veh-102",
+      vehiclePlate: "AE 456 FG",
+      history: [
+        { label: "Programado", at: "2026-09-05 06:00", done: true },
+        { label: "En curso", at: "2026-09-05 09:00", done: true },
+      ],
+    });
+  }),
+  http.post("*/api/services/:serviceId/suspend", async ({ params, request }) => {
+    const body = (await request.json()) as { reason: string; note: string };
+    return HttpResponse.json({
+      id: params.serviceId,
+      serviceTypeId: "st-street-cleaning",
+      serviceTypeName: "Barrido mecánico",
+      title: "Barrido mecánico — Recorrido en curso",
+      mode: "ROUTE",
+      status: "SUSPENDED",
+      statusReason: `Desperfecto vehicular: ${body.note}`,
+      origin: "PLANNED",
+      zoneIds: ["zone-3"],
+      zoneNames: ["Zona Centro"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      crewId: "crew-b",
+      crewName: "Cuadrilla B · Fernández",
+      history: [
+        { label: "Programado", at: "2026-09-05 06:00", done: true },
+        { label: "En curso", at: "2026-09-05 08:05", done: true },
+        { label: "Suspendido", at: "2026-09-05 10:00", done: true },
+      ],
+    });
+  }),
+  http.post("*/api/services/:serviceId/resume", ({ params }) => {
+    return HttpResponse.json({
+      id: params.serviceId,
+      serviceTypeId: "st-street-cleaning",
+      serviceTypeName: "Barrido mecánico",
+      title: "Barrido mecánico — Recorrido en curso",
+      mode: "ROUTE",
+      status: "IN_PROGRESS",
+      statusReason: null,
+      origin: "PLANNED",
+      zoneIds: ["zone-3"],
+      zoneNames: ["Zona Centro"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      crewId: "crew-b",
+      crewName: "Cuadrilla B · Fernández",
+      history: [
+        { label: "Programado", at: "2026-09-05 06:00", done: true },
+        { label: "En curso", at: "2026-09-05 08:05", done: true },
+        { label: "Suspendido", at: "2026-09-05 10:00", done: true },
+        { label: "Reanudado", at: "2026-09-05 10:30", done: true },
+      ],
+    });
+  }),
+);
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => resetServiceFixtures());
+afterEach(() => {
+  server.resetHandlers();
+  localStorage.clear();
+});
+afterAll(() => server.close());
+
+async function confirmOutOfHoursStart(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement) {
+  await user.click(trigger);
+  const dialog = await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });
+  await user.click(within(dialog).getByRole("button", { name: "Iniciar igual" }));
+  return dialog;
+}
+
+describe("FieldWorkPanel component", () => {
+  it("lets Field view the referrals of an assigned Service but not create them (Operations and Admin do)", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    const sweeping = (await screen.findByText("Barrido mecánico — Bulevar Costero")).closest("li")!;
+    await user.click(within(sweeping).getByRole("button", { name: "Abrir" }));
+
+    expect(await screen.findByRole("heading", { name: "Derivaciones" })).toBeVisible();
+    expect(screen.getByText("Derivación a Obras Públicas")).toBeVisible();
+    expect(screen.queryByText("RR-1001")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
+  });
+
+  it("explains when Field has no assigned crew", () => {
+    const scenario = { ...scenarios.fieldCrewLeader, actor: { ...scenarios.fieldCrewLeader.actor, crewId: undefined, crewName: undefined } };
+    render(<FieldWorkPanel scenario={scenario} />);
+    expect(screen.getByText("Sin cuadrilla asignada. Pida a un administrador que lo agregue a una cuadrilla.")).toBeInTheDocument();
+    expect(screen.queryByText("Sin servicios asignados.")).not.toBeInTheDocument();
+  });
+
+  it("uses the real crew resolved for the session and shows a clear error when its services fail to load", async () => {
+    const realCrewId = "d907516e-ddb7-46d4-a7d4-cd235cbb1529";
+    const requested: string[] = [];
+    server.use(
+      http.get("*/api/services", ({ request }) => {
+        requested.push(new URL(request.url).searchParams.get("crewId") ?? "");
+        return HttpResponse.json(
+          { statusCode: 503, message: "El backend no responde.", error: "Service Unavailable", timestamp: new Date().toISOString(), path: "/api/services" },
+          { status: 503 },
+        );
+      }),
+    );
+    const scenario = { ...scenarios.fieldCrewLeader, actor: { ...scenarios.fieldCrewLeader.actor, crewId: realCrewId } };
+
+    render(<FieldWorkPanel scenario={scenario} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/No se pudieron cargar los servicios/);
+    expect(screen.queryByText(/No hay servicios asignados/)).not.toBeInTheDocument();
+    expect(requested).toEqual([realCrewId]);
+  });
+
+  it("scopes list to actor's own crew and excludes other crews' services", async () => {
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    expect(screen.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible();
+      expect(screen.getByText("Reparación de contenedor CT-0112")).toBeVisible();
+    });
+    expect(screen.queryByText("SVC-1050", { exact: true })).not.toBeInTheDocument();
+
+    // Does NOT show services assigned to crew-a or unassigned
+    expect(screen.queryByText(/Recolección de residuos — Recorrido 4/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Poda de árbol/i)).not.toBeInTheDocument();
+  });
+
+  it("renders read-only view for Crew Member with no start action and allows viewing detail", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewMember} />);
+
+    // Shows heading and member indicators
+    expect(screen.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
+    expect(screen.getByText("Solo consulta")).toBeVisible();
+
+    // Open SVC-1050 by its title: the in-progress SVC-1060 is listed first
+    const sweeping = (await screen.findByText("Barrido mecánico — Bulevar Costero")).closest("li")!;
+    await user.click(within(sweeping).getByRole("button", { name: "Abrir" }));
+
+    // Detail view opens
+    expect(screen.getByRole("region", { name: /Detalle completo de Barrido mecánico — Bulevar Costero/i })).toBeVisible();
+    expect(screen.getByText("Solo consulta")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Iniciar servicio" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /asignar cuadrilla/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Crear derivación de reparación" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /corte de calle/i })).not.toBeInTheDocument();
+
+    // Return back to assigned list
+    await user.click(screen.getByRole("button", { name: "Volver" }));
+    expect(screen.getByRole("heading", { name: "Servicios asignados" })).toBeVisible();
+  });
+
+  it("allows Crew Leader to start an assigned service and shows early/late warning outside window", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible();
+    });
+
+    // Window for SVC-1050 is 08:00 - 12:00. If current time is outside, warning appears
+    const warnings = screen.queryAllByText(/Fuera del horario/i);
+    expect(warnings.length).toBeGreaterThan(0);
+    // Start button remains enabled
+    const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
+    expect(startButtons[0]).toBeEnabled();
+
+    // Crew Leader starts the service, confirming the out-of-hours warning
+    await confirmOutOfHoursStart(user, startButtons[0]);
+
+    // Transitions to IN_PROGRESS (SVC-1060 is already IN_PROGRESS in the fixture, so at least 2 now)
+    await waitFor(() => {
+      expect(screen.getAllByText("En curso").length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("saves a start draft on a network failure, then resolves a drift as an explicit conflict rather than applying it", async () => {
+    let startAttempts = 0;
+    server.use(
+      http.post("*/api/services/:serviceId/start", ({ params }) => {
+        if (params.serviceId !== "SVC-1050") {
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Test",
+            mode: "ROUTE",
+            status: "IN_PROGRESS",
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [],
+          });
+        }
+        startAttempts += 1;
+        return HttpResponse.error();
+      }),
+      http.get("*/api/services/:serviceId", ({ params }) => {
+        // Service was reassigned server-side while offline.
+        return HttpResponse.json({
+          id: params.serviceId,
+          serviceTypeId: "st-street-cleaning",
+          serviceTypeName: "Barrido mecánico",
+          title: "Barrido mecánico — Bulevar Costero",
+          mode: "ROUTE",
+          status: "SCHEDULED",
+          origin: "PLANNED",
+          zoneIds: ["zone-3"],
+          zoneNames: ["Zona Centro"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: "crew-c",
+          crewName: "Cuadrilla C · Ibáñez",
+          history: [],
+          updatedAt: "2026-09-05T12:00:00.000Z",
+        });
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible();
+    });
+
+    const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
+    await confirmOutOfHoursStart(user, startButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Sin enviar \(sin conexión\)/i)).toBeVisible();
+    });
+    const retryButton = await screen.findByRole("button", { name: "Reenviar" });
+
+    await user.click(retryButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeVisible();
+    });
+    const conflictDialog = screen.getByRole("dialog");
+    expect(within(conflictDialog).getByText(/El servicio cambió/i)).toBeVisible();
+    expect(within(conflictDialog).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    expect(startAttempts).toBe(1);
+
+    await user.click(within(conflictDialog).getByRole("button", { name: "Descartar lo cargado" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Sin enviar \(sin conexión\)/i)).not.toBeInTheDocument();
+    });
+    expect(screen.getAllByRole("button", { name: "Iniciar servicio" })[0]).toBeVisible();
+  });
+
+  it("surfaces Backend error when starting a service missing a required vehicle", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Reparación de contenedor CT-0112")).toBeVisible();
+    });
+
+    // Find the start button for SVC-1054
+    const startButtons = screen.getAllByRole("button", { name: "Iniciar servicio" });
+    // Click start on SVC-1054 (second scheduled item)
+    const dialog = await confirmOutOfHoursStart(user, startButtons[1]);
+
+    // Backend error stays inside the confirmation, which remains open to retry or cancel
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("El tipo de servicio requiere un vehículo operativo asignado para iniciar.");
+    expect(within(dialog).getByRole("button", { name: "Iniciar igual" })).toBeEnabled();
+
+    // The card does not repeat the error while the confirmation shows it; it keeps it after closing.
+    const card = screen.getByText("Reparación de contenedor CT-0112").closest("li")!;
+    expect(within(card).queryByText(/vehículo operativo/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(card).getByRole("alert")).toHaveTextContent("El tipo de servicio requiere un vehículo operativo asignado para iniciar.");
+  });
+
+  it("el detalle no repite en la página el error que muestra la confirmación", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+    await waitFor(() => expect(screen.getByText("Reparación de contenedor CT-0112")).toBeVisible());
+    const card = screen.getByText("Reparación de contenedor CT-0112").closest("li")!;
+    await user.click(within(card).getByRole("button", { name: "Abrir" }));
+    const detail = await screen.findByRole("region", { name: /Detalle completo de/ });
+    const dialog = await confirmOutOfHoursStart(user, within(detail).getByRole("button", { name: "Iniciar servicio" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("vehículo operativo");
+    expect(within(detail).queryByText(/vehículo operativo/)).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(within(detail).getByText(/vehículo operativo/)).toBeVisible();
+  });
+
+  describe("Iniciar servicio según la franja (#910)", () => {
+    function recordStarts() {
+      const calls: string[] = [];
+      server.use(http.post("*/api/services/:serviceId/start", ({ request }) => { calls.push(request.url); }));
+      return calls;
+    }
+
+    it("dentro de la franja inicia con un toque, sin diálogo", async () => {
+      const today = todayInArgentina();
+      server.use(http.get("*/api/services", () => HttpResponse.json({
+        data: [{
+          id: "SVC-1050", serviceTypeId: "st-street-cleaning", serviceTypeName: "Barrido mecánico", title: "Barrido mecánico — Bulevar Costero",
+          mode: "ROUTE", status: "SCHEDULED", origin: "PLANNED", zoneIds: ["zone-3"], zoneNames: ["Zona Centro"], scheduledDate: today,
+          windowFrom: "00:00", windowTo: "23:59", crewId: "crew-b", crewName: "Cuadrilla B · Fernández", vehicleId: "veh-102", vehiclePlate: "AE 456 FG", history: [],
+        }],
+        meta: { total: 1, page: 1, pageSize: 50, totalPages: 1 },
+      })));
+      const calls = recordStarts();
+      const user = userEvent.setup();
+      render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+      await waitFor(() => expect(screen.getAllByRole("button", { name: "Iniciar servicio" })).toHaveLength(1));
+      expect(screen.queryByText(/Fuera del horario/i)).not.toBeInTheDocument();
+
+      const start = screen.getByRole("button", { name: "Iniciar servicio" });
+      expect(start).not.toHaveAttribute("aria-haspopup");
+      await user.click(start);
+
+      await waitFor(() => expect(calls).toHaveLength(1));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("fuera de la franja advierte con la franja programada y solo envía al confirmar", async () => {
+      const calls = recordStarts();
+      const user = userEvent.setup();
+      render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+      await waitFor(() => expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible());
+      const start = screen.getAllByRole("button", { name: "Iniciar servicio" })[0];
+      expect(start).toHaveAttribute("aria-haspopup", "dialog");
+
+      await user.click(start);
+      const dialog = await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });
+      expect(within(dialog).getByText(/Franja programada: 05\/09\/2026, de 08:00 a 12:00/)).toBeVisible();
+      expect(calls).toHaveLength(0);
+
+      await user.click(within(dialog).getByRole("button", { name: "Iniciar igual" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(calls).toHaveLength(1);
+    });
+
+    it("fuera de la franja, cancelar con Escape no envía nada y devuelve el foco", async () => {
+      const calls = recordStarts();
+      const user = userEvent.setup();
+      render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+      await waitFor(() => expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible());
+      const start = screen.getAllByRole("button", { name: "Iniciar servicio" })[0];
+      await user.click(start);
+      await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(calls).toHaveLength(0);
+      await waitFor(() => expect(start).toHaveFocus());
+    });
+
+    it("el detalle también confirma fuera de la franja", async () => {
+      const calls = recordStarts();
+      const user = userEvent.setup();
+      render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+      await waitFor(() => expect(screen.getByText("Barrido mecánico — Bulevar Costero")).toBeVisible());
+      const card = screen.getByText("Barrido mecánico — Bulevar Costero").closest("li");
+      if (!card) throw new Error("SVC-1050 must be listed for this test.");
+      await user.click(within(card).getByRole("button", { name: "Abrir" }));
+      const detail = await screen.findByRole("region", { name: /Detalle completo de/ });
+      const start = await within(detail).findByRole("button", { name: "Iniciar servicio" });
+      expect(start).toHaveAttribute("aria-haspopup", "dialog");
+      await user.click(start);
+      const dialog = await screen.findByRole("dialog", { name: "Iniciar servicio fuera de horario" });
+      expect(calls).toHaveLength(0);
+      await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(calls).toHaveLength(0);
+    });
+  });
+
+  it("allows Crew Leader to suspend an in-progress service with a reason and note, then resume it clearing the reason", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
+    });
+
+    const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
+    // SVC-1060 is in progress, so My Work lists it first
+    await user.click(detailButtons[0]);
+
+    expect(screen.getByRole("button", { name: "Suspender servicio" })).toHaveAttribute("aria-haspopup", "dialog");
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+
+    expect(
+      screen.getByRole("heading", {
+        name: "Suspender Barrido mecánico — Recorrido en curso",
+      }),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("combobox", { name: /Motivo de suspensión/i }));
+    await user.click(await screen.findByRole("option", { name: "Desperfecto vehicular" }));
+    await user.type(screen.getByLabelText(/^Nota/i), "El camión no arranca.");
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Suspendido")).toBeVisible();
+    });
+    expect(screen.getByText(/desperfecto vehicular/i)).toBeVisible();
+    expect(screen.getByText(/el camión no arranca/i)).toBeVisible();
+
+    // Resume clears the prior reason
+    await user.click(screen.getByRole("button", { name: "Reanudar servicio" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("En curso")).toBeVisible();
+    });
+    expect(screen.queryByText(/desperfecto vehicular/i)).not.toBeInTheDocument();
+  });
+
+  it("preserves a suspend draft across dialog reopen, then shows an explicit conflict on drift instead of silently applying it", async () => {
+    let suspendAttempts = 0;
+    server.use(
+      http.post("*/api/services/:serviceId/suspend", async ({ request }) => {
+        suspendAttempts += 1;
+        if (suspendAttempts === 1) {
+          return HttpResponse.error();
+        }
+        const body = (await request.json()) as { reason: string; note: string };
+        return HttpResponse.json({
+          id: "SVC-1060",
+          serviceTypeId: "st-street-cleaning",
+          serviceTypeName: "Barrido mecánico",
+          title: "Barrido mecánico — Recorrido en curso",
+          mode: "ROUTE",
+          status: "SUSPENDED",
+          statusReason: `Desperfecto vehicular: ${body.note}`,
+          origin: "PLANNED",
+          zoneIds: ["zone-3"],
+          zoneNames: ["Zona Centro"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: "crew-b",
+          crewName: "Cuadrilla B · Fernández",
+          history: [],
+        });
+      }),
+      http.get("*/api/services/:serviceId", () =>
+        // Service was reassigned server-side while the crew leader was offline.
+        HttpResponse.json({
+          id: "SVC-1060",
+          serviceTypeId: "st-street-cleaning",
+          serviceTypeName: "Barrido mecánico",
+          title: "Barrido mecánico — Recorrido en curso",
+          mode: "ROUTE",
+          status: "IN_PROGRESS",
+          origin: "PLANNED",
+          zoneIds: ["zone-3"],
+          zoneNames: ["Zona Centro"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: "crew-c",
+          crewName: "Cuadrilla C · Ibáñez",
+          history: [],
+          updatedAt: "2026-09-05T12:00:00.000Z",
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
+    });
+
+    const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
+    await user.click(detailButtons[0]);
+
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("combobox", { name: /Motivo de suspensión/i }));
+    await user.click(await screen.findByRole("option", { name: "Desperfecto vehicular" }));
+    await user.type(within(dialog).getByLabelText(/^Nota/i), "El camión no arranca.");
+    await user.click(within(dialog).getByRole("button", { name: "Suspender servicio" }));
+
+    // Real network failure: draft saved locally, dialog stays open with a pending-draft banner
+    await waitFor(() => {
+      expect(within(dialog).getByRole("status")).toHaveTextContent(/Sin conexión\. Se guardó en este dispositivo/i);
+    });
+    expect(within(dialog).getByRole("button", { name: "Reenviar" })).toBeVisible();
+
+    // Close and reopen: the draft's fields are restored from the on-device copy
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Suspender servicio" }));
+    const reopenedDialog = await screen.findByRole("dialog");
+    expect(within(reopenedDialog).getByRole("combobox", { name: /Motivo de suspensión/i })).toHaveTextContent(
+      "Desperfecto vehicular",
+    );
+    expect(within(reopenedDialog).getByLabelText(/^Nota/i)).toHaveValue("El camión no arranca.");
+    expect(within(reopenedDialog).getByRole("status")).toHaveTextContent(/Sin conexión\. Se guardó en este dispositivo/i);
+
+    // Manual resubmit: the Service drifted server-side (reassigned) -> explicit conflict, never silently applied
+    await user.click(within(reopenedDialog).getByRole("button", { name: "Reenviar" }));
+
+    await waitFor(() => {
+      expect(within(reopenedDialog).getByText(/Compare y elija qué hacer con lo que cargó/i)).toBeVisible();
+    });
+    expect(within(reopenedDialog).getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    expect(suspendAttempts).toBe(1);
+
+    // Discard clears the on-device draft and resets the form
+    await user.click(within(reopenedDialog).getByRole("button", { name: "Descartar lo cargado" }));
+    await waitFor(() => {
+      expect(within(reopenedDialog).queryByRole("status")).not.toBeInTheDocument();
+    });
+    expect(within(reopenedDialog).getByRole("combobox", { name: /Motivo de suspensión/i })).toHaveTextContent("Seleccione un motivo…");
+  });
+
+  it("does not offer suspend/resume actions to a Crew Member", async () => {
+    const user = userEvent.setup();
+    render(<FieldWorkPanel scenario={scenarios.fieldCrewMember} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Barrido mecánico — Recorrido en curso")).toBeVisible();
+    });
+
+    const detailButtons = screen.getAllByRole("button", { name: "Abrir" });
+    await user.click(detailButtons[0]);
+
+    expect(screen.queryByRole("button", { name: "Suspender servicio" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reanudar servicio" })).not.toBeInTheDocument();
+  });
+});
+
+describe("internal jargon guard", () => {
+  it("keeps module codes, backend and API field names out of the rendered copy", async () => {
+    const { container } = render(<FieldWorkPanel scenario={scenarios.fieldCrewLeader} />);
+    await screen.findAllByRole("button", { name: "Abrir" });
+
+    expectNoInternalJargon(container);
+  });
+});

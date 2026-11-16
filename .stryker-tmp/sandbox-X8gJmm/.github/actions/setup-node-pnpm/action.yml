@@ -1,0 +1,37 @@
+# Prepara pnpm + Node 22 + node_modules (con caché) para cualquier job del CI.
+# Requiere que `actions/checkout` ya haya corrido en el job.
+name: Setup Node.js and pnpm
+description: Instala pnpm y Node.js 22 y restaura node_modules desde la caché (instala solo si no hay acierto).
+
+inputs:
+  install:
+    description: "'false' para jobs que no necesitan node_modules (solo pnpm dlx)."
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+      with:
+        version: 12.14.0
+        run_install: false
+
+    - name: Setup Node.js 22
+      uses: actions/setup-node@v7
+      with:
+        node-version: 22
+        cache: pnpm
+
+    - name: Restore node_modules cache
+      if: ${{ inputs.install == 'true' }}
+      id: cache-node-modules
+      uses: actions/cache@v6
+      with:
+        path: node_modules
+        key: node-modules-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - name: Install dependencies
+      if: ${{ inputs.install == 'true' && steps.cache-node-modules.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: pnpm install --frozen-lockfile

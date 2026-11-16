@@ -1,0 +1,20 @@
+// @ts-nocheck
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
+import { NextResponse } from "next/server";
+
+import { fetchBackend, pathId } from "@/lib/bff-backend";
+import { disposalSiteUpdateInputSchema } from "@/lib/disposal-sites";
+import { disposalSiteFixtures, updateDisposalSiteFixture } from "@/lib/disposal-site-fixtures";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+
+
+
+async function targetId(context: { params: Promise<{ id: string }> }) { return (await context.params).id; }
+function requireOffice(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar sitios de disposición.", capability: "disposalSite:manage", throwOnError: true }).session; }
+
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) { const path = new URL(request.url).pathname; try { const session = getRequiredSession(request); const id = await targetId(context); if (backendMode(session)) { const response = await fetchBackend(request, `/disposal-sites/${pathId(id)}`); return forwardResponse(response); } const item = disposalSiteFixtures.find((candidate) => candidate.id === id); return item ? NextResponse.json(item) : errorResponse(404, `Sitio de disposición ${id} no encontrado.`, path); } catch (error) { if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path); if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path); return mapSessionError(error, path, "No se pudo cargar el sitio de disposición."); } }
+
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) { const path = new URL(request.url).pathname; try { const session = requireOffice(request); const id = await targetId(context); const parsed = await parseJsonBody(request, disposalSiteUpdateInputSchema, path);
+ if (parsed instanceof Response) return parsed; if (backendMode(session)) { const response = await fetchBackend(request, `/disposal-sites/${pathId(id)}`, "disposalSite:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }); return forwardResponse(response); } const updated = updateDisposalSiteFixture(id, parsed.data); return updated ? NextResponse.json(updated) : errorResponse(404, `Sitio de disposición ${id} no encontrado.`, path); } catch (error) { if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path); if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message); if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path); return mapSessionError(error, path, "No se pudo actualizar el sitio de disposición."); } }
+
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) { const path = new URL(request.url).pathname; try { const session = requireOffice(request); const id = await targetId(context); if (backendMode(session)) { const response = await fetchBackend(request, `/disposal-sites/${pathId(id)}`, "disposalSite:manage", { method: "DELETE" }); return forwardResponse(response); } const updated = updateDisposalSiteFixture(id, { active: false }); return updated ? NextResponse.json(updated) : errorResponse(404, `Sitio de disposición ${id} no encontrado.`, path); } catch (error) { if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path); if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message); if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path); return mapSessionError(error, path, "No se pudo dar de baja el sitio de disposición."); } }

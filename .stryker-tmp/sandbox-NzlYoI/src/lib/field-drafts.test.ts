@@ -1,0 +1,361 @@
+// @ts-nocheck
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
+
+import {
+  clearFieldDraft,
+  clearAllFieldDrafts,
+  getFieldDraft,
+  hasServiceDrifted,
+  resubmitFieldAction,
+  retryFieldDraft,
+  saveFieldDraft,
+  setFieldDraftOwner,
+  snapshotService,
+  submitFieldAction,
+  type FieldDraft,
+} from "./field-drafts";
+import type { Service } from "./services";
+import { NetworkFailureError } from "./authenticated-fetch";
+
+const server = setupServer();
+
+beforeEach(() => setFieldDraftOwner("actor-a"));
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
+afterAll(() => server.close());
+
+function makeService(overrides: Partial<Service> = {}): Service {
+  return {
+    id: "SVC-9001",
+    serviceTypeId: "st-street-cleaning",
+    serviceTypeName: "Barrido mecánico",
+    title: "Test service",
+    mode: "ROUTE",
+    status: "IN_PROGRESS",
+    statusReason: null,
+    origin: "PLANNED",
+    zoneIds: ["zone-1"],
+    zoneNames: ["Zona Norte"],
+    scheduledDate: "2026-09-05",
+    windowFrom: "08:00",
+    windowTo: "12:00",
+    crewId: "crew-a",
+    crewName: "Cuadrilla A",
+    vehicleId: "veh-101",
+    vehiclePlate: "AF 123 CD",
+    coordinates: { x: 10, y: 10 },
+    attachments: [],
+    history: [],
+    updatedAt: "2026-09-05T08:00:00.000Z",
+    ...overrides,
+  };
+}
+
+describe("field-drafts storage primitives", () => {
+  it("clears all actors' drafts and legacy keys while preserving unrelated storage", () => {
+    localStorage.setItem("m6:field-draft:v2:actor-a:service:start", "private-a");
+    localStorage.setItem("m6:field-draft:v2:actor-b:service:start", "private-b");
+    localStorage.setItem("m6:field-draft:service:start", "legacy");
+    localStorage.setItem("map-preference", "table");
+    clearAllFieldDrafts();
+    expect(localStorage.length).toBe(1);
+    expect(localStorage.getItem("map-preference")).toBe("table");
+    const draft: FieldDraft = { serviceId: "SVC-9001", actionType: "start", payload: null, composedAgainst: snapshotService(makeService()), savedAt: "2026-09-05T09:00:00.000Z" };
+    expect(saveFieldDraft(draft)).toBe(false);
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+  });
+
+  it("isolates drafts by actor and does not expose legacy unscoped drafts", () => {
+    const draft: FieldDraft = { serviceId: "SVC-9001", actionType: "start", payload: { note: "private" }, composedAgainst: snapshotService(makeService()), savedAt: "2026-09-05T09:00:00.000Z" };
+    localStorage.setItem("m6:field-draft:SVC-9001:start", JSON.stringify(draft));
+    setFieldDraftOwner("actor-a");
+    expect(localStorage.getItem("m6:field-draft:SVC-9001:start")).toBeNull();
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+    expect(saveFieldDraft(draft)).toBe(true);
+    setFieldDraftOwner("actor-b");
+    expect(getFieldDraft("SVC-9001", "start")).toBeNull();
+    clearFieldDraft("SVC-9001", "start");
+    setFieldDraftOwner("actor-a");
+    expect(getFieldDraft("SVC-9001", "start")).toEqual(draft);
+  });
+
+  it("round-trips a draft through save/get/clear", () => {
+    const service = makeService();
+    const draft: FieldDraft<{ note: string }> = {
+      serviceId: service.id,
+      actionType: "suspend",
+      payload: { note: "grúa solicitada" },
+      composedAgainst: snapshotService(service),
+      savedAt: "2026-09-05T09:00:00.000Z",
+    };
+
+    expect(saveFieldDraft(draft)).toBe(true);
+    expect(getFieldDraft(service.id, "suspend")).toEqual(draft);
+
+    clearFieldDraft(service.id, "suspend");
+    expect(getFieldDraft(service.id, "suspend")).toBeNull();
+  });
+
+  it("scopes drafts of the same action type by an explicit scope (e.g. zoneId)", () => {
+    const service = makeService();
+    saveFieldDraft({
+      serviceId: service.id,
+      actionType: "zoneResult",
+      scope: "zone-1",
+      payload: { status: "SERVICED" },
+      composedAgainst: snapshotService(service),
+      savedAt: "2026-09-05T09:00:00.000Z",
+    });
+    saveFieldDraft({
+      serviceId: service.id,
+      actionType: "zoneResult",
+      scope: "zone-2",
+      payload: { status: "PARTIAL" },
+      composedAgainst: snapshotService(service),
+      savedAt: "2026-09-05T09:00:00.000Z",
+    });
+
+    expect(getFieldDraft(service.id, "zoneResult", "zone-1")?.payload).toEqual({ status: "SERVICED" });
+    expect(getFieldDraft(service.id, "zoneResult", "zone-2")?.payload).toEqual({ status: "PARTIAL" });
+
+    clearFieldDraft(service.id, "zoneResult", "zone-1");
+    expect(getFieldDraft(service.id, "zoneResult", "zone-1")).toBeNull();
+    expect(getFieldDraft(service.id, "zoneResult", "zone-2")).not.toBeNull();
+  });
+
+  it("detects drift only when updatedAt differs", () => {
+    const service = makeService();
+    const snapshot = snapshotService(service);
+    expect(hasServiceDrifted(snapshot, service)).toBe(false);
+    expect(hasServiceDrifted(snapshot, { ...service, updatedAt: "2026-09-05T10:00:00.000Z" })).toBe(
+      true,
+    );
+  });
+});
+
+describe("submitFieldAction", () => {
+  it("clears any existing draft and returns success when the submit call succeeds", async () => {
+    const service = makeService();
+    saveFieldDraft({
+      serviceId: service.id,
+      actionType: "start",
+      payload: null,
+      composedAgainst: snapshotService(service),
+      savedAt: "2026-09-05T09:00:00.000Z",
+    });
+
+    const outcome = await submitFieldAction({
+      service,
+      actionType: "start",
+      payload: null,
+      submit: async () => ({ ...service, status: "IN_PROGRESS" }),
+    });
+
+    expect(outcome.kind).toBe("success");
+    expect(getFieldDraft(service.id, "start")).toBeNull();
+  });
+
+  it("saves a local draft on a real network failure instead of surfacing a generic error", async () => {
+    const service = makeService();
+
+    const outcome = await submitFieldAction({
+      service,
+      actionType: "suspend",
+      payload: { reason: "VEHICLE_BREAKDOWN", note: "no arranca" },
+      submit: async () => {
+        throw new NetworkFailureError();
+      },
+    });
+
+    expect(outcome.kind).toBe("draft-saved");
+    const stored = getFieldDraft(service.id, "suspend");
+    expect(stored?.payload).toEqual({ reason: "VEHICLE_BREAKDOWN", note: "no arranca" });
+    expect(stored?.composedAgainst.updatedAt).toBe(service.updatedAt);
+  });
+
+  it("reports when localStorage.setItem cannot save the draft", async () => {
+    const service = makeService();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+
+    const outcome = await submitFieldAction({
+      service,
+      actionType: "suspend",
+      payload: { reason: "VEHICLE_BREAKDOWN", note: "no arranca" },
+      submit: async () => {
+        throw new NetworkFailureError();
+      },
+    });
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
+  });
+
+  it("reports when reading localStorage itself throws while saving the draft", async () => {
+    const service = makeService();
+    const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("Storage access denied", "SecurityError");
+      },
+    });
+    expect(() => window.localStorage).toThrow("Storage access denied");
+
+    let outcome;
+    try {
+      outcome = await submitFieldAction({
+        service,
+        actionType: "suspend",
+        payload: { reason: "VEHICLE_BREAKDOWN", note: "no arranca" },
+        submit: async () => {
+          throw new NetworkFailureError();
+        },
+      });
+    } finally {
+      if (descriptor) Object.defineProperty(window, "localStorage", descriptor);
+      else Reflect.deleteProperty(window, "localStorage");
+    }
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
+  });
+
+  it("surfaces a normal error message for a non-network failure (no draft saved)", async () => {
+    const service = makeService();
+
+    const outcome = await submitFieldAction({
+      service,
+      actionType: "start",
+      payload: null,
+      submit: async () => {
+        throw new Error("El tipo de servicio requiere un vehículo operativo asignado.");
+      },
+    });
+
+    expect(outcome.kind).toBe("error");
+    expect(getFieldDraft(service.id, "start")).toBeNull();
+  });
+});
+
+describe("resubmitFieldAction / retryFieldDraft", () => {
+  it("applies the draft when the Service is unchanged since it was composed", async () => {
+    const service = makeService();
+    server.use(
+      http.get("*/api/services/:id", () => HttpResponse.json(service)),
+    );
+
+    const outcome = await resubmitFieldAction({
+      serviceId: service.id,
+      actionType: "resume",
+      composedAgainst: snapshotService(service),
+      payload: null,
+      submit: async () => ({ ...service, status: "IN_PROGRESS", statusReason: null }),
+    });
+
+    expect(outcome.kind).toBe("success");
+  });
+
+  it("returns a conflict — never applying the draft — when the Service changed server-side", async () => {
+    const service = makeService();
+    const composedAgainst = snapshotService(service);
+    const driftedService = { ...service, status: "CANCELLED" as const, updatedAt: "2026-09-05T11:00:00.000Z" };
+    server.use(http.get("*/api/services/:id", () => HttpResponse.json(driftedService)));
+
+    let submitCalled = false;
+    const outcome = await resubmitFieldAction({
+      serviceId: service.id,
+      actionType: "resume",
+      composedAgainst,
+      payload: null,
+      submit: async () => {
+        submitCalled = true;
+        return service;
+      },
+    });
+
+    expect(outcome.kind).toBe("conflict");
+    expect(submitCalled).toBe(false);
+    if (outcome.kind === "conflict") {
+      expect(outcome.current.status).toBe("CANCELLED");
+    }
+  });
+
+  it("retryFieldDraft resubmits the stored draft verbatim and clears it on success", async () => {
+    const service = makeService();
+    server.use(http.get("*/api/services/:id", () => HttpResponse.json(service)));
+
+    const draft: FieldDraft<{ note: string }> = {
+      serviceId: service.id,
+      actionType: "suspend",
+      payload: { note: "grúa en camino" },
+      composedAgainst: snapshotService(service),
+      savedAt: "2026-09-05T09:00:00.000Z",
+    };
+    saveFieldDraft(draft);
+
+    const outcome = await retryFieldDraft({
+      draft,
+      submit: async (payload) => ({ ...service, status: "SUSPENDED", statusReason: payload.note }),
+    });
+
+    expect(outcome.kind).toBe("success");
+    expect(getFieldDraft(service.id, "suspend")).toBeNull();
+  });
+
+  it("keeps the draft pending (still-offline) when the resubmit itself fails to connect", async () => {
+    const service = makeService();
+    server.use(http.get("*/api/services/:id", () => HttpResponse.json(service)));
+
+    const outcome = await resubmitFieldAction({
+      serviceId: service.id,
+      actionType: "resume",
+      composedAgainst: snapshotService(service),
+      payload: null,
+      submit: async () => {
+        throw new NetworkFailureError();
+      },
+    });
+
+    expect(outcome.kind).toBe("still-offline");
+    expect(getFieldDraft(service.id, "resume")).not.toBeNull();
+  });
+
+  it("reports an unsaved draft when an offline resubmit cannot re-save it", async () => {
+    const service = makeService();
+    server.use(http.get("*/api/services/:id", () => HttpResponse.json(service)));
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+
+    const outcome = await resubmitFieldAction({
+      serviceId: service.id,
+      actionType: "resume",
+      composedAgainst: snapshotService(service),
+      payload: null,
+      submit: async () => {
+        throw new NetworkFailureError();
+      },
+    });
+
+    expect(outcome).toEqual({
+      kind: "error",
+      message: "No se pudo guardar el borrador en este dispositivo. No cierre esta pantalla: sus datos siguen en el formulario.",
+      draftUnsaved: true,
+    });
+  });
+});

@@ -1,0 +1,67 @@
+// @ts-nocheck
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
+import { NextResponse } from "next/server";
+
+import { fetchBackend } from "@/lib/bff-backend";
+import { addServiceTypeFixture, filterServiceTypeFixtures, paginateServiceTypeFixtures } from "@/lib/service-type-fixtures";
+import { serviceTypeCategorySchema, serviceTypeCreateInputSchema, serviceTypeModeSchema, type ServiceTypeQuery } from "@/lib/service-types";
+import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
+
+
+
+
+
+function parseQuery(url: URL): ServiceTypeQuery {
+  const activeParam = url.searchParams.get("active");
+  const category = serviceTypeCategorySchema.safeParse(url.searchParams.get("category"));
+  const mode = serviceTypeModeSchema.safeParse(url.searchParams.get("mode"));
+  return {
+    active: activeParam === null ? undefined : activeParam === "true",
+    category: category.success ? category.data : undefined,
+    mode: mode.success ? mode.data : undefined,
+    search: searchParam(url.searchParams),
+    page: pageParam(url.searchParams),
+    pageSize: pageSizeParam(url.searchParams),
+  };
+}
+
+function requireOfficeCapability(request: Request) { return authorize(request, { office: true, officeMessage: "Solo Oficina puede administrar tipos de servicio.", capability: "serviceType:manage", throwOnError: true }).session; }
+
+export async function GET(request: Request) {
+  const path = new URL(request.url).pathname;
+  try {
+    const session = getRequiredSession(request);
+    const query = parseQuery(new URL(request.url));
+    if (backendMode(session)) {
+      const response = await fetchBackend(request, `/service-types${backendQuery(query, ["active", "category", "mode", "search", "page", "pageSize"])}`);
+      return forwardResponse(response);
+    }
+    return NextResponse.json(paginateServiceTypeFixtures(filterServiceTypeFixtures(query), query.page, query.pageSize));
+  } catch (error) {
+    if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
+    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+    return mapSessionError(error, path, "No se pudieron cargar los tipos de servicio.");
+  }
+}
+
+export async function POST(request: Request) {
+  const path = new URL(request.url).pathname;
+  try {
+    const session = requireOfficeCapability(request);
+    const parsed = await parseJsonBody(request, serviceTypeCreateInputSchema, path);
+    if (parsed instanceof Response) return parsed;
+    if (backendMode(session)) {
+      const response = await fetchBackend(request, "/service-types", "serviceType:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
+      return forwardResponse(response);
+    }
+    const created = { id: `st-${Date.now()}`, ...parsed.data, active: true };
+    addServiceTypeFixture(created);
+    return NextResponse.json(created, { status: 201 });
+  } catch (error) {
+    if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
+    if (error instanceof ForbiddenSessionError) return mapSessionError(error, path, error.message);
+    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+    return mapSessionError(error, path, "No se pudo crear el tipo de servicio.");
+  }
+}

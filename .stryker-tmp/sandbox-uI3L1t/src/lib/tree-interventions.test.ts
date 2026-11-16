@@ -1,0 +1,193 @@
+// @ts-nocheck
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  treeInterventionsAdapter,
+  TreeInterventionContractError,
+  TreeInterventionRequestError,
+} from "./tree-interventions";
+
+afterEach(() => vi.restoreAllMocks());
+
+const intervention = {
+  id: "intervention-1",
+  interventionType: "SAFETY_PRUNING",
+  treeIds: ["tree-2", "tree-4"],
+  address: "Parque del Bicentenario, sector norte",
+  requiresStreetClosure: true,
+  priority: "HIGH",
+  status: "REQUESTED",
+  serviceId: null,
+  justification: "Relevamiento 06/09/2026 (survey-2).",
+};
+const linkedTree = { treeId: "tree-2" };
+
+describe("treeInterventionsAdapter", () => {
+  it("accepts nullable address and priority from the backend", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ ...intervention, treeIds: undefined, address: null, priority: null, trees: [{ treeId: "tree-2" }] }],
+      meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 },
+    })));
+
+    await expect(treeInterventionsAdapter.list()).resolves.toMatchObject({
+      interventions: [{ id: "intervention-1", address: null, priority: null }],
+    });
+  });
+
+  it("drops an intervention with an unknown status instead of failing the whole list (#638)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ ...intervention, treeIds: undefined, id: "new", status: "FROM_THE_FUTURE", trees: [linkedTree] }, { ...intervention, treeIds: undefined, trees: [linkedTree] }],
+      meta: { total: 2, page: 1, pageSize: 10, totalPages: 1 },
+    })));
+
+    const page = await treeInterventionsAdapter.list();
+    expect(page.interventions.map((item) => item.id)).toEqual(["intervention-1"]);
+  });
+
+  it("accepts the documented list response with linked trees instead of tree ids", async () => {
+    const trees = [linkedTree];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ ...intervention, treeIds: undefined, trees }],
+      meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 },
+    })));
+
+    await expect(treeInterventionsAdapter.list()).resolves.toMatchObject({
+      interventions: [{ id: "intervention-1", treeIds: ["tree-2"] }],
+    });
+  });
+
+  it("forwards intervention filters and validates a paginated response", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ ...intervention, treeIds: undefined, trees: [linkedTree] }], meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 } })),
+    );
+
+    await expect(
+      treeInterventionsAdapter.list({ interventionType: "SAFETY_PRUNING", status: "REQUESTED", priority: "HIGH", page: 1, pageSize: 10 }),
+    ).resolves.toMatchObject({
+      interventions: [{ ...intervention, treeIds: ["tree-2"] }],
+      totalPages: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions?interventionType=SAFETY_PRUNING&status=REQUESTED&priority=HIGH&page=1&pageSize=10",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("creates a multi-tree request and reads detail with linked trees", async () => {
+    const detail = {
+      ...intervention,
+      treeIds: undefined,
+      trees: [{ treeId: "tree-2" }, { treeId: "tree-4" }],
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(intervention), { status: 201 }));
+    const input = {
+      interventionType: "SAFETY_PRUNING" as const,
+      treeIds: ["tree-2", "tree-4"],
+      address: intervention.address,
+      requiresStreetClosure: true,
+      priority: "HIGH" as const,
+      justification: intervention.justification,
+    };
+
+    await expect(treeInterventionsAdapter.create(input)).resolves.toEqual(intervention);
+    expect(fetchMock).toHaveBeenCalledWith("/api/tree-interventions", expect.objectContaining({ method: "POST", body: JSON.stringify(input) }));
+
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(detail)));
+    await expect(treeInterventionsAdapter.get("intervention-1")).resolves.toEqual(intervention);
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/tree-interventions/intervention-1", expect.objectContaining({ cache: "no-store" }));
+  });
+
+  it("submits removals for authorization without inventing a request body", async () => {
+    const pending = { ...intervention, interventionType: "REMOVAL", status: "PENDING_AUTHORIZATION" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(pending)));
+
+    await expect(treeInterventionsAdapter.submitForAuthorization("intervention-1")).resolves.toMatchObject({
+      status: "PENDING_AUTHORIZATION",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions/intervention-1/submit-for-authorization",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
+  });
+
+  it("authorizes without sending an identity (the backend takes it from the token)", async () => {
+    const authorized = {
+      ...intervention,
+      status: "AUTHORIZED",
+      authorizedByUserId: "user-lucia",
+      authorizedAt: "2026-09-07T14:30:00.000Z",
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(authorized)));
+
+    await expect(treeInterventionsAdapter.authorize("intervention-1")).resolves.toMatchObject(authorized);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions/intervention-1/authorize",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
+  });
+
+  it("rejects a removal without sending a reason to the backend", async () => {
+    const rejected = { ...intervention, interventionType: "REMOVAL", status: "REJECTED" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(rejected)));
+
+    await expect(treeInterventionsAdapter.reject("intervention-1")).resolves.toMatchObject({ status: "REJECTED" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions/intervention-1/reject",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).not.toHaveProperty("body");
+  });
+
+  it("assigns an existing Service and validates the updated intervention", async () => {
+    const linked = { ...intervention, status: "AUTHORIZED", serviceId: "SVC-1200" };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(linked)));
+
+    await expect(treeInterventionsAdapter.assignService("intervention-1", { serviceId: "SVC-1200" })).resolves.toMatchObject(linked);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tree-interventions/intervention-1/assign-service",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ serviceId: "SVC-1200" }),
+      }),
+    );
+  });
+
+  it("surfaces the duplicate-link conflict instead of treating it as success", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      statusCode: 409,
+      message: "La intervención ya tiene un servicio asociado.",
+      error: "Conflict",
+      timestamp: new Date().toISOString(),
+      path: "/api/tree-interventions/intervention-1/assign-service",
+    }), { status: 409 }));
+
+    await expect(treeInterventionsAdapter.assignService("intervention-1", { serviceId: "SVC-1200" })).rejects.toMatchObject({
+      constructor: TreeInterventionRequestError,
+      status: 409,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks removal without justification before making a request", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    await expect(treeInterventionsAdapter.create({
+      interventionType: "REMOVAL",
+      treeIds: ["tree-4"],
+      address: "Paseo de la Costa 220",
+      requiresStreetClosure: false,
+      priority: "CRITICAL",
+    })).rejects.toBeInstanceOf(TreeInterventionContractError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed success and error responses", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ malformed: true })));
+    await expect(treeInterventionsAdapter.list()).rejects.toBeInstanceOf(TreeInterventionContractError);
+
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ statusCode: 403, message: "Sin permiso", error: "Forbidden", timestamp: "now", path: "/api/tree-interventions" }), { status: 403 }));
+    await expect(treeInterventionsAdapter.list()).rejects.toMatchObject({ constructor: TreeInterventionRequestError, status: 403 });
+  });
+});

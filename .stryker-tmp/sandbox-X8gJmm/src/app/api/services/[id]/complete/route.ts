@@ -1,0 +1,190 @@
+// @ts-nocheck
+import { findServiceFixture } from "@/lib/bff-service-mock";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { NextResponse } from "next/server";
+
+import { fetchBackend, pathId } from "@/lib/bff-backend";
+import {
+  getZoneResultsByServiceId,
+  serviceFixtures,
+  updateServiceFixture,
+} from "@/lib/services-fixtures";
+import { MAX_NOTES_LENGTH } from "@/lib/input-limits";
+import { completeServiceInputSchema, type CompleteServiceInput, type ServiceStatus } from "@/lib/services";
+import {
+  completeRepairFixture,
+  confirmRelocationFixture,
+  containerFixtures,
+  emptyContainerFixture,
+  getContainerFixture,
+} from "@/lib/containers-fixtures";
+import { getScenario } from "@/lib/scenarios";
+import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { recordTelemetryEvent } from "@/lib/telemetry";
+
+
+
+
+
+function findTargetContainer(service: (typeof serviceFixtures)[number]) {
+  if (service.mode !== "POINT" || service.targetType !== "CONTAINER") return null;
+
+  return (
+    (service.targetId ? getContainerFixture(service.targetId) : null) ??
+    (service.targetRef ? containerFixtures.find((container) => container.code === service.targetRef) ?? null : null)
+  );
+}
+
+function transitionTargetContainer(
+  service: (typeof serviceFixtures)[number],
+  input: CompleteServiceInput,
+) {
+  const container = findTargetContainer(service);
+  if (!container) return;
+
+  switch (container.status) {
+    case "OVERFLOWED":
+      emptyContainerFixture(container.id);
+      break;
+    case "UNDER_REPAIR":
+      completeRepairFixture(container.id);
+      break;
+    case "RELOCATING":
+      if (!input.containerLocation) {
+        throw new Error("CONTAINER_LOCATION_REQUIRED");
+      }
+      confirmRelocationFixture(container.id, input.containerLocation);
+      break;
+    default:
+      break;
+  }
+}
+
+// Cada nota de zona ya es libre; unidas pueden superar el tope de notas del backend.
+// Se corta con una elipsis en lugar de rechazar el cierre.
+function capStatusReason(value: string): string {
+  return value.length > MAX_NOTES_LENGTH ? `${value.slice(0, MAX_NOTES_LENGTH - 1)}…` : value;
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const params = await context.params;
+  const serviceId = params.id;
+  const path = new URL(request.url).pathname;
+
+  try {
+    const session = getRequiredSession(request);
+    const scenario = getScenario(session);
+
+    authorize(session, { capability: "service:execute", capabilityMessage: "No tiene permisos para completar el servicio. Solo la persona responsable de la cuadrilla puede hacerlo.", throwOnError: true });
+
+    let completionInput: CompleteServiceInput = {};
+    const requestBody = await request.text();
+    if (requestBody.trim()) {
+      let parsedBody: unknown;
+      try {
+        parsedBody = JSON.parse(requestBody);
+      } catch {
+        return errorResponse(400, "El cuerpo de la solicitud debe ser un JSON válido.", path);
+      }
+      const parsedInput = completeServiceInputSchema.safeParse(parsedBody);
+      if (!parsedInput.success) {
+        return errorResponse(400, parsedInput.error.issues.map((issue) => issue.message).join(" "), path);
+      }
+      completionInput = parsedInput.data;
+    }
+
+    if (backendMode(session)) {
+      const scopedService = await requireCrewScope(request, session, { serviceId });
+      if (scopedService instanceof Response) return scopedService;
+      const backendInit: RequestInit = { method: "POST" };
+      if (requestBody.trim()) {
+        backendInit.headers = { "content-type": "application/json" };
+        backendInit.body = JSON.stringify(completionInput);
+      }
+      const backendResponse = await fetchBackend(
+        request,
+        `/services/${pathId(serviceId)}/complete`,
+        undefined,
+        backendInit,
+      );
+            return forwardResponse(backendResponse);
+    }
+
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
+
+    if (scenario.actor.kind === "FIELD" && scenario.actor.crewId) {
+      if (service.crewId !== scenario.actor.crewId) {
+        return errorResponse(403, "No tiene permisos para completar servicios de otra cuadrilla.", path);
+      }
+    }
+
+    if (service.status !== "IN_PROGRESS") {
+      return errorResponse(
+        409,
+        `Solo se pueden completar servicios en curso (IN_PROGRESS) (estado actual: ${service.status}).`,
+        path,
+      );
+    }
+
+    const results = getZoneResultsByServiceId(serviceId);
+    const missingZones = service.zoneIds.filter((zid) => !results.some((r) => r.zoneId === zid));
+    if (missingZones.length > 0) {
+      return errorResponse(
+        409,
+        `Falta registrar el resultado de ${missingZones.length} zona(s) del servicio antes de completar.`,
+        path,
+      );
+    }
+
+    // Backend-computed completion rollup
+    const allServiced = results.every((r) => r.status === "SERVICED");
+    const computedStatus: ServiceStatus = allServiced ? "COMPLETED" : "PARTIALLY_COMPLETED";
+    const historyLabel = computedStatus === "COMPLETED" ? "Completado" : "Parcial";
+
+    const nonServicedNotes = capStatusReason(
+      results
+        .filter((r) => r.status !== "SERVICED" && r.notes)
+        .map((r) => r.notes)
+        .join(" · "),
+    );
+
+    if (computedStatus === "COMPLETED") {
+      try {
+        transitionTargetContainer(service, completionInput);
+      } catch (error) {
+      if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
+        if (error instanceof Error && error.message === "CONTAINER_LOCATION_REQUIRED") {
+          return errorResponse(400, "La nueva ubicación del contenedor es obligatoria para completar la reubicación.", path);
+        }
+        throw error;
+      }
+    }
+
+    const updated = updateServiceFixture(service.id, {
+      status: computedStatus,
+      statusReason: computedStatus === "PARTIALLY_COMPLETED"
+        ? (nonServicedNotes || "Cierre parcial con zonas no atendidas o parciales")
+        : null,
+      history: [
+        ...service.history,
+        {
+          label: historyLabel,
+          at: new Date().toISOString().slice(0, 16).replace("T", " "),
+          done: true,
+        },
+      ],
+    });
+
+    return NextResponse.json(updated, { status: 200 });
+  } catch (caught: unknown) {
+    if (caught instanceof AuthUnavailableError || caught instanceof InvalidSessionError) {
+      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
+      return errorResponse(401, "La sesión no está activa o es inválida.", path);
+    }
+    return mapSessionError(caught, path, "Error interno del servidor.");
+  }
+}

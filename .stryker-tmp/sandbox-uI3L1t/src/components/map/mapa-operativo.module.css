@@ -1,0 +1,622 @@
+.workspace {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.workspace .tabs {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.heading h1 {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(1.75rem, 2.5vw, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.heading .refreshButton {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  flex: 0 0 auto;
+}
+
+.heading .refreshButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.viewSwitcher {
+  display: grid;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--space-4);
+  padding: 0 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+}
+
+.viewTab {
+  min-height: 40px;
+  white-space: normal;
+}
+
+.tabContent {
+  min-width: 0;
+}
+
+.layout,
+.loading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: var(--space-16);
+}
+
+.layout {
+  height: 620px;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.loading {
+  min-height: 620px;
+}
+
+.mapPanel,
+.sidePanel {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.mapPanel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mapToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-10) var(--space-14);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mapToolbar strong {
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.mapToolbar span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mapPlaceholder {
+  display: grid;
+  min-height: 568px;
+  flex: 1;
+  place-content: center;
+  gap: var(--space-8);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.mapPlaceholder svg {
+  margin-inline: auto;
+  color: var(--color-action);
+}
+
+.sidePanel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.viewPanel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-16);
+  overflow-y: auto;
+  padding: var(--space-14);
+}
+
+.panelIntro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.panelTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.panelTitleRow svg {
+  width: 20px;
+  color: var(--color-action);
+}
+
+.panelTitleRow h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.panelIntro p,
+.mapHint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.zoneList,
+.routeStopList,
+.todayZoneList,
+.todayServiceItems {
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+}
+
+.zoneButton,
+.routeStopButton {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-8);
+  text-align: left;
+}
+
+.zoneButton {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.routeStopCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.routeSummary strong,
+.todayServiceList h3 {
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.routeSummary span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.zoneSwatch,
+.todayStatus {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: var(--color-info-fill);
+}
+
+.belgrano { background: var(--color-info-fill); border-color: var(--color-info); }
+.palermo { background: var(--color-success-fill); border-color: var(--color-success); }
+.recoleta { background: var(--color-warning-fill); border-color: var(--color-warning); }
+.retiro { background: var(--color-danger-fill); border-color: var(--color-danger); }
+.colegiales { background: var(--color-info-fill); border-color: var(--color-info-line); }
+.montserrat { background: var(--color-success-fill); border-color: var(--color-success-line); }
+.puerto-madero { background: var(--color-warning-fill); border-color: var(--color-warning-line); }
+.san-nicolas { background: var(--color-danger-fill); border-color: var(--color-danger-line); }
+
+.mapHint {
+  margin-top: auto;
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--color-border);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.fieldGroup label {
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.routeSummary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-10);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.routeStopButton {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.sequenceBadge {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-action);
+  color: var(--color-on-institutional);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.duration {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.todaySummary {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayZoneItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.todayStatus {
+  border-radius: 50%;
+}
+
+.todayZoneItem > [data-slot="item-content"] {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.statusLabel {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: var(--space-4) var(--space-6);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pending { color: var(--color-info); background: var(--color-info-fill); border-color: var(--color-info-line); }
+.serviced { color: var(--color-success); background: var(--color-success-fill); border-color: var(--color-success-line); }
+.partial { color: var(--color-warning); background: var(--color-warning-fill); border-color: var(--color-warning-line); }
+.not_serviced { color: var(--color-danger); background: var(--color-danger-fill); border-color: var(--color-danger-line); }
+
+.todayServiceList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--color-border);
+}
+
+.todayServiceList h3 {
+  margin: 0;
+}
+
+.coverageLegend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+  padding-block: var(--space-10);
+  border-block: 1px solid var(--color-border);
+}
+
+.coverageLegendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.coverageLegendSwatch {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+}
+
+.coverageNoData { background: var(--color-surface-subtle); border-color: var(--color-border-strong); }
+.coverageLow { background: var(--color-danger-fill); border-color: var(--color-danger); }
+.coveragePartial { background: var(--color-warning-fill); border-color: var(--color-warning); }
+.coverageGood { background: var(--color-info-fill); border-color: var(--color-info); }
+.coverageHigh { background: var(--color-success-fill); border-color: var(--color-success); }
+
+.coverageSummary {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverageZoneList {
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+}
+
+.coverageZoneButton {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-8);
+  text-align: left;
+}
+
+.coverageZoneCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sideRegion {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.sideLoading {
+  min-height: 300px;
+  padding: var(--space-14);
+}
+
+.layers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-14);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.layers legend {
+  margin-bottom: var(--space-8);
+  padding: 0;
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.layerControl {
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-10);
+  border-radius: 12px;
+  padding: var(--space-8);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.layerControl:hover {
+  background: var(--color-surface-subtle);
+}
+
+.layerControl small,
+.listHeading span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.layerSwatch,
+.listMarker {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+}
+
+.containers { background: var(--color-info-fill); border-color: var(--color-info); }
+.greenPoints { background: var(--color-success-fill); border-color: var(--color-success); }
+.greenSpaces { background: var(--color-success-fill); border-color: var(--color-success); }
+.trees { background: var(--color-info-fill); border-color: var(--color-action); }
+.action { background: var(--color-action); border-color: var(--color-action); }
+.info { background: var(--color-info); border-color: var(--color-info); }
+.success { background: var(--color-success); border-color: var(--color-success); }
+.warning { background: var(--color-warning); border-color: var(--color-warning); }
+.danger { background: var(--color-danger); border-color: var(--color-danger); }
+
+.visibleList {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.listHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-14) var(--space-14) var(--space-8);
+}
+
+.listHeading h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.locationNotice {
+  margin: 0;
+  padding: 0 var(--space-14) var(--space-10);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.visibleItemGroup {
+  gap: var(--space-4);
+  min-height: 0;
+  flex: 1;
+  margin: 0;
+  padding: 0 var(--space-8) var(--space-8);
+  overflow-y: auto;
+  scrollbar-color: var(--color-border-strong) var(--color-surface-subtle);
+  scrollbar-width: thin;
+}
+
+.visibleItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-10);
+}
+
+.visibleItemContent {
+  min-width: 0;
+}
+
+.itemButton {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0;
+  text-align: left;
+}
+
+.listMarker {
+  margin-top: 3px;
+}
+
+.emptyState {
+  min-height: 260px;
+  border: 0;
+}
+
+.loadingMap {
+  min-height: 0;
+  border-radius: 0;
+}
+
+@media (max-width: 1024px) {
+  .layout,
+  .loading {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace { gap: var(--space-16); }
+  .workspace .tabs { gap: var(--space-16); }
+  .viewSwitcher {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .viewSwitcher > :global([role="tab"]) {
+    flex: 0 0 auto;
+    padding-right: var(--space-12);
+    padding-left: var(--space-12);
+    white-space: nowrap;
+  }
+  .viewTab { min-height: 48px; }
+  .heading .refreshButton {
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    min-height: 48px;
+  }
+  .layout,
+  .loading {
+    min-height: 0;
+    grid-template-columns: 1fr;
+  }
+  .layout { height: auto; grid-template-rows: auto; }
+  .layout:not(.layoutInventory) .mapPanel {
+    height: min(65vh, calc(100dvh - 440px));
+    min-height: 190px;
+  }
+  .layoutInventory {
+    position: relative;
+    display: block;
+    height: min(65vh, calc(100dvh - 440px));
+    min-height: 190px;
+    overflow: hidden;
+    border-radius: 16px;
+    background: var(--color-surface);
+    isolation: isolate;
+  }
+  .layoutInventory .mapPanel {
+    position: relative;
+    z-index: 0;
+    height: 100%;
+    border: 0;
+    border-radius: inherit;
+  }
+  .layoutInventory .mapPanel :global(.leaflet-container) { min-height: 0; }
+  .mapPlaceholder { min-height: 0; }
+  .sidePanel { max-height: 52vh; }
+  .layerControl { min-height: 48px; }
+  .itemButton { min-height: 48px; }
+  .routeStopButton,
+  .zoneButton { min-height: 48px; }
+  .loadingMap { min-height: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layerControl { transition: none; }
+}

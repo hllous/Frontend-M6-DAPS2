@@ -1,0 +1,189 @@
+// @ts-nocheck
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { delay, http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+
+import { scenarios } from "@/lib/scenarios";
+import {
+  complianceIndicatorFixture,
+  coverageIndicatorFixture,
+  incidentsIndicatorFixture,
+  wasteIndicatorFixture,
+} from "@/lib/indicator-fixtures";
+import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
+import { handlers } from "@/mocks/handlers";
+
+import { IndicatorsDashboard } from "./indicators-dashboard";
+
+const server = setupServer(...handlers);
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => {
+  server.resetHandlers();
+  vi.unstubAllGlobals();
+  window.history.replaceState(null, "", "/");
+  olvidarCatalogoDeEtiquetas();
+});
+afterAll(() => server.close());
+
+async function familyCard(label: string) {
+  const user = userEvent.setup();
+  const back = screen.queryByRole("button", { name: "Volver a Tableros" });
+  if (back) await user.click(back);
+  await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+  await user.click(await screen.findByRole("menuitem", { name: label }));
+  return screen.findByRole("region", { name: `Resumen de ${label}` });
+}
+
+describe("metas de las tarjetas de indicadores", () => {
+  it("muestra meta, sentido y estado para indicadores con meta, y aclara cuando falta", async () => {
+    server.use(
+      http.get("*/api/indicators/coverage", () => HttpResponse.json({
+        ...coverageIndicatorFixture,
+        totals: { ...coverageIndicatorFixture.totals, coveragePct: 96 },
+      })),
+      http.get("*/api/indicators/compliance", () => HttpResponse.json({
+        ...complianceIndicatorFixture,
+        finished: { ...complianceIndicatorFixture.finished, onTimePct: 82 },
+      })),
+      http.get("*/api/indicators/incidents", () => HttpResponse.json(incidentsIndicatorFixture)),
+      http.get("*/api/indicators/waste", () => HttpResponse.json(wasteIndicatorFixture)),
+    );
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const coverage = await familyCard("Cobertura");
+    expect(await within(coverage).findByText("Cumple la meta")).toBeVisible();
+    expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
+    expect(within(coverage).getByText("más es mejor")).toBeVisible();
+
+    const compliance = await familyCard("Cumplimiento");
+    expect(await within(compliance).findByText("Bajo la meta")).toBeVisible();
+    expect(within(compliance).getByText("Meta ≥ 90 %")).toBeVisible();
+    expect(within(compliance).getByText("más es mejor")).toBeVisible();
+
+    const incidents = await familyCard("Incidencias");
+    expect(await within(incidents).findByText("Cumple la meta")).toBeVisible();
+    expect(within(incidents).getByText("1,8 días hábiles")).toBeVisible();
+    expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
+    expect(within(incidents).getByText("menos es mejor")).toBeVisible();
+    expect(within(incidents).getByText(/Resolución media en días corridos:/)).toHaveTextContent("2,4 días");
+
+    const waste = await familyCard("Residuos");
+    expect(await within(waste).findByText("Sin meta definida")).toBeVisible();
+    expect(within(waste).queryByText("más es mejor")).not.toBeInTheDocument();
+    expect(within(waste).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
+  });
+
+  it("reserva el rojo para lo que empeora: bajo la meta pero mejorando es advertencia", async () => {
+    const compliance = (delta: number) => http.get("*/api/indicators/compliance", () => HttpResponse.json({
+      ...complianceIndicatorFixture,
+      finished: { ...complianceIndicatorFixture.finished, onTimePct: 82 },
+      delta: { ...complianceIndicatorFixture.delta, onTimePct: delta },
+    }));
+    server.use(compliance(3));
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    const improving = await familyCard("Cumplimiento");
+    expect((await within(improving).findByText("Bajo la meta")).closest("[data-slot=badge]")).toHaveAttribute("data-variant", "warning");
+  });
+
+  it("marca en rojo el estado bajo la meta cuando además empeora", async () => {
+    server.use(http.get("*/api/indicators/compliance", () => HttpResponse.json({
+      ...complianceIndicatorFixture,
+      finished: { ...complianceIndicatorFixture.finished, onTimePct: 82 },
+      delta: { ...complianceIndicatorFixture.delta, onTimePct: -3 },
+    })));
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+    const worsening = await familyCard("Cumplimiento");
+    expect((await within(worsening).findByText("Bajo la meta")).closest("[data-slot=badge]")).toHaveAttribute("data-variant", "danger");
+  });
+
+  it("marca sobre la meta cuando las incidencias superan el máximo", async () => {
+    server.use(http.get("*/api/indicators/incidents", () => HttpResponse.json({
+      ...incidentsIndicatorFixture,
+      reports: { ...incidentsIndicatorFixture.reports, avgResolutionBusinessDays: 8.2 },
+    })));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const incidents = await familyCard("Incidencias");
+    expect(await within(incidents).findByText("Sobre la meta")).toBeVisible();
+    expect(within(incidents).getByText("8,2 días hábiles")).toBeVisible();
+    expect(within(incidents).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
+    expect(within(incidents).getByText("menos es mejor")).toBeVisible();
+    expect(within(incidents).getByText(/Resolución media en días corridos:/)).toHaveTextContent("2,4 días");
+  });
+
+  it("muestra los mismos datos de la familia seleccionada en la pestaña móvil Resumen", async () => {
+    vi.stubGlobal("matchMedia", vi.fn().mockImplementation(() => ({
+      matches: true,
+      media: "(max-width: 760px)",
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const incidents = await familyCard("Incidencias");
+    await within(incidents).findByText("Cumple la meta");
+
+
+    const summary = screen.getByRole("tabpanel");
+    expect(within(summary).getByText("1,8 días hábiles")).toBeVisible();
+    expect(within(summary).getByText("Meta ≤ 5 días hábiles")).toBeVisible();
+    expect(within(summary).getByText("menos es mejor")).toBeVisible();
+    expect(within(summary).getByText("Cumple la meta")).toBeVisible();
+  });
+
+  it("no muestra un estado mientras los datos de una familia cargan", async () => {
+    server.use(http.get("*/api/indicators/coverage", async () => {
+      await delay("infinite");
+      return HttpResponse.json(coverageIndicatorFixture);
+    }));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const coverage = await familyCard("Cobertura");
+    expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
+    expect(within(coverage).getByText("más es mejor")).toBeVisible();
+    expect(within(coverage).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
+  });
+
+  it("no muestra un estado cuando una familia no tiene resultados", async () => {
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json({
+      ...coverageIndicatorFixture,
+      byZone: [],
+      byServiceType: [],
+    })));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const coverage = await familyCard("Cobertura");
+
+    expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
+    expect(within(coverage).getByText("más es mejor")).toBeVisible();
+    expect(within(coverage).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
+  });
+
+  it("no conserva un estado de meta cuando falla la carga de una familia", async () => {
+    server.use(http.get("*/api/indicators/coverage", () => HttpResponse.json(
+      { statusCode: 503, message: "Servicio no disponible" },
+      { status: 503 },
+    )));
+
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    const coverage = await familyCard("Cobertura");
+    expect(await screen.findByText(/No se pudo actualizar Cobertura/)).toBeVisible();
+    expect(within(coverage).queryByLabelText("Cargando resumen")).not.toBeInTheDocument();
+    expect(within(coverage).getByText("Sin datos disponibles.")).toBeVisible();
+    expect(within(coverage).getByText("Meta ≥ 95 %")).toBeVisible();
+    expect(within(coverage).getByText("más es mejor")).toBeVisible();
+    expect(within(coverage).queryByText(/Cumple la meta|Bajo la meta|Sobre la meta/)).not.toBeInTheDocument();
+  });
+});

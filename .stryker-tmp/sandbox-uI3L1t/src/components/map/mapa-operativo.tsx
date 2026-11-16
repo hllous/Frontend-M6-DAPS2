@@ -1,0 +1,1181 @@
+// @ts-nocheck
+"use client";
+
+import { Activity, AlertTriangle, Boxes, MapPinned, RefreshCw, Route as RouteIcon } from "lucide-react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { ListItemsSkeleton, MapPaneSkeleton } from "@/components/ui/loading-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Toggle } from "@/components/ui/toggle";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { todayInArgentina } from "@/lib/argentina-date";
+import { CONTAINER_STATUS_LABELS } from "@/lib/containers";
+import { indicatorsAdapter, type CoverageIndicator } from "@/lib/indicators";
+import {
+  buildCoverageZoneOverlays,
+  COVERAGE_BAND_CLASSES,
+  COVERAGE_BAND_LABELS,
+  type CoverageZoneOverlay,
+} from "@/lib/map-coverage";
+import {
+  operationalMapAdapter,
+  type OperationalMapData,
+} from "@/lib/operational-map";
+import {
+  buildTodayZoneCoverage,
+  loadRoute,
+  loadTodayServiceCoverage,
+  operationalZonesAdapter,
+  routeToStopOverlays,
+  type OperationalZone,
+  type TodayServiceCoverage,
+} from "@/lib/operational-zones";
+import { routesAdapter, type Route } from "@/lib/routes";
+import type { OperationalScenario } from "@/lib/scenarios";
+import { ZONE_RESULT_STATUS_LABEL } from "@/lib/services";
+import type { RiskLevel } from "@/lib/tree-surveys";
+import { treeCatalogHref } from "@/lib/trees";
+import { cn } from "@/lib/utils";
+
+import { InventoryMapDrawer } from "./inventory-map-drawer";
+import type { OperationalMapView } from "./operational-map-canvas";
+import { mapWithConcurrency } from "@/lib/map-concurrency";
+import styles from "./mapa-operativo.module.css";
+
+type LayerId = keyof OperationalMapData;
+
+type MapListItem = {
+  id: string;
+  layer: LayerId;
+  title: string;
+  description: string;
+  lat: number | null;
+  lng: number | null;
+  markerSymbol: string;
+  markerTone: "info" | "success" | "warning" | "danger" | "action";
+};
+
+type MapViewOption = {
+  id: OperationalMapView;
+  label: string;
+  title: string;
+};
+
+const mapViews: MapViewOption[] = [
+  { id: "inventory", label: "Inventario", title: "Inventario" },
+  { id: "zones", label: "Zonas", title: "Zonas" },
+  { id: "coverage", label: "Cobertura", title: "Cobertura por zona" },
+  { id: "route", label: "Recorrido", title: "Recorrido" },
+  { id: "today", label: "Hoy", title: "Hoy" },
+];
+
+const OperationalMapCanvas = dynamic(
+  () => import("./operational-map-canvas").then((module) => module.OperationalMapCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <LoadingRegion label="Mapa" className={styles.mapPlaceholder}>
+        <MapPaneSkeleton className="min-h-0" />
+      </LoadingRegion>
+    ),
+  },
+);
+
+const layerLabels: Record<LayerId, string> = {
+  containers: "Contenedores",
+  greenPoints: "Puntos verdes",
+  greenSpaces: "Espacios verdes",
+  trees: "Arbolado",
+};
+
+const initialLayers: Record<LayerId, boolean> = {
+  containers: true,
+  greenPoints: true,
+  greenSpaces: true,
+  trees: true,
+};
+
+const mapLoadError = "No se pudo cargar el mapa. Intente nuevamente.";
+const viewLoadError = "No se pudo cargar esta vista. Intente nuevamente.";
+
+const wasteTypeLabels = {
+  HOUSEHOLD: "Domiciliarios",
+  RECYCLABLE: "Reciclables",
+  BULKY: "Voluminosos",
+  GREEN: "Restos verdes",
+  MIXED: "Mixtos",
+} as const;
+
+const wasteMarkerTones = {
+  HOUSEHOLD: "action",
+  RECYCLABLE: "info",
+  BULKY: "warning",
+  GREEN: "success",
+  MIXED: "danger",
+} as const;
+
+const greenSpaceTypeLabels = {
+  SQUARE: "Plaza",
+  PARK: "Parque",
+  PLANTER: "Cantero",
+  MEDIAN: "Bulevar",
+  PROMENADE: "Paseo",
+} as const;
+
+const greenSpaceMarkerTones = {
+  SQUARE: "success",
+  PARK: "success",
+  PLANTER: "warning",
+  MEDIAN: "info",
+  PROMENADE: "action",
+} as const;
+
+const treeRiskLabels: Record<RiskLevel, string> = {
+  NONE: "Sin riesgo",
+  LOW: "Riesgo bajo",
+  MEDIUM: "Riesgo medio",
+  HIGH: "Riesgo alto",
+  CRITICAL: "Riesgo crítico",
+};
+
+const treeRiskMarkerTones: Record<RiskLevel, MapListItem["markerTone"]> = {
+  NONE: "success",
+  LOW: "info",
+  MEDIUM: "warning",
+  HIGH: "danger",
+  CRITICAL: "danger",
+};
+
+const todayStatusLabels = {
+  PENDING: "Pendiente",
+  SERVICED: "Atendida",
+  PARTIAL: "Parcial",
+  NOT_SERVICED: "No atendida",
+} as const;
+
+const coverageBandSwatchClass = {
+  "no-data": "coverageNoData",
+  low: "coverageLow",
+  partial: "coveragePartial",
+  good: "coverageGood",
+  high: "coverageHigh",
+} as const;
+
+function toListItems(data: OperationalMapData): MapListItem[] {
+  return [
+    ...data.containers.map((item) => ({
+      id: item.id,
+      layer: "containers" as const,
+      title: item.code,
+      description: `${item.address} · ${CONTAINER_STATUS_LABELS[item.status]}`,
+      lat: item.lat,
+      lng: item.lng,
+      markerSymbol: "C",
+      markerTone: item.status === "DAMAGED" || item.status === "REMOVED"
+        ? "danger" as const
+        : item.status === "OVERFLOWED" || item.status === "UNDER_REPAIR"
+          ? "warning" as const
+          : item.status === "RELOCATING"
+            ? "info" as const
+            : "success" as const,
+    })),
+    ...data.greenPoints.map((item) => ({
+      id: item.id,
+      layer: "greenPoints" as const,
+      title: item.name,
+      description: `${item.address ?? "Sin dirección"} · ${item.wasteTypes.map((type) => wasteTypeLabels[type]).join(", ")}`,
+      lat: item.lat,
+      lng: item.lng,
+      markerSymbol: "P",
+      markerTone: wasteMarkerTones[item.wasteTypes[0] ?? "MIXED"],
+    })),
+    ...data.greenSpaces.map((item) => ({
+      id: item.id,
+      layer: "greenSpaces" as const,
+      title: item.name,
+      description: item.areaM2 === null ? `${greenSpaceTypeLabels[item.spaceType]} · sin superficie` : `${greenSpaceTypeLabels[item.spaceType]} · ${Math.round(item.areaM2).toLocaleString("es-AR")} m²`,
+      lat: item.lat,
+      lng: item.lng,
+      markerSymbol: "E",
+      markerTone: greenSpaceMarkerTones[item.spaceType],
+    })),
+    ...data.trees.map((item) => ({
+      id: item.id,
+      layer: "trees" as const,
+      title: item.surveyCode,
+      description: `${item.species} · ${item.address ?? "Sin dirección"} · ${item.lastSurvey ? treeRiskLabels[item.lastSurvey.riskLevel] : "Sin relevamiento"}`,
+      lat: item.lat,
+      lng: item.lng,
+      markerSymbol: item.lastSurvey ? "A" : "?",
+      markerTone: item.lastSurvey ? treeRiskMarkerTones[item.lastSurvey.riskLevel] : "action" as const,
+    })),
+  ];
+}
+
+function formatTodayDate(date: string) {
+  return formatCalendarDate(date);
+}
+
+function formatCalendarDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value) return value;
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+function formatMapDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return value;
+  const timeZone = "America/Argentina/Buenos_Aires";
+  const dateLabel = new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone,
+  }).format(date);
+  const timeLabel = new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).format(date);
+  return `${dateLabel} ${timeLabel}`;
+}
+
+function activeZoneRecords(zones: OperationalZone[]) {
+  return zones.flatMap((item) => item.zone ? [item.zone] : []);
+}
+
+export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
+  const [data, setData] = useState<OperationalMapData | null>(null);
+  const [lastConsultedAt, setLastConsultedAt] = useState<string | null>(null);
+  const [zones, setZones] = useState<OperationalZone[]>([]);
+  const [enabledLayers, setEnabledLayers] = useState(initialLayers);
+  const [view, setView] = useState<OperationalMapView>("inventory");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [viewError, setViewError] = useState<string | null>(null);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [inventoryComplete, setInventoryComplete] = useState(false);
+  const [routesLoaded, setRoutesLoaded] = useState(false);
+  const [routeDetailRequestVersion, setRouteDetailRequestVersion] = useState(0);
+  const [selectedRouteId, setSelectedRouteId] = useState("");
+  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
+  const [todayServices, setTodayServices] = useState<TodayServiceCoverage[]>([]);
+  const [todayLoaded, setTodayLoaded] = useState(false);
+  const [isTodayLoading, setIsTodayLoading] = useState(false);
+  const [coverage, setCoverage] = useState<CoverageIndicator | null>(null);
+  const [coverageLoaded, setCoverageLoaded] = useState(false);
+  const [isCoverageLoading, setIsCoverageLoading] = useState(false);
+  const [selectedStopSequence, setSelectedStopSequence] = useState<number | null>(null);
+  const [selectedZoneCode, setSelectedZoneCode] = useState<string | null>(null);
+  const [selectedMapItemKey, setSelectedMapItemKey] = useState<string | null>(null);
+  const viewSwitcherRef = useRef<HTMLDivElement>(null);
+  // El árbol seleccionado vive en la URL (`tree`), igual que en el catálogo de arbolado.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedTreeId = searchParams.get("tree");
+  const selectTree = (treeId: string | null) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (treeId) next.set("tree", treeId); else next.delete("tree");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  };
+  const availableMapViews = mapViews.filter(
+    (option) => option.id !== "coverage" || scenario.capabilities.includes("indicator:view"),
+  );
+
+  const load = useCallback(async () => {
+    operationalMapAdapter.invalidate(true);
+    setInventoryComplete(false);
+    setIsLoading(!data);
+    setError(null);
+    setViewError(null);
+    if (view === "coverage") {
+      setCoverage(null);
+      setCoverageLoaded(false);
+      setIsCoverageLoading(true);
+    }
+    if (view === "route") {
+      setRoutesLoaded(false);
+      setRouteDetailRequestVersion((version) => version + 1);
+      setIsRouteLoading(true);
+    }
+    if (view === "today") {
+      setTodayServices([]);
+      setTodayLoaded(false);
+      setIsTodayLoading(true);
+    }
+    try {
+      const [nextData, nextZones] = await Promise.all([
+        operationalMapAdapter.load(),
+        operationalZonesAdapter.list().then((loadedZones) => { setZones(loadedZones); return loadedZones; }),
+      ]);
+      setData(nextData);
+      setInventoryComplete(true);
+      setZones(nextZones);
+      setLastConsultedAt(new Date().toISOString());
+    } catch {
+      setError(mapLoadError);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [view, data]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const unsubscribe = operationalMapAdapter.subscribe((partial) => {
+      if (isCurrent && Object.values(partial).some((items) => items.length > 0)) { setData(partial); setIsLoading(false); }
+    });
+
+    const zonesPromise = operationalZonesAdapter.list().then((loadedZones) => {
+      if (isCurrent) setZones(loadedZones);
+      return loadedZones;
+    });
+    Promise.all([operationalMapAdapter.load(), zonesPromise]).then(
+      ([nextData, nextZones]) => {
+        if (!isCurrent) return;
+        setData(nextData);
+        setInventoryComplete(true);
+        setZones(nextZones);
+        setLastConsultedAt(new Date().toISOString());
+        setIsLoading(false);
+      },
+      () => {
+        if (!isCurrent) return;
+        setError(mapLoadError);
+        setIsLoading(false);
+      },
+    );
+
+    return () => {
+      isCurrent = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (view !== "route" || routesLoaded) return;
+    let isCurrent = true;
+
+    void (async () => {
+      const firstPage = await routesAdapter.list({ active: true, page: 1, pageSize: 100 });
+      const nextRoutes = [...firstPage.routes];
+
+      const remaining = await mapWithConcurrency(
+        Array.from({ length: Math.max(0, firstPage.totalPages - 1) }, (_, index) => index + 2),
+        6,
+        (page) => routesAdapter.list({ active: true, page, pageSize: 100 }),
+      );
+      if (!isCurrent) return;
+      nextRoutes.push(...remaining.flatMap((page) => page.routes));
+
+      if (isCurrent) {
+        setRoutes(nextRoutes);
+        setSelectedRouteId((current) => current || nextRoutes[0]?.id || "");
+        setRoutesLoaded(true);
+        setLastConsultedAt(new Date().toISOString());
+      }
+    })().catch(() => {
+      if (!isCurrent) return;
+      setViewError(viewLoadError);
+      setRoutesLoaded(true);
+      setIsRouteLoading(false);
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [routesLoaded, view]);
+
+  useEffect(() => {
+    if (view !== "route" || !selectedRouteId) return;
+    let isCurrent = true;
+
+    void loadRoute(selectedRouteId).then(
+      (route) => {
+        if (!isCurrent) return;
+        setSelectedRoute(route);
+        setIsRouteLoading(false);
+        setLastConsultedAt(new Date().toISOString());
+      },
+      (reason) => {
+        if (!isCurrent) return;
+        setSelectedRoute(null);
+        setViewError(viewLoadError);
+        setIsRouteLoading(false);
+      },
+    );
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [routeDetailRequestVersion, selectedRouteId, view]);
+
+  useEffect(() => {
+    if (view !== "today" || todayLoaded) return;
+    let isCurrent = true;
+
+    void loadTodayServiceCoverage(todayInArgentina()).then(
+      (coverage) => {
+        if (!isCurrent) return;
+        setTodayServices(coverage);
+        setTodayLoaded(true);
+        setIsTodayLoading(false);
+        setLastConsultedAt(new Date().toISOString());
+      },
+      () => {
+        if (!isCurrent) return;
+        setViewError(viewLoadError);
+        setTodayLoaded(true);
+        setIsTodayLoading(false);
+      },
+    );
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [todayLoaded, view]);
+
+  useEffect(() => {
+    if (view !== "coverage" || coverageLoaded) return;
+    let isCurrent = true;
+
+    void indicatorsAdapter.getCoverage().then(
+      (nextCoverage) => {
+        if (!isCurrent) return;
+        setCoverage(nextCoverage);
+        setCoverageLoaded(true);
+        setIsCoverageLoading(false);
+        setLastConsultedAt(new Date().toISOString());
+      },
+      () => {
+        if (!isCurrent) return;
+        setViewError(viewLoadError);
+        setCoverageLoaded(true);
+        setIsCoverageLoading(false);
+      },
+    );
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [coverageLoaded, view]);
+
+  const items = useMemo(() => (data ? toListItems(data) : []), [data]);
+  const visibleItems = items.filter((item) => enabledLayers[item.layer]);
+  const locatedItems = visibleItems.filter(
+    (item): item is MapListItem & { lat: number; lng: number } => item.lat !== null && item.lng !== null,
+  );
+  const unlocatedCount = visibleItems.length - locatedItems.length;
+  const routeStops = useMemo(
+    () => selectedRoute ? routeToStopOverlays(selectedRoute, activeZoneRecords(zones)) : [],
+    [selectedRoute, zones],
+  );
+  const todayZoneCoverage = useMemo(
+    () => buildTodayZoneCoverage(todayServices, activeZoneRecords(zones)),
+    [todayServices, zones],
+  );
+  const coverageZoneOverlays = useMemo(
+    () => buildCoverageZoneOverlays(zones, coverage),
+    [coverage, zones],
+  );
+  const currentView = availableMapViews.find((item) => item.id === view) ?? availableMapViews[0]!;
+  const isViewLoading = view === "route"
+    ? isRouteLoading || !routesLoaded
+    : view === "today"
+      ? isTodayLoading || !todayLoaded
+      : view === "coverage"
+        ? isCoverageLoading || !coverageLoaded
+        : false;
+
+  const handleViewChange = (nextView: OperationalMapView) => {
+    setView(nextView);
+    setViewError(null);
+    if (nextView === "today" && !todayLoaded) setIsTodayLoading(true);
+    if (nextView === "route" && routesLoaded && selectedRouteId) setIsRouteLoading(true);
+    if (nextView === "coverage" && !coverageLoaded) setIsCoverageLoading(true);
+  };
+
+  const handleRouteChange = (nextRouteId: string) => {
+    setSelectedRouteId(nextRouteId);
+    setSelectedRoute(null);
+    setSelectedStopSequence(null);
+    setViewError(null);
+    setIsRouteLoading(Boolean(nextRouteId));
+  };
+
+  const selectInventoryItem = (item: MapListItem) => {
+    const itemKey = `${item.layer}-${item.id}`;
+    const currentKey = selectedTreeId ? `trees-${selectedTreeId}` : selectedMapItemKey;
+    const nextKey = currentKey === itemKey ? null : itemKey;
+    setSelectedMapItemKey(nextKey);
+    if (item.layer === "trees") selectTree(nextKey ? item.id : null);
+    else if (selectedTreeId) selectTree(null);
+  };
+
+  const selectInventoryMarker = (marker: { id: string; layer: string }) => {
+    setSelectedMapItemKey(`${marker.layer}-${marker.id}`);
+    if (marker.layer === "trees") selectTree(marker.id);
+    else if (selectedTreeId) selectTree(null);
+  };
+
+  const selectedMarkerKey = selectedTreeId ? `trees-${selectedTreeId}` : selectedMapItemKey;
+
+  return (
+    <section className={styles.workspace} aria-labelledby="mapa-operativo-title">
+      <Tabs
+        value={view}
+        onValueChange={(nextView) => {
+          if (typeof nextView !== "string") return;
+          const nextLabel = availableMapViews.find((option) => option.id === nextView)?.label;
+          const nextTab = Array.from(
+            viewSwitcherRef.current?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [],
+          ).find((tab) => tab.textContent?.trim() === nextLabel);
+          if (nextTab && typeof nextTab.scrollIntoView === "function") {
+            nextTab.scrollIntoView({ block: "nearest", inline: "nearest" });
+          }
+          handleViewChange(nextView as OperationalMapView);
+        }}
+        className={styles.tabs}
+      >
+        <header className={styles.heading}>
+          <h1 id="mapa-operativo-title">Mapa operativo</h1>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    className={styles.refreshButton}
+                    variant="outline"
+                    size="icon"
+                    type="button"
+                    aria-label="Actualizar"
+                    onClick={() => void load()}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw aria-hidden />
+                  </Button>
+                }
+              />
+              <TooltipContent>Actualizar</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </header>
+
+        <TabsList
+          ref={viewSwitcherRef}
+          activateOnFocus
+          className={styles.viewSwitcher}
+          variant="line"
+          aria-label="Vistas"
+        >
+          {availableMapViews.map((option) => (
+            <TabsTrigger key={option.id} value={option.id} className={styles.viewTab}>
+              {option.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTriangle aria-hidden />
+            <AlertTitle>No se pudo cargar el mapa</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              Reintentar
+            </Button>
+          </Alert>
+        ) : null}
+
+        <TabsContent value={view} id={`map-view-${view}`} className={styles.tabContent}>
+          {viewError ? (
+            <Alert variant="destructive">
+              <AlertTriangle aria-hidden />
+              <AlertTitle>No se pudo cargar la vista</AlertTitle>
+              <AlertDescription>{viewError}</AlertDescription>
+              <Button variant="outline" size="sm" onClick={() => {
+                setViewError(null);
+                if (view === "route") {
+                  setRoutesLoaded(false);
+                } else if (view === "today") {
+                  setTodayLoaded(false);
+                } else if (view === "coverage") {
+                  setCoverage(null);
+                  setCoverageLoaded(false);
+                }
+              }}>
+                Reintentar
+              </Button>
+            </Alert>
+          ) : null}
+
+          <LoadingRegion label="Mapa" isLoading={isLoading}>
+          {isLoading ? <MapLoading /> : data ? (
+            <div className={cn(styles.layout, view === "inventory" && styles.layoutInventory)}>
+              <div className={styles.mapPanel}>
+                <div className={styles.mapToolbar}>
+                  <strong>{currentView.title}</strong>
+                  <span>{mapToolbarSummary(view, locatedItems.length, zones, routeStops.length, todayServices.length, coverageZoneOverlays)}</span>
+                  {lastConsultedAt ? <span>Consultado {formatMapDateTime(lastConsultedAt)}</span> : null}
+                </div>
+                <OperationalMapCanvas
+                  view={view}
+                  viewLoading={isViewLoading}
+                  inventoryComplete={inventoryComplete}
+                  markers={locatedItems}
+                  zones={zones}
+                  routeStops={routeStops}
+                  todayZones={todayZoneCoverage}
+                  coverageZones={coverageZoneOverlays}
+                  selectedStopSequence={selectedStopSequence}
+                  onSelectStop={setSelectedStopSequence}
+                  selectedZoneCode={selectedZoneCode}
+                  onSelectZone={setSelectedZoneCode}
+                  selectedMarkerKey={selectedMarkerKey}
+                  onSelectMarker={selectInventoryMarker}
+                />
+              </div>
+
+              {view === "inventory" ? (
+                <InventoryMapDrawer
+                  ariaLabel="Controles"
+                  className={styles.sidePanel}
+                  expandToViewport
+                  summary="Elementos"
+                >
+                  <InventoryPanel
+                    items={items}
+                    locatedItems={locatedItems}
+                    unlocatedCount={unlocatedCount}
+                    selectedMapItemKey={selectedMarkerKey}
+                    onSelectItem={selectInventoryItem}
+                    enabledLayers={enabledLayers}
+                    onLayerChange={(layer, checked) => {
+                      setEnabledLayers((current) => ({ ...current, [layer]: checked }));
+                    }}
+                  />
+                </InventoryMapDrawer>
+              ) : (
+                <aside className={styles.sidePanel} aria-label="Controles">
+                  {view === "zones" ? (
+                    <ZonesMapPanel zones={zones} selectedZoneCode={selectedZoneCode} onSelectZone={setSelectedZoneCode} />
+                  ) : view === "route" ? (
+                    <SideLoadingRegion label="Cargando" isLoading={isViewLoading}>
+                    <RouteMapPanel
+                      routes={routes}
+                      selectedRouteId={selectedRouteId}
+                      selectedRoute={selectedRoute}
+                      routeStops={routeStops}
+                      onRouteChange={handleRouteChange}
+                      selectedStopSequence={selectedStopSequence}
+                      onSelectStop={setSelectedStopSequence}
+                    />
+                    </SideLoadingRegion>
+                  ) : view === "coverage" ? (
+                    <SideLoadingRegion label="Cargando" isLoading={isViewLoading}>
+                    <CoverageMapPanel
+                      coverage={coverage}
+                      zones={coverageZoneOverlays}
+                      selectedZoneCode={selectedZoneCode}
+                      onSelectZone={setSelectedZoneCode}
+                    />
+                    </SideLoadingRegion>
+                  ) : (
+                    <SideLoadingRegion label="Cargando" isLoading={isViewLoading}>
+                    <TodayMapPanel
+                      services={todayServices}
+                      zones={todayZoneCoverage}
+                    />
+                    </SideLoadingRegion>
+                  )}
+                </aside>
+              )}
+            </div>
+          ) : null}
+          </LoadingRegion>
+        </TabsContent>
+      </Tabs>
+    </section>
+  );
+}
+
+function mapToolbarSummary(
+  view: OperationalMapView,
+  locatedCount: number,
+  zones: OperationalZone[],
+  routeStopCount: number,
+  todayServiceCount: number,
+  coverageZones: CoverageZoneOverlay[],
+) {
+  if (view === "inventory") return `${locatedCount} ubicados`;
+  if (view === "zones") return `${zones.length} zonas`;
+  if (view === "route") return `${routeStopCount} paradas`;
+  if (view === "coverage") {
+    const withData = coverageZones.filter((zone) => zone.rate !== null).length;
+    return `${withData} de ${coverageZones.length} con datos`;
+  }
+  return `${todayServiceCount} servicio${todayServiceCount === 1 ? "" : "s"}`;
+}
+
+function InventoryPanel({
+  items,
+  locatedItems,
+  unlocatedCount,
+  selectedMapItemKey,
+  onSelectItem,
+  enabledLayers,
+  onLayerChange,
+}: {
+  items: MapListItem[];
+  locatedItems: (MapListItem & { lat: number; lng: number })[];
+  unlocatedCount: number;
+  selectedMapItemKey: string | null;
+  onSelectItem: (item: MapListItem) => void;
+  enabledLayers: Record<LayerId, boolean>;
+  onLayerChange: (layer: LayerId, checked: boolean) => void;
+}) {
+  return (
+    <>
+      <fieldset className={styles.layers}>
+        <legend>Capas</legend>
+        {(Object.keys(layerLabels) as LayerId[]).map((layer) => {
+          const count = items.filter((item) => item.layer === layer && item.lat !== null && item.lng !== null).length;
+          return (
+            <Field className={styles.layerControl} key={layer}>
+              <Checkbox
+                id={`map-layer-${layer}`}
+                checked={enabledLayers[layer]}
+                onCheckedChange={(checked) => onLayerChange(layer, checked === true)}
+                aria-label={`${layerLabels[layer]}, ${count} ubicados`}
+              />
+              <span className={`${styles.layerSwatch} ${styles[layer]}`} aria-hidden />
+              <FieldLabel htmlFor={`map-layer-${layer}`} className="text-sm font-normal">{layerLabels[layer]}</FieldLabel>
+              <small>{count}</small>
+            </Field>
+          );
+        })}
+      </fieldset>
+
+      <section className={styles.visibleList} aria-labelledby="visible-items-title">
+        <div className={styles.listHeading}>
+          <h2 id="visible-items-title">Elementos</h2>
+          <span>{locatedItems.length}</span>
+        </div>
+        {unlocatedCount > 0 ? (
+          <p className={styles.locationNotice}>{unlocatedCount} sin coordenadas no se muestran en el mapa.</p>
+        ) : null}
+        {locatedItems.length > 0 ? (
+          <ItemGroup className={styles.visibleItemGroup} aria-label="Elementos visibles">
+            {locatedItems.map((item) => {
+              const isSelected = `${item.layer}-${item.id}` === selectedMapItemKey;
+              return (
+                <Item key={`${item.layer}-${item.id}`} variant={isSelected ? "muted" : "default"} size="xs" className={styles.visibleItem}>
+                  <ItemMedia>
+                    <span className={`${styles.listMarker} ${styles[item.markerTone]}`} aria-hidden />
+                  </ItemMedia>
+                  <ItemContent className={styles.visibleItemContent}>
+                    <Toggle
+                      type="button"
+                      className={cn(styles.itemButton, "h-auto w-full items-start justify-start whitespace-normal text-left")}
+                      pressed={isSelected}
+                      onPressedChange={() => onSelectItem(item)}
+                    >
+                      <ItemTitle className="w-full min-w-0">{item.title}</ItemTitle>
+                      <ItemDescription>{item.description}</ItemDescription>
+                    </Toggle>
+                    {isSelected && item.layer === "trees" ? (
+                      <Link className={buttonVariants({ variant: "link", size: "sm" })} href={treeCatalogHref(item.id)}>
+                        Ver ficha del árbol {item.title}
+                      </Link>
+                    ) : null}
+                  </ItemContent>
+                </Item>
+              );
+            })}
+          </ItemGroup>
+        ) : (
+          <Empty className={styles.emptyState}>
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><Boxes aria-hidden /></EmptyMedia>
+              <EmptyTitle>Sin elementos</EmptyTitle>
+              <EmptyDescription>Active una capa.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+      </section>
+    </>
+  );
+}
+
+function ZonesMapPanel({
+  zones,
+  selectedZoneCode,
+  onSelectZone,
+}: {
+  zones: OperationalZone[];
+  selectedZoneCode: string | null;
+  onSelectZone: (code: string) => void;
+}) {
+  return (
+    <section className={styles.viewPanel} aria-labelledby="zones-view-title">
+      <div className={styles.panelIntro}>
+        <div className={styles.panelTitleRow}>
+          <MapPinned aria-hidden />
+          <h2 id="zones-view-title">Zonas</h2>
+        </div>
+      </div>
+      <ItemGroup className={styles.zoneList} aria-labelledby="zones-view-title">
+        {zones.map((zone) => (
+          <Item
+            key={zone.code}
+            variant={selectedZoneCode === zone.code ? "muted" : "default"}
+            size="xs"
+            render={<Toggle
+              type="button"
+              className={cn(styles.zoneButton, "h-auto min-w-0 justify-start whitespace-normal text-left")}
+              variant="default"
+              pressed={selectedZoneCode === zone.code}
+              onPressedChange={(pressed) => onSelectZone(pressed ? zone.code : "")}
+            />}
+          >
+            <ItemMedia>
+              <span className={cn(styles.zoneSwatch, styles[zone.code])} aria-hidden />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>{zone.name}</ItemTitle>
+            </ItemContent>
+          </Item>
+        ))}
+      </ItemGroup>
+    </section>
+  );
+}
+
+function CoverageMapPanel({
+  coverage,
+  zones,
+  selectedZoneCode,
+  onSelectZone,
+}: {
+  coverage: CoverageIndicator | null;
+  zones: CoverageZoneOverlay[];
+  selectedZoneCode: string | null;
+  onSelectZone: (code: string) => void;
+}) {
+  const zonesWithData = zones.filter((zone) => zone.rate !== null).length;
+  const legendBands = ["no-data", "low", "partial", "good", "high"] as const;
+
+  return (
+    <section className={styles.viewPanel} aria-labelledby="coverage-view-title">
+      <div className={styles.panelIntro}>
+        <div className={styles.panelTitleRow}>
+          <Activity aria-hidden />
+          <h2 id="coverage-view-title">Cobertura por zona</h2>
+        </div>
+        <p>
+          {coverage ? formatCoveragePeriod(coverage.period) : "Sin período"}
+        </p>
+      </div>
+      <div className={styles.coverageLegend} role="group" aria-label="Escala de cobertura">
+        {legendBands.map((band) => (
+          <span className={styles.coverageLegendItem} key={band}>
+            <span className={`${styles.coverageLegendSwatch} ${styles[coverageBandSwatchClass[band]]}`} aria-hidden />
+            <span>{COVERAGE_BAND_LABELS[band]}</span>
+          </span>
+        ))}
+      </div>
+      <p className={styles.coverageSummary}>
+        {zonesWithData} de {zones.length} con datos
+        {coverage ? ` · Actualizado ${formatCoverageFreshness(coverage.freshness.updatedAt)}` : ""}
+      </p>
+      <ItemGroup className={styles.coverageZoneList} aria-labelledby="coverage-view-title">
+        {zones.map((zone) => (
+          <Item
+            key={zone.zoneCode}
+            variant={selectedZoneCode === zone.zoneCode ? "muted" : "default"}
+            size="xs"
+            render={<Toggle
+              type="button"
+              className={cn(styles.coverageZoneButton, "h-auto min-w-0 justify-start whitespace-normal text-left")}
+              variant="default"
+              pressed={selectedZoneCode === zone.zoneCode}
+              onPressedChange={(pressed) => onSelectZone(pressed ? zone.zoneCode : "")}
+            />}
+          >
+            <ItemMedia>
+              <span className={`${styles.coverageLegendSwatch} ${styles[coverageBandSwatchClass[zone.band]]}`} aria-hidden />
+            </ItemMedia>
+            <ItemContent className={styles.coverageZoneCopy}>
+              <ItemTitle>{zone.zoneName}</ItemTitle>
+              {zone.note ? <ItemDescription>{zone.note}</ItemDescription> : null}
+            </ItemContent>
+            <span className={COVERAGE_BAND_CLASSES[zone.band]}>
+              {COVERAGE_BAND_LABELS[zone.band]} · {formatCoverageRate(zone.rate)}
+            </span>
+          </Item>
+        ))}
+      </ItemGroup>
+    </section>
+  );
+}
+
+function RouteMapPanel({
+  routes,
+  selectedRouteId,
+  selectedRoute,
+  routeStops,
+  onRouteChange,
+  selectedStopSequence,
+  onSelectStop,
+}: {
+  routes: Route[];
+  selectedRouteId: string;
+  selectedRoute: Route | null;
+  routeStops: ReturnType<typeof routeToStopOverlays>;
+  onRouteChange: (id: string) => void;
+  selectedStopSequence: number | null;
+  onSelectStop: (sequence: number) => void;
+}) {
+  return (
+    <section className={styles.viewPanel} aria-labelledby="route-view-title">
+      <div className={styles.panelIntro}>
+        <div className={styles.panelTitleRow}>
+          <RouteIcon aria-hidden />
+          <h2 id="route-view-title">{selectedRoute?.name ?? "Recorrido"}</h2>
+        </div>
+      </div>
+      <Field className={styles.fieldGroup}>
+        <FieldLabel htmlFor="map-route-select">Recorrido</FieldLabel>
+        <NativeSelect
+          id="map-route-select"
+          value={selectedRouteId}
+          onChange={(event) => onRouteChange(event.target.value)}
+        >
+          {routes.length === 0 ? <NativeSelectOption value="">Sin recorridos activos</NativeSelectOption> : null}
+          {routes.map((route) => <NativeSelectOption key={route.id} value={route.id}>{route.code} · {route.name}</NativeSelectOption>)}
+        </NativeSelect>
+      </Field>
+      {selectedRoute ? (
+        <>
+          <div className={styles.routeSummary}>
+            <strong>{selectedRoute.name}</strong>
+            <span>{routeStops.length} paradas · {totalRouteDuration(routeStops)} min</span>
+          </div>
+          <ItemGroup className={styles.routeStopList} aria-label="Paradas del recorrido">
+            {routeStops.map((stop) => (
+              <Item
+                key={stop.id}
+                variant={selectedStopSequence === stop.sequence ? "muted" : "default"}
+                size="xs"
+                render={<Toggle
+                  type="button"
+                  className={cn(styles.routeStopButton, "h-auto min-w-0 justify-start whitespace-normal text-left")}
+                  variant="default"
+                  pressed={selectedStopSequence === stop.sequence}
+                  onPressedChange={(pressed) => onSelectStop(pressed ? stop.sequence : 0)}
+                />}
+              >
+                <ItemMedia className={styles.sequenceBadge} aria-hidden>{stop.sequence}</ItemMedia>
+                <ItemContent className={styles.routeStopCopy}>
+                  <ItemTitle>Parada {stop.sequence}</ItemTitle>
+                  <ItemDescription>{stop.zoneName}</ItemDescription>
+                </ItemContent>
+                <ItemActions className={styles.duration}>
+                  <ItemDescription>{stop.estimatedDurationMin !== null ? `${stop.estimatedDurationMin} min` : "—"}</ItemDescription>
+                </ItemActions>
+              </Item>
+            ))}
+          </ItemGroup>
+        </>
+      ) : (
+        <Empty className={styles.emptyState}>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><RouteIcon aria-hidden /></EmptyMedia>
+            <EmptyTitle>Sin paradas</EmptyTitle>
+            <EmptyDescription>Elija otro recorrido.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+    </section>
+  );
+}
+
+function TodayMapPanel({
+  services,
+  zones,
+}: {
+  services: TodayServiceCoverage[];
+  zones: ReturnType<typeof buildTodayZoneCoverage>;
+}) {
+  return (
+    <section className={styles.viewPanel} aria-labelledby="today-view-title">
+      <div className={styles.panelIntro}>
+        <div className={styles.panelTitleRow}>
+          <MapPinned aria-hidden />
+          <h2 id="today-view-title">Hoy</h2>
+        </div>
+        <p>{formatTodayDate(todayInArgentina())}</p>
+      </div>
+      {services.length > 0 ? (
+        <p className={styles.todaySummary}>
+          {services.length} servicio{services.length === 1 ? "" : "s"} hoy
+        </p>
+      ) : null}
+      {zones.length > 0 ? (
+        <ItemGroup className={styles.todayZoneList} aria-labelledby="today-view-title">
+          {zones.map((zone) => (
+            <Item key={zone.zoneId} variant="outline" size="xs" className={styles.todayZoneItem}>
+              <ItemMedia>
+                <span className={`${styles.todayStatus} ${styles[zone.status.toLowerCase()]}`} aria-hidden />
+              </ItemMedia>
+              <ItemContent>
+                <ItemTitle>{zone.zoneName}</ItemTitle>
+                <ItemDescription>{zone.resultCount}/{zone.serviceCount} resultados registrados</ItemDescription>
+              </ItemContent>
+              <span className={`${styles.statusLabel} ${styles[zone.status.toLowerCase()]}`}>
+                {todayStatusLabels[zone.status]}
+              </span>
+            </Item>
+          ))}
+        </ItemGroup>
+      ) : (
+        <Empty className={styles.emptyState}>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><MapPinned aria-hidden /></EmptyMedia>
+            <EmptyTitle>Sin servicios hoy</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
+      )}
+      {services.length > 0 ? (
+        <div className={styles.todayServiceList}>
+          <h3 id="today-service-list-title">Servicios</h3>
+          <ItemGroup className={styles.todayServiceItems} aria-labelledby="today-service-list-title">
+            {services.map(({ service, zoneResults }) => (
+              <Item key={service.id} variant="outline" size="xs">
+                <ItemContent>
+                  <ItemTitle>{service.title}</ItemTitle>
+                  <ItemDescription>{service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "sin horario"}</ItemDescription>
+                  <ItemDescription>{service.zoneIds.map((zoneId) => {
+                    const result = zoneResults.find((candidate) => candidate.zoneId === zoneId);
+                    return `${service.zoneNames[service.zoneIds.indexOf(zoneId)] ?? "Zona sin nombre disponible"}: ${result ? ZONE_RESULT_STATUS_LABEL[result.status] : "Pendiente"}`;
+                  }).join(" · ")}
+                  </ItemDescription>
+                </ItemContent>
+              </Item>
+            ))}
+          </ItemGroup>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function totalRouteDuration(stops: ReturnType<typeof routeToStopOverlays>) {
+  return stops.reduce((total, stop) => total + (stop.estimatedDurationMin ?? 0), 0);
+}
+
+function formatCoverageRate(rate: number | null) {
+  return rate === null
+    ? "—"
+    : `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(rate)} %`;
+}
+
+function formatCoveragePeriod(period: CoverageIndicator["period"]) {
+  return `${formatCalendarDate(period.from)} – ${formatCalendarDate(period.to)}`;
+}
+
+function formatCoverageFreshness(updatedAt: string) {
+  return formatMapDateTime(updatedAt);
+}
+
+function SideLoadingRegion({ label, isLoading, children }: { label: string; isLoading: boolean; children: ReactNode }) {
+  return (
+    <LoadingRegion label={label} isLoading={isLoading} className={styles.sideRegion}>
+      {isLoading ? <ListItemsSkeleton itemCount={6} className={styles.sideLoading} /> : children}
+    </LoadingRegion>
+  );
+}
+
+function MapLoading() {
+  return (
+    <div className={cn(styles.layout, styles.loading, styles.layoutInventory)}>
+      <div className={styles.mapPanel}>
+        <div data-skeleton="map-context-header" aria-hidden="true" className={styles.mapToolbar}>
+          <Skeleton data-skeleton="map-context-title" className="h-[18px] w-36 max-w-full" />
+          <Skeleton data-skeleton="map-context-summary" className="h-[18px] w-20 max-w-full" />
+          <Skeleton data-skeleton="map-context-consulted" className="h-[18px] w-48 max-w-full" />
+        </div>
+        <MapPaneSkeleton className={cn(styles.loadingMap, "min-h-0")} />
+      </div>
+      <InventoryMapDrawer
+        ariaLabel="Controles"
+        className={styles.sidePanel}
+        expandToViewport
+        summary="Elementos"
+      >
+        <InventoryPanelSkeleton />
+      </InventoryMapDrawer>
+    </div>
+  );
+}
+
+function InventoryPanelSkeleton() {
+  return (
+    <>
+      <fieldset aria-hidden="true" data-skeleton="map-layer-controls" className={styles.layers}>
+        <legend><Skeleton className="h-5 w-28" /></legend>
+        {(Object.keys(layerLabels) as LayerId[]).map((layer) => (
+          <div key={layer} data-skeleton="map-layer-control" className={styles.layerControl}>
+            <Skeleton className="size-4 rounded-sm" />
+            <Skeleton className={cn(styles.layerSwatch, "rounded-sm")} />
+            <Skeleton className="h-4 w-24 max-w-full" />
+            <Skeleton className="ml-auto h-4 w-6" />
+          </div>
+        ))}
+      </fieldset>
+
+      <section aria-hidden="true" className={styles.visibleList}>
+        <div className={styles.listHeading}>
+          <Skeleton data-skeleton="map-elements-heading" className="h-5 w-20" />
+          <Skeleton className="h-4 w-8" />
+        </div>
+        <ListItemsSkeleton
+          itemCount={6}
+          itemHeight={styles.visibleItem}
+          avatarSize="size-3"
+          primaryWidth="w-3/4"
+          secondaryWidth="w-1/2"
+          className={styles.visibleItemGroup}
+        />
+      </section>
+    </>
+  );
+}

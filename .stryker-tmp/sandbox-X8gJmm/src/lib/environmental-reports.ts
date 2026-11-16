@@ -1,0 +1,672 @@
+// @ts-nocheck
+import { z } from "zod";
+
+import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { attachmentSchema } from "./services";
+import { recordTelemetryEvent } from "./telemetry";
+import { MAX_NOTES_LENGTH, latitudeInput, longitudeInput, reasonInput } from "@/lib/input-limits";
+import { droppedRecords, tolerantRecords } from "./tolerant-records";
+
+export const environmentalReportTypeSchema = z.enum([
+  "NOISE",
+  "DUMPING",
+  "ILLEGAL_DUMPSITE",
+  "WATER_DISCHARGE",
+  "AIR_EMISSION",
+  "ODOR",
+  "PEST_INFESTATION",
+  "OTHER",
+]);
+export type EnvironmentalReportType = z.infer<typeof environmentalReportTypeSchema>;
+
+export const environmentalReportStatusSchema = z.enum([
+  "RECEIVED",
+  "UNDER_REVIEW",
+  "FORWARDED",
+  "DISMISSED",
+  "INSPECTION_SCHEDULED",
+  "INSPECTED",
+  "NO_VIOLATION",
+  "VIOLATION_FOUND",
+  "NOTICE_ISSUED",
+  "SANCTIONED",
+  "CLOSED",
+]);
+export type EnvironmentalReportStatus = z.infer<typeof environmentalReportStatusSchema>;
+
+export const environmentalReportPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
+export type EnvironmentalReportPriority = z.infer<typeof environmentalReportPrioritySchema>;
+
+export const sanctionDecisionSchema = z.enum([
+  "FINE_ISSUED",
+  "CLOSURE_ORDERED",
+  "FORMAL_NOTICE_ISSUED",
+  "DISMISSED",
+]);
+export type SanctionDecision = z.infer<typeof sanctionDecisionSchema>;
+
+export const sanctionOutcomeSchema = z.object({
+  violationNoticeId: z.string().trim().min(1),
+  decision: sanctionDecisionSchema,
+  decidedAt: z.string(),
+  externalRef: z.string().trim().min(1),
+  dismissalReason: z.string().nullable().optional(),
+});
+export type SanctionOutcome = z.infer<typeof sanctionOutcomeSchema>;
+
+export const sanctionOutcomeIntegrationExceptionSchema = z.object({
+  type: z.literal("UNCORRELATED_SANCTION_OUTCOME"),
+  violationNoticeId: z.string(),
+  externalRef: z.string(),
+  receivedAt: z.string(),
+  message: z.string(),
+});
+export type SanctionOutcomeIntegrationException = z.infer<typeof sanctionOutcomeIntegrationExceptionSchema>;
+
+export const createEnvironmentalReportInputSchema = z.object({
+  reportType: environmentalReportTypeSchema,
+  address: z.string().trim().min(1, "Debe indicar la ubicación del hallazgo."),
+  lat: latitudeInput(),
+  lng: longitudeInput(),
+  description: z.string().trim().min(1, "Debe describir el hallazgo.").max(MAX_NOTES_LENGTH, `La descripción no puede superar los ${MAX_NOTES_LENGTH} caracteres.`),
+});
+export type CreateEnvironmentalReportInput = z.infer<typeof createEnvironmentalReportInputSchema>;
+
+// Backend ReportStatusChangeDto: forward and dismiss require a reason (max 500).
+export const reportDecisionInputSchema = z.object({ reason: reasonInput("Debe indicar el motivo.") });
+export type ReportDecisionInput = z.infer<typeof reportDecisionInputSchema>;
+
+// Backend RequestInformationDto: message (required, max 500) is what the citizen sees in M2;
+// requiredBy is a SUGGESTED deadline (YYYY-MM-DD; M2 sets the effective one); internalNote is
+// team-only (max 500); a blank one is dropped instead of sent as "".
+export const requestInformationInputSchema = z.object({
+  message: reasonInput("Debe indicar qué información se le pide al vecino."),
+  requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha sugerida es inválida.").optional(),
+  internalNote: z.string().trim().max(500, "La nota interna no puede superar los 500 caracteres.").optional().transform((value) => value || undefined),
+});
+export type RequestInformationInput = z.input<typeof requestInformationInputSchema>;
+
+const reportLocationSchema = z.object({
+  address: z.string().nullable().optional(),
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
+}).passthrough();
+
+export const environmentalReportSchema = z.object({
+  id: z.string(),
+  reportType: environmentalReportTypeSchema,
+  address: z.string().nullable().optional(),
+  // M2 contract v1.6 dropped lat/lng from its location payload, so the backend
+  // always sends these as explicit `null` (not omitted) for ticket-originated
+  // reports (ticketId present) — see issue #191. `.nullable()` is required
+  // because Zod's `.optional()` alone rejects an explicit `null`.
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
+  location: reportLocationSchema.optional(),
+  // El backend siempre manda la clave y vale null en los expedientes que abre M2 y en
+  // los creados sin descripción (#289): un solo null tumbaba el listado entero.
+  description: z.string().nullable().optional(),
+  details: z.string().optional(),
+  publicId: z.string().nullable().optional(),
+  // EXP-AAAA-NNNNNN (Backend #509): número de expediente de M6, lo tienen todos. Solo para mostrar.
+  caseNumber: z.string().optional(),
+  ticketId: z.string().nullable().optional(),
+  reporterSnapshot: z.unknown().optional(),
+  status: environmentalReportStatusSchema,
+  priority: environmentalReportPrioritySchema.nullable(),
+  deadlineAt: z.string().nullable().optional(),
+  escalated: z.boolean().optional(),
+  citizenResponse: z.string().nullable().optional(),
+  informationRequestPending: z.boolean().optional(),
+  informationRequestedAt: z.string().nullable().optional(),
+  informationRequestMessage: z.string().nullable().optional(),
+  informationRequestRequiredBy: z.string().nullable().optional(),
+  sanctionOutcome: sanctionOutcomeSchema.nullable().optional(),
+  assignedCrewId: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough();
+export type EnvironmentalReport = z.infer<typeof environmentalReportSchema>;
+
+export function mergeEnvironmentalReportRead(
+  current: EnvironmentalReport,
+  incoming: EnvironmentalReport,
+): EnvironmentalReport {
+  const currentUpdatedAt = Date.parse(current.updatedAt);
+  const incomingUpdatedAt = Date.parse(incoming.updatedAt);
+  if (!Number.isNaN(currentUpdatedAt) && !Number.isNaN(incomingUpdatedAt) && incomingUpdatedAt < currentUpdatedAt) {
+    return current;
+  }
+  if (current.sanctionOutcome && !incoming.sanctionOutcome) {
+    return { ...incoming, sanctionOutcome: current.sanctionOutcome };
+  }
+  return incoming;
+}
+
+export const environmentalInspectionOutcomeSchema = z.enum([
+  "NO_VIOLATION",
+  "VIOLATION_FOUND",
+  "INCONCLUSIVE",
+]);
+export type EnvironmentalInspectionOutcome = z.infer<typeof environmentalInspectionOutcomeSchema>;
+export const ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS: Record<EnvironmentalInspectionOutcome, string> = {
+  NO_VIOLATION: "Sin infracción",
+  VIOLATION_FOUND: "Infracción constatada",
+  INCONCLUSIVE: "Inconclusa",
+};
+
+export const environmentalInspectionNextStepSchema = z.enum([
+  "NOTICE_TO_BE_ISSUED",
+  "REINSPECTION",
+  "CASE_CLOSED",
+]);
+export type EnvironmentalInspectionNextStep = z.infer<typeof environmentalInspectionNextStepSchema>;
+
+export const environmentalInspectionViolationTypeSchema = z.enum([
+  "NOISE_LIMIT",
+  "ILLEGAL_DUMPING",
+  "UNTREATED_DISCHARGE",
+  "HAZARDOUS_WASTE",
+  "AIR_EMISSION",
+  "NO_WASTE_MANAGEMENT",
+  "INSPECTION_OBSTRUCTION",
+]);
+export type EnvironmentalInspectionViolationType = z.infer<typeof environmentalInspectionViolationTypeSchema>;
+
+export const environmentalInspectionSeveritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
+export type EnvironmentalInspectionSeverity = z.infer<typeof environmentalInspectionSeveritySchema>;
+
+export const environmentalInspectionSuggestedActionSchema = z.enum([
+  "WARNING",
+  "FORMAL_NOTICE",
+  "FINE",
+  "CLOSURE",
+]);
+export type EnvironmentalInspectionSuggestedAction = z.infer<typeof environmentalInspectionSuggestedActionSchema>;
+
+// Una sola fuente de etiquetas: la inspección y el acta muestran los mismos valores.
+export const ENVIRONMENTAL_VIOLATION_TYPE_LABELS: Record<EnvironmentalInspectionViolationType, string> = {
+  NOISE_LIMIT: "Exceso de ruido",
+  ILLEGAL_DUMPING: "Vertido ilegal",
+  UNTREATED_DISCHARGE: "Descarga sin tratamiento",
+  HAZARDOUS_WASTE: "Residuos peligrosos",
+  AIR_EMISSION: "Emisión al aire",
+  NO_WASTE_MANAGEMENT: "Falta de gestión de residuos",
+  INSPECTION_OBSTRUCTION: "Obstrucción de la inspección",
+};
+
+export const ENVIRONMENTAL_SEVERITY_LABELS: Record<EnvironmentalInspectionSeverity, string> = {
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+  CRITICAL: "Crítica",
+};
+
+export const ENVIRONMENTAL_SUGGESTED_ACTION_LABELS: Record<EnvironmentalInspectionSuggestedAction, string> = {
+  WARNING: "Advertencia",
+  FORMAL_NOTICE: "Aviso formal",
+  FINE: "Multa",
+  CLOSURE: "Clausura",
+};
+
+// Hypothesis: the backend has not published the exact checklist DTO yet.
+export const environmentalInspectionChecklistItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  required: z.boolean().default(true),
+}).passthrough();
+export type EnvironmentalInspectionChecklistItem = z.infer<typeof environmentalInspectionChecklistItemSchema>;
+
+// Forma real del backend (InspectionResponseDto.checklistItems): cada ítem tiene un
+// `id` UUID, un `itemCode` (el código), `label`, `result` y `observations`.
+export const environmentalInspectionChecklistItemResponseSchema = z.object({
+  id: z.string(),
+  itemCode: z.string(),
+  label: z.string(),
+  result: z.boolean(),
+  observations: z.string().nullable().optional(),
+}).passthrough();
+
+export const environmentalInspectionChecklistResultSchema = z.object({
+  id: z.string().trim().min(1),
+  label: z.string().trim().min(1),
+  completed: z.boolean(),
+});
+export type EnvironmentalInspectionChecklistResult = z.infer<typeof environmentalInspectionChecklistResultSchema>;
+
+export const environmentalInspectionCompleteInputSchema = z
+  .object({
+    inspectedAt: z.string().datetime({ offset: true }).refine(
+      (value) => Date.parse(value) <= Date.now() + 5 * 60 * 1000,
+      "La fecha de inspección no puede ser futura.",
+    ),
+    outcome: environmentalInspectionOutcomeSchema,
+    nextStep: environmentalInspectionNextStepSchema.optional(),
+    checklist: z.array(environmentalInspectionChecklistResultSchema).min(1, "Debe completar el checklist de inspección."),
+    conclusion: z.string().trim().max(MAX_NOTES_LENGTH, `La conclusión no puede superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
+    findings: z.string().trim().max(MAX_NOTES_LENGTH, `Los hallazgos no pueden superar los ${MAX_NOTES_LENGTH} caracteres.`).optional(),
+    violationType: environmentalInspectionViolationTypeSchema.optional(),
+    severity: environmentalInspectionSeveritySchema.optional(),
+    suggestedAction: environmentalInspectionSuggestedActionSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.checklist.some((item) => !item.completed)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["checklist"], message: "Debe completar todos los controles del checklist." });
+    }
+    if (data.outcome === "NO_VIOLATION" && !data.conclusion) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "La conclusión es obligatoria para un resultado sin infracción." });
+    }
+    if (data.outcome === "VIOLATION_FOUND") {
+      if (data.nextStep !== "NOTICE_TO_BE_ISSUED") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["nextStep"], message: "Una infracción constatada debe continuar con la emisión del aviso." });
+      if (!data.findings) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["findings"], message: "Los hallazgos son obligatorios cuando se constata una infracción." });
+      if (!data.violationType) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["violationType"], message: "Debe indicar el tipo de infracción constatada." });
+      if (!data.severity) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["severity"], message: "Debe indicar la gravedad de la infracción constatada." });
+      if (!data.suggestedAction) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["suggestedAction"], message: "Debe indicar la acción sugerida." });
+    }
+    if (data.outcome === "INCONCLUSIVE" && !data.conclusion) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conclusion"], message: "Debe explicar por qué la inspección resulta inconclusa." });
+    }
+  });
+export type EnvironmentalInspectionCompleteInput = z.infer<typeof environmentalInspectionCompleteInputSchema>;
+
+// Hypothesis: schedule fields are kept explicit at this adapter seam until OpenAPI
+// exposes the authoritative request and response nesting.
+export const environmentalInspectionScheduleInputSchema = z.object({
+  inspectorId: z.string().trim().regex(/^\d{1,19}$/, "El legajo debe ser numérico.").optional(),
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe tener formato YYYY-MM-DD"),
+  timeWindow: z.object({
+    start: z.string().regex(/^\d{2}:\d{2}$/, "Hora de inicio inválida (HH:MM)"),
+    end: z.string().regex(/^\d{2}:\d{2}$/, "Hora de fin inválida (HH:MM)"),
+  }),
+  checklistVersion: z.string().trim().min(1, "Debe seleccionar una versión de checklist"),
+  checklist: z.array(environmentalInspectionChecklistItemSchema).min(1, "El checklist debe tener al menos un control"),
+  zoneId: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
+});
+export type EnvironmentalInspectionScheduleInput = z.infer<typeof environmentalInspectionScheduleInputSchema>;
+
+// Backend `AllowedActionsDto` (#451): what can be derived from this inspection now, by report type,
+// outcome and existing notice. The client does not replicate that matrix; it only reads the flags.
+// `suggestedViolationType` is a plain string: the client does not branch on it.
+export const environmentalInspectionAllowedActionsSchema = z.object({
+  repair: z.boolean(),
+  notice: z.boolean(),
+  suggestedViolationType: z.string().nullable().optional(),
+});
+export type EnvironmentalInspectionAllowedActions = z.infer<typeof environmentalInspectionAllowedActionsSchema>;
+
+export const environmentalInspectionSchema = z.object({
+  // Required by the contract; kept optional only so one inspection without it is not discarded. Defensive: absent means no follow-up is offered.
+  allowedActions: environmentalInspectionAllowedActionsSchema.optional(),
+  inspectorId: z.string().nullable().optional(),
+  completedByUserId: z.string().nullable().optional(),
+  id: z.string(),
+  reportId: z.string(),
+  serviceId: z.string().nullable().optional(),
+  inspectedAt: z.string().nullable().optional(),
+  // Campos de agenda: son del frontend (el backend no los devuelve); se mantienen
+  // opcionales para que la respuesta real del backend siga parseando.
+  scheduledDate: z.string().optional(),
+  timeWindow: z.object({ start: z.string(), end: z.string() }).optional(),
+  checklistVersion: z.string().optional(),
+  checklist: z.array(environmentalInspectionChecklistItemSchema).optional(),
+  checklistItems: z.array(environmentalInspectionChecklistItemResponseSchema).optional(),
+  attachments: z.array(attachmentSchema).optional(),
+  findings: z.string().nullable().optional(),
+  conclusion: z.string().nullable().optional(),
+  violationType: environmentalInspectionViolationTypeSchema.nullable().optional(),
+  severity: environmentalInspectionSeveritySchema.nullable().optional(),
+  suggestedAction: environmentalInspectionSuggestedActionSchema.nullable().optional(),
+  outcome: environmentalInspectionOutcomeSchema.nullable().optional(),
+  nextStep: environmentalInspectionNextStepSchema.nullable().optional(),
+  notes: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).passthrough();
+export type EnvironmentalInspection = z.infer<typeof environmentalInspectionSchema>;
+
+// Plantilla del frontend: el backend no guarda checklist al programar, así que una
+// inspección recién creada llega con `checklistItems: []`.
+export const INSPECTION_CHECKLIST_TEMPLATE: readonly EnvironmentalInspectionChecklistItem[] = [
+  { id: "location", label: "Verificar ubicación y contexto del hallazgo", required: true },
+  { id: "source", label: "Identificar la fuente del impacto", required: true },
+  { id: "evidence", label: "Registrar observaciones para el acta", required: true },
+];
+
+/**
+ * El checklist que muestra la UI. En modo mock viene como `checklist`
+ * (items con `id`=código y `required`); contra el backend real viene como
+ * `checklistItems` (`itemCode`). Se normaliza a la forma interna. Si todavía no
+ * hay nada relevado, se usa la plantilla.
+ */
+export function inspectionChecklist(inspection: EnvironmentalInspection): EnvironmentalInspectionChecklistItem[] {
+  if (inspection.checklist?.length) return inspection.checklist;
+  if (!inspection.checklistItems?.length) return INSPECTION_CHECKLIST_TEMPLATE.map((item) => ({ ...item }));
+  return inspection.checklistItems.map((item) => ({
+    id: item.itemCode,
+    label: item.label,
+    required: true,
+  }));
+}
+
+export const issueViolationNoticeInputSchema = z.object({
+  // null is reserved for the explicit non-forwarded path. A resolved notice
+  // must always carry an establishment identifier for M4 projection.
+  establishmentId: z.string().trim().min(1, "Debe indicar un establecimiento válido.").nullable(),
+  violationType: environmentalInspectionViolationTypeSchema,
+  severity: environmentalInspectionSeveritySchema,
+  suggestedAction: environmentalInspectionSuggestedActionSchema,
+});
+export type IssueViolationNoticeInput = z.infer<typeof issueViolationNoticeInputSchema>;
+
+export const violationNoticeSchema = z.object({
+  id: z.string(),
+  noticeNumber: z.string(),
+  inspectionId: z.string(),
+  issuedAt: z.string(),
+  establishmentId: z.string().nullable(),
+  violationType: environmentalInspectionViolationTypeSchema,
+  severity: environmentalInspectionSeveritySchema,
+  suggestedAction: environmentalInspectionSuggestedActionSchema,
+  priorNoticeCount: z.number().int().nonnegative(),
+}).passthrough();
+export type ViolationNotice = z.infer<typeof violationNoticeSchema>;
+
+export const environmentalReportDateRangeSchema = z.object({
+  from: z.iso.date("Use una fecha válida con formato AAAA-MM-DD.").optional(),
+  to: z.iso.date("Use una fecha válida con formato AAAA-MM-DD.").optional(),
+}).refine((range) => !range.from || !range.to || range.from <= range.to, {
+  path: ["to"],
+  message: "La fecha «Desde» no puede ser posterior a «Hasta».",
+});
+
+export type EnvironmentalReportQuery = {
+  from?: string;
+  to?: string;
+  status?: EnvironmentalReportStatus | EnvironmentalReportStatus[];
+  reportType?: EnvironmentalReportType;
+  priority?: EnvironmentalReportPriority;
+  publicId?: string;
+  ticketId?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type EnvironmentalReportsPage = {
+  environmentalReports: EnvironmentalReport[];
+  /** Records of this page dropped for an unknown enum value (not the same as `total` exceeding the rows shown). */
+  dropped?: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  sanctionOutcomeIntegrationExceptions: SanctionOutcomeIntegrationException[];
+};
+
+export class EnvironmentalReportContractError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "EnvironmentalReportContractError";
+  }
+}
+
+export class EnvironmentalReportRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "EnvironmentalReportRequestError";
+    this.status = status;
+  }
+}
+
+export const ENVIRONMENTAL_REPORT_TYPE_LABELS: Record<EnvironmentalReportType, string> = {
+  NOISE: "Ruidos molestos",
+  DUMPING: "Vertido de residuos",
+  ILLEGAL_DUMPSITE: "Microbasural",
+  WATER_DISCHARGE: "Descarga de efluentes",
+  AIR_EMISSION: "Emisión al aire",
+  ODOR: "Olores",
+  PEST_INFESTATION: "Plaga o infestación",
+  OTHER: "Otro hallazgo ambiental",
+};
+
+export const ENVIRONMENTAL_REPORT_STATUS_LABELS: Record<EnvironmentalReportStatus, string> = {
+  RECEIVED: "Recibido",
+  UNDER_REVIEW: "En revisión",
+  FORWARDED: "Derivado",
+  DISMISSED: "Desestimado",
+  INSPECTION_SCHEDULED: "Inspección programada",
+  INSPECTED: "Inspeccionado",
+  NO_VIOLATION: "Sin infracción",
+  VIOLATION_FOUND: "Infracción constatada",
+  NOTICE_ISSUED: "Acta emitida",
+  SANCTIONED: "Sancionado",
+  CLOSED: "Cerrado",
+};
+
+export const ENVIRONMENTAL_REPORT_PRIORITY_LABELS: Record<EnvironmentalReportPriority, string> = {
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+  CRITICAL: "Crítica",
+};
+
+const errorResponseSchema = z.object({
+  statusCode: z.number(),
+  message: z.union([z.string(), z.array(z.string())]),
+  error: z.string(),
+  timestamp: z.string(),
+  path: z.string(),
+});
+
+function queryString(query: EnvironmentalReportQuery): string {
+  const params = new URLSearchParams();
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  const statuses = Array.isArray(query.status) ? query.status : query.status ? [query.status] : [];
+  for (const status of statuses) params.append("status", status);
+  if (query.reportType) params.set("reportType", query.reportType);
+  if (query.priority) params.set("priority", query.priority);
+  if (query.publicId) params.set("publicId", query.publicId);
+  if (query.ticketId) params.set("ticketId", query.ticketId);
+  if (query.search) params.set("search", query.search);
+  if (query.page !== undefined) params.set("page", String(query.page));
+  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  const value = params.toString();
+  return value ? `?${value}` : "";
+}
+
+async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await authenticatedFetch(path, init);
+  } catch (cause) {
+    if (cause instanceof NetworkFailureError) {
+      recordTelemetryEvent({ name: "request_network_failure", resource: "environmental-reports" });
+    }
+    throw cause;
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (cause) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+    throw new EnvironmentalReportContractError("No se pudo obtener información válida del control ambiental. Reintente en unos segundos.", { cause });
+  }
+
+  if (!response.ok) {
+    const parsedError = errorResponseSchema.safeParse(payload);
+    const message = parsedError.success
+      ? (Array.isArray(parsedError.data.message) ? parsedError.data.message.join(" ") : parsedError.data.message)
+      : "No se pudo completar la operación ambiental.";
+    throw new EnvironmentalReportRequestError(message, response.status);
+  }
+  return payload;
+}
+
+function resourcePayload(payload: unknown): unknown {
+  return payload && typeof payload === "object" && "data" in payload && !("id" in payload)
+    ? (payload as { data: unknown }).data
+    : payload;
+}
+
+function parseResource(payload: unknown, message: string): EnvironmentalReport {
+  const parsed = environmentalReportSchema.safeParse(resourcePayload(payload));
+  if (!parsed.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+    throw new EnvironmentalReportContractError(message, { cause: parsed.error });
+  }
+  return parsed.data;
+}
+
+function parseInspection(payload: unknown, message: string): EnvironmentalInspection {
+  const parsed = environmentalInspectionSchema.safeParse(resourcePayload(payload));
+  if (!parsed.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+    throw new EnvironmentalReportContractError(message, { cause: parsed.error });
+  }
+  return parsed.data;
+}
+
+export const environmentalReportsAdapter = {
+  async issueViolationNotice(id: string, input: IssueViolationNoticeInput): Promise<ViolationNotice> {
+    const parsedInput = issueViolationNoticeInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new EnvironmentalReportContractError("Los datos para emitir el acta son inválidos.", { cause: parsedInput.error });
+    }
+    const payload = await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}/violation-notice`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsedInput.data),
+    });
+    const parsed = violationNoticeSchema.safeParse(resourcePayload(payload));
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+      throw new EnvironmentalReportContractError("No se pudo obtener información válida de la emisión del acta. Reintente en unos segundos.", { cause: parsed.error });
+    }
+    return parsed.data;
+  },
+
+  /** `null` = la inspección todavía no tiene acta (el backend responde 200 con `null`). */
+  async getViolationNotice(id: string): Promise<ViolationNotice | null> {
+    const payload = await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}/violation-notice`);
+    if (payload === null) return null;
+    const parsed = violationNoticeSchema.safeParse(resourcePayload(payload));
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+      throw new EnvironmentalReportContractError("No se pudo obtener información válida del acta. Reintente en unos segundos.", { cause: parsed.error });
+    }
+    return parsed.data;
+  },
+
+  async list(query: EnvironmentalReportQuery = {}): Promise<EnvironmentalReportsPage> {
+    const payload = await requestJson(`/api/environmental-reports${queryString(query)}`);
+    const parsed = z.object({
+      data: tolerantRecords(environmentalReportSchema, "environmental-reports"),
+      // `meta.dropped`: what the Field BFF already dropped while scoping to the crew.
+      meta: z.object({ total: z.number(), page: z.number(), pageSize: z.number(), totalPages: z.number(), dropped: z.number().int().nonnegative().optional() }),
+      sanctionOutcomeIntegrationExceptions: z.array(sanctionOutcomeIntegrationExceptionSchema).optional(),
+    }).safeParse(payload);
+    if (!parsed.success) throw new EnvironmentalReportContractError("No se pudo obtener información válida de la lista de expedientes. Reintente en unos segundos.", { cause: parsed.error });
+    return {
+      environmentalReports: parsed.data.data,
+      dropped: droppedRecords(parsed.data.data) + (parsed.data.meta.dropped ?? 0),
+      page: parsed.data.meta.page,
+      pageSize: parsed.data.meta.pageSize,
+      total: parsed.data.meta.total,
+      totalPages: parsed.data.meta.totalPages,
+      sanctionOutcomeIntegrationExceptions: parsed.data.sanctionOutcomeIntegrationExceptions ?? [],
+    };
+  },
+
+  async get(id: string): Promise<EnvironmentalReport> {
+    return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}`), "No se pudo obtener información válida del detalle del expediente. Reintente en unos segundos.");
+  },
+
+  async create(input: CreateEnvironmentalReportInput): Promise<EnvironmentalReport> {
+    const parsedInput = createEnvironmentalReportInputSchema.safeParse(input);
+    if (!parsedInput.success) throw new EnvironmentalReportContractError("Los datos del hallazgo son inválidos.", { cause: parsedInput.error });
+    return parseResource(await requestJson("/api/environmental-reports", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsedInput.data),
+    }), "No se pudo obtener información válida de la creación del expediente. Reintente en unos segundos.");
+  },
+
+  async startReview(id: string): Promise<EnvironmentalReport> {
+    return transition(id, "start-review", "No se pudo obtener información válida del inicio de revisión. Reintente en unos segundos.");
+  },
+  async forward(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
+    return transition(id, "forward", "No se pudo obtener información válida de derivación. Reintente en unos segundos.", decisionBody(input));
+  },
+  async dismiss(id: string, input: ReportDecisionInput): Promise<EnvironmentalReport> {
+    return transition(id, "dismiss", "No se pudo obtener información válida de desestimación. Reintente en unos segundos.", decisionBody(input));
+  },
+  async requestInformation(id: string, input: RequestInformationInput): Promise<EnvironmentalReport> {
+    const parsed = requestInformationInputSchema.safeParse(input);
+    if (!parsed.success) throw new EnvironmentalReportContractError(parsed.error.issues[0]?.message ?? "El pedido de información es inválido.", { cause: parsed.error });
+    return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}/request-information`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed.data),
+    }), "No se pudo obtener información válida del pedido de información. Reintente en unos segundos.");
+  },
+  async close(id: string): Promise<EnvironmentalReport> {
+    return transition(id, "close", "No se pudo obtener información válida de cierre. Reintente en unos segundos.");
+  },
+
+  async schedule(reportId: string, input: EnvironmentalInspectionScheduleInput): Promise<EnvironmentalInspection> {
+    const parsedInput = environmentalInspectionScheduleInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new EnvironmentalReportContractError("Los datos para programar la inspección son inválidos.", { cause: parsedInput.error });
+    }
+    return parseInspection(await requestJson(`/api/environmental-reports/${encodeURIComponent(reportId)}/inspections`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsedInput.data),
+    }), "No se pudo obtener información válida de la programación de inspección. Reintente en unos segundos.");
+  },
+
+  async listInspections(reportId: string): Promise<EnvironmentalInspection[]> {
+    const payload = await requestJson(`/api/environmental-reports/${encodeURIComponent(reportId)}/inspections`);
+    const raw = payload && typeof payload === "object" && "data" in payload
+      ? (payload as { data: unknown }).data
+      : payload;
+    const parsed = z.array(environmentalInspectionSchema).safeParse(raw);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "environmental-reports" });
+      throw new EnvironmentalReportContractError("No se pudo obtener información válida de la historia de inspecciones. Reintente en unos segundos.", { cause: parsed.error });
+    }
+    return parsed.data;
+  },
+
+  async completeInspection(id: string, input: EnvironmentalInspectionCompleteInput): Promise<EnvironmentalInspection> {
+    const parsedInput = environmentalInspectionCompleteInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new EnvironmentalReportContractError("Los datos para completar la inspecci\u00f3n son inv\u00e1lidos.", { cause: parsedInput.error });
+    }
+    return parseInspection(await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsedInput.data),
+    }), "No se pudo obtener información válida de la finalizaci\u00f3n de inspecci\u00f3n. Reintente en unos segundos.");
+  },
+
+  async getInspection(id: string): Promise<EnvironmentalInspection> {
+    return parseInspection(await requestJson(`/api/environmental-inspections/${encodeURIComponent(id)}`), "No se pudo obtener información válida del detalle de inspección. Reintente en unos segundos.");
+  },
+};
+
+function decisionBody(input: ReportDecisionInput) {
+  const parsed = reportDecisionInputSchema.safeParse(input);
+  if (!parsed.success) throw new EnvironmentalReportContractError(parsed.error.issues[0]?.message ?? "El motivo es inválido.", { cause: parsed.error });
+  return parsed.data;
+}
+
+async function transition(id: string, action: string, message: string, body?: ReportDecisionInput): Promise<EnvironmentalReport> {
+  const init: RequestInit = body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { method: "POST" };
+  return parseResource(await requestJson(`/api/environmental-reports/${encodeURIComponent(id)}/${action}`, init), message);
+}

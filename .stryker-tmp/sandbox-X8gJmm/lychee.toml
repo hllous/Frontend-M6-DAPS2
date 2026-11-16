@@ -1,0 +1,17 @@
+# Link check for the repository's own documentation (#348).
+#
+# Offline on purpose: it verifies that relative links and #anchors between our
+# Markdown files resolve, and never touches the network, so it cannot flake.
+# External URLs are not checked here.
+#
+# Run locally (install lychee first: https://lychee.cli.rs/installation/):
+#   lychee --config lychee.toml '*.md' 'docs/**/*.md' '.github/*.md'
+
+offline = true
+include_fragments = "anchor-only"
+no_progress = true
+
+# Read-only, intentionally partial mirror of Backend docs: it links to pages that
+# were not copied, so its links are validated at the Backend source, not here.
+# Regex; accepts both separators so the same file works on Windows and Linux.
+exclude_path = ['docs[/\\]backend-context']

@@ -1,0 +1,46 @@
+# Deja Chromium de Playwright listo (navegador en caché + dependencias del sistema si faltan).
+# Requiere setup-node-pnpm ejecutado antes.
+name: Setup Playwright Chromium
+description: Restaura la caché del navegador, instala Chromium y, solo si le faltan librerías, sus dependencias del sistema.
+
+runs:
+  using: composite
+  steps:
+    - name: Read Playwright version
+      id: playwright-version
+      shell: bash
+      run: |
+        version=$(node -p "require('@playwright/test/package.json').version")
+        printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Playwright browser cache
+      id: cache-playwright
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.version }}
+
+    - name: Install Playwright Chromium
+      if: ${{ steps.cache-playwright.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: pnpm exec playwright install chromium
+
+    # La imagen ubuntu-24.04 ya trae las librerías de Chromium; `install-deps` solo
+    # sumaba un `apt-get update` (7–35 s por job) y fuentes CJK que ningún test usa
+    # (no hay capturas de comparación). Si una imagen futura las pierde, `ldd` lo
+    # detecta y se instalan como antes.
+    - name: Install Playwright system dependencies if missing
+      shell: bash
+      run: |
+        missing=false
+        while IFS= read -r browser; do
+          if ldd "$browser" 2>/dev/null | grep -q "not found"; then
+            echo "Missing shared libraries for $browser"
+            missing=true
+          fi
+        done < <(find ~/.cache/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell \))
+        if [ "$missing" = true ]; then
+          pnpm exec playwright install-deps chromium
+        else
+          echo "Chromium shared libraries already present; skipping install-deps."
+        fi

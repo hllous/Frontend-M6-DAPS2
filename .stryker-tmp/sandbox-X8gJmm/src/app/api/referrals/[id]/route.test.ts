@@ -1,0 +1,137 @@
+// @ts-nocheck
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { addRepairRequestFixture, resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
+import { resetStreetClosureRequestFixtures } from "@/lib/street-closure-request-fixtures";
+import { resetServiceFixtures } from "@/lib/services-fixtures";
+import { GET } from "./route";
+import { loginAs } from "@/test/session";
+
+beforeEach(() => {
+  process.env.M6_AUTH_MODE = "mock";
+  resetRepairRequestFixtures();
+  resetStreetClosureRequestFixtures();
+  resetServiceFixtures();
+});
+
+afterEach(() => {
+  delete process.env.M6_AUTH_MODE;
+  delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
+});
+
+
+
+describe("referral detail BFF", () => {
+  it("lets Field open an assigned StreetClosureRequest detail", async () => {
+    const cookie = await loginAs("field-crew-leader-route");
+    const response = await GET(
+      new Request("http://localhost/api/referrals/SCR-1001", { headers: { cookie } }),
+      { params: Promise.resolve({ id: "SCR-1001" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ kind: "STREET_CLOSURE_REQUEST", sourceServiceId: "SVC-1050" });
+  });
+
+  it("does not disclose an out-of-scope referral detail to Field", async () => {
+    addRepairRequestFixture({
+      id: "RR-OTHER",
+      damageType: "BROKEN_SIDEWALK",
+      address: "Av. de los Trabajadores 100",
+      severity: "LOW",
+      publicSafetyRisk: false,
+      detectedInType: "SERVICE",
+      detectedInId: "SVC-1042",
+      sourceContext: {
+        type: "SERVICE",
+        id: "SVC-1042",
+        label: "Recolección de residuos — Recorrido 4",
+        href: "/app?destination=services&detail=SVC-1042",
+      },
+      status: "REQUESTED",
+      workOrderId: null,
+      requestedAt: "2026-09-05T08:00:00.000Z",
+    });
+    const cookie = await loginAs("field-crew-leader-route");
+    const response = await GET(
+      new Request("http://localhost/api/referrals/RR-OTHER", { headers: { cookie } }),
+      { params: Promise.resolve({ id: "RR-OTHER" }) },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("returns a safe 502 when the backend success body is not JSON", async () => {
+    process.env.M6_AUTH_MODE = "real-m1";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<!doctype html><title>Proxy error</title>", {
+      status: 200,
+      headers: { "content-type": "text/html" },
+    }));
+    const cookie = await loginAs("office-duty-queue");
+
+    const response = await GET(
+      new Request("http://localhost/api/referrals/RR-NONJSON", { headers: { cookie } }),
+      { params: Promise.resolve({ id: "RR-NONJSON" }) },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      message: "No se pudo obtener la derivación. Reintente en unos segundos.",
+      path: "/api/referrals/RR-NONJSON",
+    });
+  });
+
+  it("wraps non-JSON backend errors with the safe BFF envelope", async () => {
+    process.env.M6_AUTH_MODE = "real-m1";
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>internal proxy detail</html>", {
+      status: 503,
+      headers: { "content-type": "text/html" },
+    }));
+    const cookie = await loginAs("office-duty-queue");
+
+    const response = await GET(
+      new Request("http://localhost/api/referrals/RR-UPSTREAM-ERROR", { headers: { cookie } }),
+      { params: Promise.resolve({ id: "RR-UPSTREAM-ERROR" }) },
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-type")).toContain("application/json");
+    const body = await response.json();
+    expect(body).toMatchObject({
+      statusCode: 503,
+      error: "Service Unavailable",
+      message: "El sistema devolvió una respuesta que no se pudo leer. Reintente en unos segundos.",
+      path: "/api/referrals/RR-UPSTREAM-ERROR",
+    });
+    expect(JSON.stringify(body)).not.toContain("internal proxy detail");
+  });
+
+  it("checks backend referral sources with encoded ids using GET and the session bearer token", async () => {
+    const id = "RR-encoded_42.3~";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const cookie = await loginAs("office-duty-queue", {
+      mode: "real-m1",
+      accessToken: devJwt,
+      backendOrigin: "https://backend.internal",
+    });
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ message: "No existe" }, { status: 404 }));
+
+    const response = await GET(
+      new Request(`http://localhost/api/referrals/${id}`, { headers: { cookie } }),
+      { params: Promise.resolve({ id }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(backendFetch.mock.calls.map(([url, init]) => [String(url), init?.method ?? "GET"])).toEqual([
+      [`https://backend.internal/repair-requests/${id}`, "GET"],
+      [`https://backend.internal/street-closure-requests/${id}`, "GET"],
+    ]);
+    expect(backendFetch.mock.calls.every(([, init]) =>
+      new Headers(init?.headers).get("authorization") === `Bearer ${devJwt}`,
+    )).toBe(true);
+  });
+});

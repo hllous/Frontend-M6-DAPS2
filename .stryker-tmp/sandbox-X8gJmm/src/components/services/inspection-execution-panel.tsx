@@ -1,0 +1,548 @@
+// @ts-nocheck
+"use client";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { CardSkeleton } from "@/components/ui/loading-skeletons";
+import { errorMessage } from "@/lib/error-message";
+
+import { useEffect, useId, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CloudOff,
+  FileCheck,
+  Paperclip,
+  RefreshCw,
+  Upload,
+  X,
+} from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
+import { notifyError, notifySuccess } from "@/components/ui/feedback";
+import { EVIDENCE_FILE_SIZE_LABEL, MAX_EVIDENCE_FILE_SIZE_BYTES } from "@/lib/evidence-limits";
+import { NetworkFailureError } from "@/lib/authenticated-fetch";
+import { formatCalendarDay } from "@/lib/argentina-date";
+import {
+  ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS,
+  ENVIRONMENTAL_SEVERITY_LABELS as SEVERITY_LABELS,
+  ENVIRONMENTAL_SUGGESTED_ACTION_LABELS as SUGGESTED_ACTION_LABELS,
+  ENVIRONMENTAL_VIOLATION_TYPE_LABELS as VIOLATION_TYPE_LABELS,
+  environmentalInspectionCompleteInputSchema,
+  environmentalInspectionOutcomeSchema,
+  environmentalInspectionSeveritySchema,
+  environmentalInspectionSuggestedActionSchema,
+  environmentalInspectionViolationTypeSchema,
+  environmentalReportsAdapter,
+  inspectionChecklist,
+  type EnvironmentalInspection,
+  type EnvironmentalInspectionCompleteInput,
+} from "@/lib/environmental-reports";
+import {
+  clearFieldDraft,
+  getFieldDraft,
+  resubmitFieldAction,
+  submitFieldAction,
+  type FieldDraftServiceSnapshot,
+} from "@/lib/field-drafts";
+import { servicesAdapter, ServiceRequestError, type Service } from "@/lib/services";
+import { OFFLINE_DRAFT_MESSAGE, OfflineDraftNotice } from "./offline-draft-notice";
+import { DraftConflictView } from "./draft-conflict-view";
+import { ZoneExecutionPanel } from "./zone-execution-panel";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { randomUuid } from "@/lib/random-id";
+
+type QueuedEvidenceFile = {
+  id: string;
+  file: File;
+  localFilename: string;
+  idempotencyKey: string;
+  status: "pending" | "uploading" | "success" | "error";
+  canonicalFilename?: string;
+  error?: string;
+};
+
+type InspectionCompletionDraftPayload = EnvironmentalInspectionCompleteInput;
+
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+const ACCEPTED_FILE_TYPES = "image/jpeg,image/png,image/webp,application/pdf";
+
+
+const NEXT_STEP_LABELS: Record<NonNullable<EnvironmentalInspection["nextStep"]>, string> = {
+  NOTICE_TO_BE_ISSUED: "Aviso a emitir por Oficina",
+  REINSPECTION: "Reinspección",
+  CASE_CLOSED: "Cierre del expediente",
+};
+
+function randomIdempotencyKey() {
+  return randomUuid();
+}
+
+function validationMessage(error: { issues: Array<{ message: string }> }) {
+  return error.issues.map((issue) => issue.message).join(" ");
+}
+
+function dateTimeLocalValue(value = new Date().toISOString()) {
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function splitDateTimeLocal(value: string) {
+  const [date = "", time = ""] = value.split("T");
+  return { date, time };
+}
+
+function joinDateTimeLocal({ date, time }: { date: string; time: string }) {
+  return date && time ? `${date}T${time}` : "";
+}
+
+function resultPayload(
+  inspection: EnvironmentalInspection,
+  checkedItems: Record<string, boolean>,
+  inspectedAt: string,
+  outcome: EnvironmentalInspectionCompleteInput["outcome"],
+  conclusion: string,
+  findings: string,
+  violationType: EnvironmentalInspectionCompleteInput["violationType"],
+  severity: EnvironmentalInspectionCompleteInput["severity"],
+  suggestedAction: EnvironmentalInspectionCompleteInput["suggestedAction"],
+): InspectionCompletionDraftPayload {
+  const inspectionDate = new Date(inspectedAt);
+  return {
+    inspectedAt: Number.isNaN(inspectionDate.getTime()) ? inspectedAt : inspectionDate.toISOString(),
+    outcome,
+    ...(outcome === "VIOLATION_FOUND" ? { nextStep: "NOTICE_TO_BE_ISSUED" as const } : {}),
+    checklist: inspectionChecklist(inspection).map((item) => ({ id: item.id, label: item.label, completed: checkedItems[item.id] === true })),
+    ...(conclusion.trim() ? { conclusion: conclusion.trim() } : {}),
+    ...(findings.trim() ? { findings: findings.trim() } : {}),
+    ...(violationType ? { violationType } : {}),
+    ...(severity ? { severity } : {}),
+    ...(suggestedAction ? { suggestedAction } : {}),
+  };
+}
+
+export function InspectionExecutionPanel({
+  service,
+  canExecute = false,
+  waitingForStart = false,
+  onServiceUpdated,
+}: {
+  service: Service;
+  canExecute?: boolean;
+  /** Quien ejecuta el servicio lo ve antes de iniciarlo: no es sólo consulta, falta iniciar. */
+  waitingForStart?: boolean;
+  onServiceUpdated?: (updated: Service) => void;
+}) {
+  const inputId = useId();
+  const [savedDraft] = useState(() => getFieldDraft<InspectionCompletionDraftPayload>(service.id, "inspectionCompletion"));
+  const inspectionId = service.inspectionId;
+  const [inspection, setInspection] = useState<EnvironmentalInspection | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<EnvironmentalInspectionCompleteInput["outcome"]>(savedDraft?.payload.outcome ?? "NO_VIOLATION");
+  const [inspectedAtParts, setInspectedAtParts] = useState(() => splitDateTimeLocal(dateTimeLocalValue(savedDraft?.payload.inspectedAt)));
+  const inspectedAt = joinDateTimeLocal(inspectedAtParts);
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(savedDraft?.payload.checklist.map((item) => [item.id, item.completed]) ?? []),
+  );
+  const [conclusion, setConclusion] = useState(savedDraft?.payload.conclusion ?? "");
+  const [findings, setFindings] = useState(savedDraft?.payload.findings ?? "");
+  const [violationType, setViolationType] = useState<EnvironmentalInspectionCompleteInput["violationType"]>(savedDraft?.payload.violationType);
+  const [severity, setSeverity] = useState<EnvironmentalInspectionCompleteInput["severity"]>(savedDraft?.payload.severity);
+  const [suggestedAction, setSuggestedAction] = useState<EnvironmentalInspectionCompleteInput["suggestedAction"]>(savedDraft?.payload.suggestedAction);
+  const [queuedFiles, setQueuedFiles] = useState<QueuedEvidenceFile[]>([]);
+  const [fileValidationError, setFileValidationError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [composedAgainst, setComposedAgainst] = useState<FieldDraftServiceSnapshot | null>(savedDraft?.composedAgainst ?? null);
+  const [conflict, setConflict] = useState<{
+    current: Service;
+    composedAgainst: FieldDraftServiceSnapshot;
+  } | null>(null);
+
+  function updateInspectedAtPart(part: "date" | "time", value: string) {
+    setInspectedAtParts((current) => ({ ...current, [part]: value }));
+  }
+
+  useEffect(() => {
+    let current = true;
+    if (!inspectionId) {
+      return () => {
+        current = false;
+      };
+    }
+
+    void environmentalReportsAdapter.getInspection(inspectionId)
+      .then((loaded) => {
+        if (!current) return;
+        setInspection(loaded);
+        if (!savedDraft) {
+          setCheckedItems(Object.fromEntries(inspectionChecklist(loaded).map((item) => [item.id, false])));
+        }
+      })
+      .catch((error: unknown) => {
+        if (current) setLoadError(errorMessage(error, "No se pudo cargar la inspección ambiental."));
+      });
+
+    return () => {
+      current = false;
+    };
+  }, [inspectionId, savedDraft]);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files?.length) return;
+    const errors: string[] = [];
+    const accepted: QueuedEvidenceFile[] = [];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_EVIDENCE_FILE_SIZE_BYTES) {
+        errors.push(`\"${file.name}\" pesa más de ${EVIDENCE_FILE_SIZE_LABEL}.`);
+        continue;
+      }
+      if (!ALLOWED_MIME_TYPES.has(file.type)) {
+        errors.push(`\"${file.name}\" no es una foto ni un PDF.`);
+        continue;
+      }
+      accepted.push({ id: `file-${randomUuid()}`, file, localFilename: file.name, idempotencyKey: randomIdempotencyKey(), status: "pending" });
+    }
+    setFileValidationError(errors.length ? errors.join(" ") : null);
+    if (accepted.length) setQueuedFiles((current) => [...current, ...accepted]);
+    event.target.value = "";
+  };
+
+  const uploadSingleFile = async (item: QueuedEvidenceFile): Promise<boolean> => {
+    if (!inspection) return false;
+    setQueuedFiles((current) => current.map((file) => file.id === item.id ? { ...file, status: "uploading", error: undefined } : file));
+    try {
+      const attachment = await servicesAdapter.uploadEvidence({ file: item.file, ownerType: "INSPECTION", ownerId: inspection.id, idempotencyKey: item.idempotencyKey });
+      setQueuedFiles((current) => current.map((file) => file.id === item.id ? { ...file, status: "success", canonicalFilename: attachment.filename } : file));
+      setInspection((current) => current ? { ...current, attachments: [...(current.attachments ?? []).filter((file) => file.id !== attachment.id), attachment] } : current);
+      return true;
+    } catch (error: unknown) {
+      const message = errorMessage(error, "No se pudo subir el archivo. Intente nuevamente.");
+      setQueuedFiles((current) => current.map((file) => file.id === item.id ? { ...file, status: "error", error: message } : file));
+      if (error instanceof NetworkFailureError) throw error;
+      return false;
+    }
+  };
+
+  const uploadPendingEvidence = async () => {
+    for (const file of queuedFiles) {
+      if (file.status === "success") continue;
+      if (!(await uploadSingleFile(file))) return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!inspection) return;
+    setFormError(null);
+    setSuccessMessage(null);
+
+    const payload = resultPayload(inspection, checkedItems, inspectedAt, outcome, conclusion, findings, violationType, severity, suggestedAction);
+    const parsed = environmentalInspectionCompleteInputSchema.safeParse(payload);
+    if (!parsed.success) {
+      setFormError(validationMessage(parsed.error));
+      return;
+    }
+    if (outcome !== "NO_VIOLATION" && (inspection.attachments?.length ?? 0) === 0 && queuedFiles.length === 0) {
+      setFormError("Debe adjuntar al menos una evidencia para este resultado.");
+      return;
+    }
+
+    const submit = async (nextPayload: InspectionCompletionDraftPayload) => {
+      const uploaded = await uploadPendingEvidence();
+      if (!uploaded) throw new Error("No se pudo cargar toda la evidencia. Revise los archivos marcados y reintente.");
+      return environmentalReportsAdapter.completeInspection(inspection.id, nextPayload);
+    };
+
+    setIsSubmitting(true);
+    try {
+      const action = composedAgainst
+        ? await resubmitFieldAction({ serviceId: service.id, actionType: "inspectionCompletion", composedAgainst, payload: parsed.data, submit })
+        : await submitFieldAction({ service, actionType: "inspectionCompletion", payload: parsed.data, submit });
+
+      if (action.kind === "success") {
+        setInspection(action.result);
+        setComposedAgainst(null);
+        setSuccessMessage(`Siguiente paso: ${action.result.nextStep ? NEXT_STEP_LABELS[action.result.nextStep] : "pendiente de confirmación"}.`);
+        notifySuccess("Inspección completada.");
+        const updatedService = await servicesAdapter.get(service.id).catch(() => null);
+        if (updatedService) onServiceUpdated?.(updatedService);
+      } else if (action.kind === "draft-saved") {
+        setComposedAgainst(action.draft.composedAgainst);
+        const message = OFFLINE_DRAFT_MESSAGE;
+        setFormError(message);
+        notifyError(message);
+      } else if (action.kind === "conflict") {
+        setConflict({ current: action.current, composedAgainst: action.composedAgainst });
+      } else if (action.kind === "still-offline") {
+        const message = OFFLINE_DRAFT_MESSAGE;
+        setFormError(message);
+        notifyError(message);
+      } else {
+        setFormError(action.message);
+        notifyError(action.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const discardDraft = () => {
+    clearFieldDraft(service.id, "inspectionCompletion");
+    setComposedAgainst(null);
+    setConflict(null);
+    setOutcome("NO_VIOLATION");
+    setInspectedAtParts(splitDateTimeLocal(dateTimeLocalValue()));
+    setCheckedItems(Object.fromEntries((inspection ? inspectionChecklist(inspection) : []).map((item) => [item.id, false])));
+    setConclusion("");
+    setFindings("");
+    setViolationType(undefined);
+    setSeverity(undefined);
+    setSuggestedAction(undefined);
+    setFormError(null);
+  };
+
+  if (loadError || !inspectionId) {
+    return <Alert variant="destructive" className="mt-6" role="alert"><AlertTriangle aria-hidden /><AlertTitle>No se pudo cargar la inspección</AlertTitle><AlertDescription>{loadError ?? "Este servicio no tiene inspección."}</AlertDescription></Alert>;
+  }
+
+  if (!inspection) {
+    return <LoadingRegion label="Inspección ambiental" className="mt-6 flex flex-col gap-4"><CardSkeleton titleClassName="h-5 w-1/3" lineWidths={["w-full", "w-5/6", "w-2/3"]} /><CardSkeleton titleClassName="h-5 w-1/4" lineWidths={["w-full", "w-3/4"]} /></LoadingRegion>;
+  }
+
+  const completed = Boolean(inspection.outcome);
+  const hasDraft = Boolean(composedAgainst);
+  const checklistComplete = inspectionChecklist(inspection).every((item) => checkedItems[item.id] === true);
+
+  return (
+    <LoadingRegion label="Inspección ambiental" isLoading={false} className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
+      <div className="flex flex-col gap-3 border-b border-[var(--color-border)] pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-action)]"><FileCheck aria-hidden />Control ambiental</div>
+          <h2 id={`inspection-execution-heading-${inputId}`} className="mt-1 text-lg font-bold text-[var(--color-text)]">Inspección ambiental</h2>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{service.title} · {formatCalendarDay(service.scheduledDate)} · {service.windowFrom ? `${service.windowFrom}–${service.windowTo ?? ""}` : "—"}</p>
+        </div>
+        <span className="rounded-lg bg-[var(--color-info-fill)] px-2.5 py-1 text-xs font-semibold text-[var(--color-info)]">Punto asignado</span>
+      </div>
+
+      {!canExecute && !completed && (waitingForStart
+        ? <Alert className="mt-4" role="status"><AlertTriangle aria-hidden /><AlertTitle>Inicie el servicio para registrar la inspección.</AlertTitle></Alert>
+        : <Alert className="mt-4" role="status"><CloudOff aria-hidden /><AlertTitle>Solo consulta</AlertTitle></Alert>
+      )}
+
+      {!canExecute && !completed ? (
+        <ReadOnlyInspection inspection={inspection} />
+      ) : completed ? (
+        <InspectionResult inspection={inspection} />
+      ) : (
+        <form className="mt-5 flex flex-col gap-5" onSubmit={handleSubmit}>
+          {hasDraft && <OfflineDraftNotice>Sin enviar. Reenvíe cuando vuelva la conexión.</OfflineDraftNotice>}
+
+          <FieldGroup>
+            <Field data-invalid={!inspectedAt || undefined}>
+              <FieldLabel id={`${inputId}-inspected-at-label`} htmlFor={`${inputId}-inspected-at-date`}>Fecha y hora de inspección <span aria-hidden="true">*</span></FieldLabel>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <DatePicker
+                  id={`${inputId}-inspected-at-date`}
+                  value={inspectedAtParts.date}
+                  onChange={(value) => updateInspectedAtPart("date", value)}
+                  disabled={!canExecute || isSubmitting}
+                  invalid={!inspectedAt}
+                  aria-required
+                  aria-labelledby={`${inputId}-inspected-at-label`}
+                />
+                <TimePicker
+                  id={`${inputId}-inspected-at-time`}
+                  value={inspectedAtParts.time}
+                  onChange={(value) => updateInspectedAtPart("time", value)}
+                  disabled={!canExecute || isSubmitting}
+                  invalid={!inspectedAt}
+                  required
+                  aria-labelledby={`${inputId}-inspected-at-label`}
+                />
+              </div>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`${inputId}-outcome`}>Resultado de la inspección <span aria-hidden="true">*</span></FieldLabel>
+              <Select value={outcome} onValueChange={(value) => { if (value) setOutcome(environmentalInspectionOutcomeSchema.parse(value)); }} disabled={!canExecute || isSubmitting}>
+                <SelectTrigger id={`${inputId}-outcome`} aria-required>
+                  <SelectValue>{ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[outcome]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {environmentalInspectionOutcomeSchema.options.map((value) => <SelectItem key={value} value={value}>{ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[value]}</SelectItem>)}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <FieldSet className="gap-3 rounded-xl border border-[var(--color-border)] p-4" data-invalid={!checklistComplete || undefined}>
+              <FieldLegend>Checklist de inspección <span aria-hidden="true">*</span></FieldLegend>
+              <FieldGroup>
+              {inspectionChecklist(inspection).map((item) => {
+                const checkboxId = `${inputId}-check-${item.id}`;
+                return (
+                  <FieldLabel key={item.id} htmlFor={checkboxId} className="min-h-12 w-full items-center gap-3">
+                    <Checkbox id={checkboxId} checked={checkedItems[item.id] === true} onCheckedChange={(checked) => setCheckedItems((current) => ({ ...current, [item.id]: checked === true }))} disabled={!canExecute || isSubmitting} />
+                    <span>{item.label}{item.required ? <span className="ml-1 text-xs text-muted-foreground">(obligatorio)</span> : null}</span>
+                  </FieldLabel>
+                );
+              })}
+              {!checklistComplete && canExecute && <p className="text-xs text-[var(--color-warning)]">Faltan controles por completar.</p>}
+              </FieldGroup>
+            </FieldSet>
+
+            {/* El backend guarda la conclusión con cualquier resultado; sólo es obligatoria sin infracción o inconclusa. */}
+            <Field>
+              <FieldLabel htmlFor={`${inputId}-conclusion`}>{outcome === "NO_VIOLATION" ? "Conclusión" : outcome === "INCONCLUSIVE" ? "Explicación de la inspección inconclusa" : "Conclusión (opcional)"} {outcome !== "VIOLATION_FOUND" && <span aria-hidden="true">*</span>}</FieldLabel>
+              <Textarea id={`${inputId}-conclusion`} value={conclusion} onChange={(event) => setConclusion(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28" />
+            </Field>
+
+            {outcome === "VIOLATION_FOUND" && <>
+              <Field><FieldLabel>Próximo paso</FieldLabel><p className="rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] px-3 py-2 text-sm">{NEXT_STEP_LABELS.NOTICE_TO_BE_ISSUED}</p></Field>
+              <Field>
+                <FieldLabel htmlFor={`${inputId}-findings`}>Hallazgos <span aria-hidden="true">*</span></FieldLabel>
+                <Textarea id={`${inputId}-findings`} value={findings} onChange={(event) => setFindings(event.target.value)} disabled={!canExecute || isSubmitting} className="min-h-28" />
+              </Field>
+              <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor={`${inputId}-violation-type`}>Tipo de infracción <span aria-hidden="true">*</span></FieldLabel>
+                  <Combobox
+                    id={`${inputId}-violation-type`}
+                    value={violationType ?? ""}
+                    onChange={(value) => setViolationType(value ? environmentalInspectionViolationTypeSchema.parse(value) : undefined)}
+                    options={environmentalInspectionViolationTypeSchema.options.map((value) => ({ value, label: VIOLATION_TYPE_LABELS[value] }))}
+                    placeholder="Seleccione un tipo"
+                    searchPlaceholder="Buscar tipo de infracción"
+                    emptyText="No hay tipos de infracción coincidentes"
+                    disabled={!canExecute || isSubmitting}
+                    aria-required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${inputId}-severity`}>Gravedad <span aria-hidden="true">*</span></FieldLabel>
+                  <Select value={severity ?? null} onValueChange={(value) => setSeverity(value ? environmentalInspectionSeveritySchema.parse(value) : undefined)} disabled={!canExecute || isSubmitting}>
+                    <SelectTrigger id={`${inputId}-severity`} aria-required>
+                      <SelectValue placeholder="Seleccione una gravedad">{severity ? SEVERITY_LABELS[severity] : undefined}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {environmentalInspectionSeveritySchema.options.map((value) => <SelectItem key={value} value={value}>{SEVERITY_LABELS[value]}</SelectItem>)}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </FieldGroup>
+              <Field>
+                <FieldLabel htmlFor={`${inputId}-suggested-action`}>Acción sugerida <span aria-hidden="true">*</span></FieldLabel>
+                <Select value={suggestedAction ?? null} onValueChange={(value) => setSuggestedAction(value ? environmentalInspectionSuggestedActionSchema.parse(value) : undefined)} disabled={!canExecute || isSubmitting}>
+                  <SelectTrigger id={`${inputId}-suggested-action`} aria-required>
+                    <SelectValue placeholder="Seleccione una acción">{suggestedAction ? SUGGESTED_ACTION_LABELS[suggestedAction] : undefined}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {environmentalInspectionSuggestedActionSchema.options.map((value) => <SelectItem key={value} value={value}>{SUGGESTED_ACTION_LABELS[value]}</SelectItem>)}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </>}
+          </FieldGroup>
+
+          <EvidenceQueue queuedFiles={queuedFiles} fileValidationError={fileValidationError} onFileSelect={handleFileSelect} onRemoveFile={(id) => setQueuedFiles((current) => current.filter((file) => file.id !== id))} onRetryFile={(file) => void uploadSingleFile(file)} disabled={!canExecute || isSubmitting} />
+
+          {formError && <Alert variant="danger"><AlertTriangle aria-hidden /><AlertDescription id={`${inputId}-form-error`}>{formError}</AlertDescription></Alert>}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end"><Button type="submit" disabled={!canExecute || isSubmitting} className="gap-2"><FileCheck data-icon="inline-start" aria-hidden />{isSubmitting ? "Registrando inspección…" : hasDraft ? "Reenviar" : "Completar inspección"}</Button></div>
+        </form>
+      )}
+
+      {successMessage && <Alert className="mt-4" role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Inspección completada</AlertTitle><AlertDescription>{successMessage}</AlertDescription></Alert>}
+
+      {completed && <ServiceClosureGuide service={service} canExecute={canExecute} onServiceUpdated={onServiceUpdated} />}
+
+      <Dialog open={Boolean(conflict)} onOpenChange={(open) => { if (!open) setConflict(null); }}>
+        <DialogContent className="max-w-lg border-[var(--color-border)] bg-[var(--color-surface)]">
+          <DialogHeader><DialogTitle>El servicio cambió</DialogTitle></DialogHeader>
+          {conflict && <DraftConflictView composedAgainst={conflict.composedAgainst} current={conflict.current} onPreserve={() => { setConflict(null); }} onDiscard={() => { discardDraft(); }} />}
+        </DialogContent>
+      </Dialog>
+    </LoadingRegion>
+  );
+}
+
+function InspectionResult({ inspection }: { inspection: EnvironmentalInspection }) {
+  const outcome = inspection.outcome ?? "INCONCLUSIVE";
+  return <div className="mt-5 flex flex-col gap-4"><Alert role="status" aria-live="polite"><CheckCircle2 aria-hidden /><AlertTitle>Resultado registrado: {ENVIRONMENTAL_INSPECTION_OUTCOME_LABELS[outcome]}</AlertTitle><AlertDescription>Siguiente paso: {inspection.nextStep ? NEXT_STEP_LABELS[inspection.nextStep] : "pendiente de confirmación"}.</AlertDescription></Alert><dl className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-canvas)] p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Checklist</dt><dd className="mt-1 text-[var(--color-text)]">{inspectionChecklist(inspection).length} controles registrados</dd></div>{inspection.conclusion && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Conclusión</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.conclusion}</dd></div>}{inspection.findings && <div className="sm:col-span-2"><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Hallazgos registrados</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.findings}</dd></div>}{inspection.violationType && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Tipo de infracción</dt><dd className="mt-1 text-[var(--color-text)]">{VIOLATION_TYPE_LABELS[inspection.violationType]}</dd></div>}{inspection.severity && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Gravedad</dt><dd className="mt-1 text-[var(--color-text)]">{SEVERITY_LABELS[inspection.severity]}</dd></div>}{inspection.suggestedAction && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Acción sugerida</dt><dd className="mt-1 text-[var(--color-text)]">{SUGGESTED_ACTION_LABELS[inspection.suggestedAction]}</dd></div>}{inspection.attachments && inspection.attachments.length > 0 && <div><dt className="text-xs font-semibold text-[var(--color-text-secondary)]">Evidencia</dt><dd className="mt-1 text-[var(--color-text)]">{inspection.attachments.length} archivo(s) asociado(s)</dd></div>}</dl></div>;
+}
+
+/**
+ * Completar la inspección no cierra el Servicio POINT: queda IN_PROGRESS hasta que la
+ * cuadrilla registra el resultado por zona y lo completa, como cualquier servicio.
+ * No hay cierre automático; esto sólo lleva a ese flujo.
+ */
+function ServiceClosureGuide({ service, canExecute, onServiceUpdated }: { service: Service; canExecute: boolean; onServiceUpdated?: (updated: Service) => void }) {
+  if (service.status !== "IN_PROGRESS" && service.status !== "COMPLETED" && service.status !== "PARTIALLY_COMPLETED") return null;
+  const open = service.status === "IN_PROGRESS";
+  return <>
+    <Alert className="mt-4" role="status" aria-label={open ? "El servicio sigue abierto" : "Servicio cerrado"}>{open ? <AlertTriangle aria-hidden /> : <CheckCircle2 aria-hidden />}<AlertTitle>{open ? "El servicio sigue abierto" : "Servicio cerrado"}</AlertTitle><AlertDescription>{open ? canExecute ? "Falta registrar la zona y completar el servicio." : "La cuadrilla asignada tiene que registrar la zona y completar el servicio." : `${service.title} quedó cerrado con el resultado por zona.`}</AlertDescription></Alert>
+    <ZoneExecutionPanel service={service} canExecute={canExecute} onServiceUpdated={onServiceUpdated} />
+  </>;
+}
+
+function ReadOnlyInspection({ inspection }: { inspection: EnvironmentalInspection }) {
+  return <div className="mt-5 flex flex-col gap-4"><h3 className="text-sm font-bold text-[var(--color-text)]">Checklist asignado</h3><ItemGroup aria-label="Checklist asignado" className="gap-2">{inspectionChecklist(inspection).map((item) => <Item key={item.id} variant="outline" className="min-h-12 flex-nowrap border-[var(--color-border)] bg-[var(--color-canvas)] px-3 text-sm text-[var(--color-text)]"><ItemMedia className="size-3 rounded-full border border-[var(--color-border-strong)]" aria-hidden="true" /><ItemContent><ItemTitle className="text-sm">{item.label}</ItemTitle></ItemContent>{item.required ? <ItemDescription className="w-fit text-xs">(obligatorio)</ItemDescription> : null}</Item>)}</ItemGroup></div>;
+}
+
+function EvidenceQueue({ queuedFiles, fileValidationError, onFileSelect, onRemoveFile, onRetryFile, disabled }: { queuedFiles: QueuedEvidenceFile[]; fileValidationError: string | null; onFileSelect: (event: React.ChangeEvent<HTMLInputElement>) => void; onRemoveFile: (id: string) => void; onRetryFile: (file: QueuedEvidenceFile) => void; disabled: boolean }) {
+  const inputId = useId();
+  return (
+    <Card className="rounded-2xl border-[var(--color-border)] bg-[var(--color-surface)] ring-0">
+      <CardHeader className="border-b border-[var(--color-border)]">
+        <CardTitle className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]"><Paperclip aria-hidden />Evidencia de la inspección</CardTitle>
+        <CardDescription>Fotos o PDF, hasta {EVIDENCE_FILE_SIZE_LABEL} por archivo.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 pt-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <FieldLabel htmlFor={inputId} className={`inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-border-strong)] px-3 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface-subtle)] ${disabled ? "pointer-events-none opacity-50" : ""}`}>
+            <Upload data-icon="inline-start" aria-hidden />Seleccionar archivos
+          </FieldLabel>
+          <Input id={inputId} type="file" multiple accept={ACCEPTED_FILE_TYPES} onChange={onFileSelect} disabled={disabled} className="sr-only" />
+          <span className="text-xs text-[var(--color-text-secondary)]">La carga se realiza archivo por archivo.</span>
+        </div>
+        {fileValidationError && <Alert variant="danger" role="alert"><AlertTriangle aria-hidden /><AlertTitle>No se pudo agregar la evidencia</AlertTitle><AlertDescription>{fileValidationError}</AlertDescription></Alert>}
+        {queuedFiles.length > 0 && (
+          <ItemGroup aria-label="Archivos de evidencia seleccionados" className="gap-2">
+            {queuedFiles.map((file) => (
+              <Item key={file.id} variant="outline" className="gap-3 border-[var(--color-border)] bg-[var(--color-canvas)] p-3 text-sm">
+                <ItemMedia variant="icon" className="text-[var(--color-text-secondary)]"><Paperclip aria-hidden /></ItemMedia>
+                <ItemContent className="min-w-0">
+                  <ItemTitle className="max-w-full truncate text-[var(--color-text)]">{file.status === "success" && file.canonicalFilename ? file.canonicalFilename : file.localFilename}</ItemTitle>
+                  {file.status === "error" && <ItemDescription className="text-[var(--color-danger)]">{file.error}</ItemDescription>}
+                </ItemContent>
+                <ItemActions className="ml-auto flex-wrap justify-end text-xs">
+                  {file.status === "pending" && <span className="text-[var(--color-text-secondary)]">Pendiente</span>}
+                  {file.status === "uploading" && <span className="text-[var(--color-info)]">Subiendo…</span>}
+                  {file.status === "success" && <span className="inline-flex items-center gap-1 font-semibold text-[var(--color-success)]"><CheckCircle2 className="size-3" aria-hidden />Subido</span>}
+                  {file.status === "error" && <Button type="button" variant="outline" size="sm" onClick={() => onRetryFile(file)} className="gap-1"><RefreshCw data-icon="inline-start" aria-hidden />Reintentar carga</Button>}
+                  {file.status !== "uploading" && file.status !== "success" && <Button type="button" variant="ghost" size="icon-sm" onClick={() => onRemoveFile(file.id)} aria-label={`Quitar ${file.localFilename}`}><X aria-hidden /></Button>}
+                </ItemActions>
+              </Item>
+            ))}
+          </ItemGroup>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

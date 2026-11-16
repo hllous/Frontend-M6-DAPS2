@@ -1,0 +1,67 @@
+// @ts-nocheck
+import { expiredLoginUrl } from "./login-return";
+import { recordTelemetryEvent } from "./telemetry";
+import { SESSION_MUTATION_HEADERS } from "./session-request";
+
+const CHANNEL_NAME = "m6-session";
+const LOGOUT_MESSAGE = "logout";
+const logoutCleanupListeners = new Set<() => void>();
+
+export function registerSessionLogoutCleanup(cleanup: () => void): () => void {
+  logoutCleanupListeners.add(cleanup);
+  return () => { logoutCleanupListeners.delete(cleanup); };
+}
+
+function clearSessionClientState(): void {
+  logoutCleanupListeners.forEach((cleanup) => cleanup());
+}
+
+let channel: BroadcastChannel | undefined;
+
+function getChannel(): BroadcastChannel | undefined {
+  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return undefined;
+  channel ??= new BroadcastChannel(CHANNEL_NAME);
+  return channel;
+}
+
+/** `expired`: la sesión cayó sola (401), no la cerró la persona; el login avisa y retoma la pantalla. */
+export async function broadcastLogout(options: { expired?: boolean } = {}): Promise<void> {
+  clearSessionClientState();
+  try {
+    await fetch("/api/session/logout", {
+      method: "POST",
+      cache: "no-store",
+      headers: SESSION_MUTATION_HEADERS,
+      body: "{}",
+    });
+  } catch {
+    // Best-effort: every open tab still redirects to login regardless.
+  }
+  completeSessionLogout(options);
+}
+
+/** Call after a caller has confirmed the server-side session cookie was cleared. */
+export function finishSessionLogout(options: { expired?: boolean } = {}): void {
+  clearSessionClientState();
+  completeSessionLogout(options);
+}
+
+function completeSessionLogout(options: { expired?: boolean }): void {
+  recordTelemetryEvent({ name: "auth_logout_broadcast" });
+  getChannel()?.postMessage(LOGOUT_MESSAGE);
+  if (typeof window !== "undefined") window.location.assign(options.expired ? expiredLoginUrl(window.location) : "/login");
+}
+
+export function onRemoteLogout(callback: () => void): () => void {
+  const activeChannel = getChannel();
+  if (!activeChannel) return () => undefined;
+
+  const handleMessage = (event: MessageEvent) => {
+    if (event.data === LOGOUT_MESSAGE) {
+      clearSessionClientState();
+      callback();
+    }
+  };
+  activeChannel.addEventListener("message", handleMessage);
+  return () => activeChannel.removeEventListener("message", handleMessage);
+}

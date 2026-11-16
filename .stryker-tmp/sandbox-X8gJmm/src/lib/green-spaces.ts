@@ -1,0 +1,209 @@
+// @ts-nocheck
+import { notifyMapInventoryChanged } from "./map-inventory-events";
+import { z } from "zod";
+
+import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { recordTelemetryEvent } from "./telemetry";
+import { withResponseCoordinates } from "./response-coordinates";
+import { MAX_DECIMAL_10_2, boundedDecimalInput, latitudeInput, longitudeInput } from "@/lib/input-limits";
+import { tolerantRecords } from "./tolerant-records";
+
+export const greenSpaceTypeSchema = z.enum(["SQUARE", "PARK", "PLANTER", "MEDIAN", "PROMENADE"]);
+export type GreenSpaceType = z.infer<typeof greenSpaceTypeSchema>;
+
+export const greenSpaceSchema = withResponseCoordinates({
+  id: z.string(),
+  name: z.string(),
+  spaceType: greenSpaceTypeSchema,
+  areaM2: z.number().nullable(),
+  zoneId: z.string(),
+  active: z.boolean(),
+});
+export type GreenSpace = z.infer<typeof greenSpaceSchema>;
+
+export type GreenSpaceQuery = {
+  active?: boolean;
+  spaceType?: GreenSpaceType;
+  zoneId?: string;
+  page?: number;
+  pageSize?: number;
+};
+export type GreenSpacesPage = {
+  greenSpaces: GreenSpace[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export const createGreenSpaceInputSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es obligatorio."),
+  spaceType: greenSpaceTypeSchema,
+  areaM2: boundedDecimalInput("La superficie", MAX_DECIMAL_10_2, { positive: true }),
+  zoneId: z.string().trim().min(1, "La zona es obligatoria."),
+  lat: latitudeInput().optional(),
+  lng: longitudeInput().optional(),
+});
+export type CreateGreenSpaceInput = z.infer<typeof createGreenSpaceInputSchema>;
+
+// spaceType is immutable in the backend (UpdateGreenSpaceDto has no such field); zod strips it if a caller sends it.
+export const updateGreenSpaceInputSchema = createGreenSpaceInputSchema.omit({ spaceType: true }).partial().extend({
+  active: z.boolean().optional(),
+});
+export type UpdateGreenSpaceInput = z.infer<typeof updateGreenSpaceInputSchema>;
+
+export class GreenSpaceContractError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "GreenSpaceContractError";
+  }
+}
+
+export class GreenSpaceRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "GreenSpaceRequestError";
+    this.status = status;
+  }
+}
+
+const greenSpacesEnvelopeSchema = z.object({
+  data: tolerantRecords(greenSpaceSchema, "green-spaces"),
+  meta: z.object({
+    total: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+    totalPages: z.number(),
+  }),
+});
+
+const errorResponseSchema = z.object({
+  statusCode: z.number(),
+  message: z.union([z.string(), z.array(z.string())]),
+  error: z.string(),
+  timestamp: z.string(),
+  path: z.string(),
+});
+
+function buildQueryString(query: GreenSpaceQuery): string {
+  const params = new URLSearchParams();
+  if (query.active !== undefined) params.set("active", String(query.active));
+  if (query.spaceType) params.set("spaceType", query.spaceType);
+  if (query.zoneId) params.set("zoneId", query.zoneId);
+  if (query.page !== undefined) params.set("page", String(query.page));
+  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : "";
+}
+
+async function readJsonBody(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (cause) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
+    throw new GreenSpaceContractError("No se pudo obtener información válida de espacios verdes. Reintente en unos segundos.", { cause });
+  }
+}
+
+function requestError(payload: unknown): GreenSpaceRequestError | GreenSpaceContractError {
+  const parsed = errorResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
+    return new GreenSpaceContractError("No se pudo obtener información válida de espacios verdes. Reintente en unos segundos.", {
+      cause: parsed.error,
+    });
+  }
+  const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
+  return new GreenSpaceRequestError(message, parsed.data.statusCode);
+}
+
+async function send(input: string, init?: RequestInit): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await authenticatedFetch(input, init);
+  } catch (cause) {
+    if (cause instanceof NetworkFailureError) {
+      recordTelemetryEvent({ name: "request_network_failure", resource: "green-spaces" });
+    }
+    throw cause;
+  }
+  const payload = await readJsonBody(response);
+  if (!response.ok) throw requestError(payload);
+  return payload;
+}
+
+function parseGreenSpace(payload: unknown, message: string): GreenSpace {
+  const parsed = greenSpaceSchema.safeParse(payload);
+  if (!parsed.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
+    throw new GreenSpaceContractError(message, { cause: parsed.error });
+  }
+  return parsed.data;
+}
+
+export const greenSpacesAdapter = {
+  async list(query: GreenSpaceQuery = {}): Promise<GreenSpacesPage> {
+    const payload = await send(`/api/green-spaces${buildQueryString(query)}`);
+    const parsed = greenSpacesEnvelopeSchema.safeParse(payload);
+    if (!parsed.success) {
+      recordTelemetryEvent({ name: "request_malformed_response", resource: "green-spaces" });
+      throw new GreenSpaceContractError("No se pudo obtener información válida de espacios verdes. Reintente en unos segundos.", {
+        cause: parsed.error,
+      });
+    }
+    return {
+      greenSpaces: parsed.data.data,
+      page: parsed.data.meta.page,
+      pageSize: parsed.data.meta.pageSize,
+      total: parsed.data.meta.total,
+      totalPages: parsed.data.meta.totalPages,
+    };
+  },
+
+  async get(id: string): Promise<GreenSpace> {
+    return parseGreenSpace(await send(`/api/green-spaces/${id}`), "No se pudo obtener información válida del detalle de espacio verde. Reintente en unos segundos.");
+  },
+
+  async create(input: CreateGreenSpaceInput): Promise<GreenSpace> {
+    const parsedInput = createGreenSpaceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new GreenSpaceContractError("Los datos para registrar el espacio verde son inválidos.", { cause: parsedInput.error });
+    }
+    const saved = parseGreenSpace(
+      await send("/api/green-spaces", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }),
+      "No se pudo obtener información válida de la creación de espacio verde. Reintente en unos segundos.",
+    );
+    notifyMapInventoryChanged();
+    return saved;
+  },
+
+  async update(id: string, input: UpdateGreenSpaceInput): Promise<GreenSpace> {
+    const parsedInput = updateGreenSpaceInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      throw new GreenSpaceContractError("Los datos para actualizar el espacio verde son inválidos.", { cause: parsedInput.error });
+    }
+    const saved = parseGreenSpace(
+      await send(`/api/green-spaces/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedInput.data),
+      }),
+      "No se pudo obtener información válida de la actualización de espacio verde. Reintente en unos segundos.",
+    );
+    notifyMapInventoryChanged();
+    return saved;
+  },
+
+  async remove(id: string): Promise<GreenSpace> {
+    return parseGreenSpace(
+      await send(`/api/green-spaces/${id}`, { method: "DELETE" }),
+      "No se pudo obtener información válida de la baja de espacio verde. Reintente en unos segundos.",
+    );
+  },
+};

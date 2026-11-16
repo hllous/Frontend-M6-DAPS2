@@ -1,0 +1,481 @@
+// @ts-nocheck
+"use client";
+import { errorMessage as getErrorMessage } from "@/lib/error-message";
+
+import { useEffect, useId, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  Calendar,
+  Check,
+  Clock,
+  Info,
+  MapPin,
+  RefreshCw,
+  Route,
+  Truck,
+} from "lucide-react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoadingRegion } from "@/components/ui/loading-region";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { formatArgentinaCalendarDate } from "@/lib/argentina-date";
+import { asksForOverrideNote, crewFit, crewFitWarnings, crewsInZoneFirst } from "@/lib/crew-fit";
+import type { Crew } from "@/lib/crews";
+import { loadReferenceCatalog } from "@/lib/reference-catalog";
+import {
+  checkAssignmentConflicts,
+  OVERRIDE_NOTE_MAX,
+  OVERRIDE_NOTE_MIN,
+  servicesAdapter,
+  ServiceRequestError,
+  type Service,
+} from "@/lib/services";
+import { serviceTypesAdapter } from "@/lib/service-types";
+import type { Vehicle } from "@/lib/vehicles";
+import { useRevealFirstError } from "./use-reveal-first-error";
+
+/** Valor del ítem que borra el vehículo elegido: el Select no tiene opción vacía. */
+const NO_VEHICLE = "__none__";
+
+interface AssignCrewDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  service: Service | null;
+  allServices?: Service[];
+  onAssigned: (updatedService: Service) => void;
+}
+
+export function AssignCrewDialog({
+  open,
+  onOpenChange,
+  service,
+  allServices = [],
+  onAssigned,
+}: AssignCrewDialogProps) {
+  if (!service) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl sm:max-w-2xl">
+        <AssignCrewForm
+          key={service.id}
+          service={service}
+          allServices={allServices}
+          onOpenChange={onOpenChange}
+          onAssigned={onAssigned}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AssignCrewForm({
+  service,
+  allServices,
+  onOpenChange,
+  onAssigned,
+}: {
+  service: Service;
+  allServices: Service[];
+  onOpenChange: (open: boolean) => void;
+  onAssigned: (updatedService: Service) => void;
+}) {
+  const formId = useId();
+
+  const [crewId, setCrewId] = useState<string>(() => service.crewId ?? "");
+  const [vehicleId, setVehicleId] = useState<string>(() => service.vehicleId ?? "");
+  const [overrideNote, setOverrideNote] = useState("");
+  // El backend puede ver un solapamiento que la lista cargada en pantalla no muestra: su 409 también pide la justificación.
+  const [backendConflict, setBackendConflict] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ crew?: string; vehicle?: string; overrideNote?: string }>({});
+  const scrollRef = useRevealFirstError(errorMessage, fieldErrors, backendConflict);
+
+  // Cuadrillas, vehículos y requiresVehicle salen del backend: sin ellos no se puede confirmar.
+  const [resources, setResources] = useState<
+    | { status: "loading" }
+    | { status: "error"; message: string }
+    | { status: "ready"; crews: Crew[]; vehicles: Vehicle[]; requiresVehicle: boolean; code: string }
+  >({ status: "loading" });
+  const [loadVersion, setLoadVersion] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      loadReferenceCatalog("crews", { active: true }),
+      loadReferenceCatalog("vehicles", { active: true }),
+      serviceTypesAdapter.get(service.serviceTypeId),
+    ])
+      .then(([crews, vehicles, type]) => {
+        if (active) {
+          // Una Crew o un vehículo que no está en el catálogo no se preselecciona por id crudo: el combo arranca vacío.
+          setCrewId((current) => (crews.some((crew) => crew.id === current) ? current : ""));
+          setVehicleId((current) => (vehicles.some((vehicle) => vehicle.id === current) ? current : ""));
+          setResources({
+            status: "ready",
+            crews,
+            vehicles,
+            requiresVehicle: type.requiresVehicle,
+            code: type.code,
+          });
+        }
+      })
+      .catch((cause: unknown) => {
+        if (active) {
+          setResources({
+            status: "error",
+            message: getErrorMessage(cause, "No se pudo cargar el formulario. Intente nuevamente."),
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [service.serviceTypeId, loadVersion]);
+
+  const ready = resources.status === "ready";
+  const requiresVehicle = ready && resources.requiresVehicle;
+  const crews = ready ? resources.crews : [];
+  const vehicles = ready ? resources.vehicles : [];
+
+  // Compute double-booking conflicts reactively
+  const conflicts = useMemo(() => {
+    return checkAssignmentConflicts({
+      service,
+      crewId: crewId || null,
+      vehicleId: vehicleId || null,
+      allServices,
+    });
+  }, [service, crewId, vehicleId, allServices]);
+  const fit = crewFit(crews.find((crew) => crew.id === crewId), service.zoneIds, ready ? resources.code : undefined);
+  const needsOverrideNote = Boolean(conflicts.crewConflict || conflicts.vehicleConflict || backendConflict || fit.zone || fit.specialty);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ready) return;
+
+    if (!crewId) {
+      setErrorMessage(null);
+      setFieldErrors({ crew: "Seleccione una cuadrilla." });
+      return;
+    }
+
+    if (requiresVehicle && (!vehicleId || !vehicleId.trim())) {
+      setErrorMessage(null);
+      setFieldErrors({ vehicle: "Seleccione un vehículo." });
+      return;
+    }
+
+    if (needsOverrideNote && overrideNote.trim().length < OVERRIDE_NOTE_MIN) {
+      setErrorMessage(null);
+      setFieldErrors({ overrideNote: `Escriba al menos ${OVERRIDE_NOTE_MIN} caracteres.` });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setFieldErrors({});
+
+    try {
+      const updated = await servicesAdapter.assignCrew(service.id, {
+        crewId,
+        vehicleId: vehicleId ? vehicleId : null,
+        ...(needsOverrideNote && { overrideNote: overrideNote.trim() }),
+      });
+      onAssigned(updated);
+      onOpenChange(false);
+    } catch (cause) {
+      if (cause instanceof ServiceRequestError && cause.status === 409) {
+        if (asksForOverrideNote(cause.message)) {
+          setBackendConflict("La asignación presenta un conflicto de horario, zona o especialidad.");
+        } else {
+          setBackendConflict(null);
+          setErrorMessage(getErrorMessage(cause, "El servicio cambió. Actualice la lista e intente nuevamente."));
+        }
+        return;
+      }
+      const msg =
+        getErrorMessage(cause, "No se pudo asignar. Intente nuevamente.");
+      setErrorMessage(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const selectedCrew = crews.find((c) => c.id === crewId);
+  const selectedVehicle = vehicles.find((v) => v.id === vehicleId);
+  // Mientras cargan las listas, la cuadrilla y el vehículo ya asignados se muestran por nombre y patente, no por id.
+  const crewItems = {
+    ...(service.crewId && service.crewName ? { [service.crewId]: service.crewName } : {}),
+    ...Object.fromEntries(crews.map((c) => [c.id, c.name])),
+  };
+  const vehicleItems = {
+    [NO_VEHICLE]: "Sin vehículo asignado",
+    ...(service.vehicleId && service.vehiclePlate ? { [service.vehicleId]: service.vehiclePlate } : {}),
+    ...Object.fromEntries(vehicles.map((v) => [v.id, v.plate])),
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Asignar cuadrilla y vehículo</DialogTitle>
+      </DialogHeader>
+
+      <div ref={scrollRef} className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 py-2">
+        <Item variant="muted">
+          <ItemContent>
+            <ItemTitle className="flex-wrap">
+              {service.title}
+              <Badge variant="neutral">
+                {service.mode === "ROUTE" ? (
+                  <>
+                    <Route data-icon="inline-start" aria-hidden />
+                    Recorrido
+                  </>
+                ) : (
+                  <>
+                    <MapPin data-icon="inline-start" aria-hidden />
+                    Punto
+                  </>
+                )}
+              </Badge>
+              {ready && (
+                <Badge variant={requiresVehicle ? "warning" : "neutral"}>
+                  <Truck data-icon="inline-start" aria-hidden />
+                  {requiresVehicle ? "Vehículo obligatorio" : "Vehículo opcional"}
+                </Badge>
+              )}
+            </ItemTitle>
+            <ItemDescription>{service.serviceTypeName}</ItemDescription>
+            <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="size-4" aria-hidden />
+                <dt>Fecha:</dt>
+                <dd className="font-semibold text-foreground">{formatArgentinaCalendarDate(service.scheduledDate)}</dd>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="size-4" aria-hidden />
+                <dt>Ventana:</dt>
+                <dd className="font-semibold text-foreground">{service.windowFrom ?? "08:00"} – {service.windowTo ?? "12:00"}</dd>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <MapPin className="size-4" aria-hidden />
+                <dt>Zonas:</dt>
+                <dd className="font-semibold text-foreground">{service.zoneNames.join(", ")}</dd>
+              </div>
+            </dl>
+          </ItemContent>
+        </Item>
+
+        {errorMessage && (
+          <Alert variant="danger">
+            <AlertCircle aria-hidden />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        {resources.status === "error" && (
+          <Alert variant="danger">
+            <AlertCircle aria-hidden />
+            <AlertDescription>
+              <p>No se pudieron cargar los datos para asignar: {resources.message}</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2 self-start"
+                onClick={() => {
+                  setResources({ status: "loading" });
+                  setLoadVersion((version) => version + 1);
+                }}
+              >
+                <RefreshCw data-icon="inline-start" aria-hidden />
+                Reintentar
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <form id={formId} noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <LoadingRegion label="Datos de asignación" isLoading={resources.status === "loading"}>
+          {resources.status === "loading" ? (
+            <div aria-hidden="true" className="flex flex-col gap-7">
+              {[0, 1].map((field) => (
+                <div key={field} data-slot="field-skeleton" className="flex flex-col gap-3">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : (
+          <FieldGroup>
+            <Field data-invalid={Boolean(fieldErrors.crew) || undefined}>
+              <FieldLabel htmlFor={`${formId}-crew`}>
+                Cuadrilla asignada <span aria-hidden>*</span>
+              </FieldLabel>
+              <Select
+                value={crewId || null}
+                items={crewItems}
+                disabled={!ready}
+                onValueChange={(value) => {
+                  setCrewId(String(value));
+                  setBackendConflict(null);
+                  setErrorMessage(null);
+                  setFieldErrors((prev) => ({ ...prev, crew: undefined }));
+                }}
+              >
+                <SelectTrigger
+                  id={`${formId}-crew`}
+                  aria-required="true"
+                  aria-invalid={Boolean(fieldErrors.crew) || undefined}
+                  aria-describedby={fieldErrors.crew ? `${formId}-crew-error` : undefined}
+                >
+                  <SelectValue placeholder="Seleccione una cuadrilla…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {crewsInZoneFirst(crews, service.zoneIds).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {fieldErrors.crew && <FieldError id={`${formId}-crew-error`}>{fieldErrors.crew}</FieldError>}
+            </Field>
+
+            <Field data-invalid={Boolean(fieldErrors.vehicle) || undefined}>
+              <FieldLabel htmlFor={`${formId}-vehicle`}>
+                Vehículo operativo{" "}
+                {requiresVehicle ? (
+                  <span aria-hidden>*</span>
+                ) : (
+                  <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+                )}
+              </FieldLabel>
+              <Select
+                value={vehicleId || null}
+                items={vehicleItems}
+                disabled={!ready}
+                onValueChange={(value) => {
+                  setVehicleId(value === NO_VEHICLE ? "" : String(value));
+                  setBackendConflict(null);
+                  setErrorMessage(null);
+                  setFieldErrors((prev) => ({ ...prev, vehicle: undefined }));
+                }}
+              >
+                <SelectTrigger
+                  id={`${formId}-vehicle`}
+                  aria-required={requiresVehicle || undefined}
+                  aria-invalid={Boolean(fieldErrors.vehicle) || undefined}
+                  aria-describedby={fieldErrors.vehicle ? `${formId}-vehicle-error` : undefined}
+                >
+                  <SelectValue placeholder={requiresVehicle ? "Seleccione un vehículo requerido…" : "Sin vehículo asignado"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={NO_VEHICLE}>{vehicleItems[NO_VEHICLE]}</SelectItem>
+                    {vehicles.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.plate}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {fieldErrors.vehicle && <FieldError id={`${formId}-vehicle-error`}>{fieldErrors.vehicle}</FieldError>}
+            </Field>
+          </FieldGroup>
+          )}
+          </LoadingRegion>
+
+          {needsOverrideNote && (
+            <Alert variant="warning" role="alert">
+              <AlertTriangle aria-hidden />
+              <AlertTitle className="font-semibold uppercase tracking-wider">Revise la asignación</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2">
+                {crewFitWarnings(fit).map((warning) => <p key={warning}>{warning}</p>)}
+                {conflicts.crewConflict && (
+                  <p>
+                    La cuadrilla{" "}
+                    <strong>{selectedCrew?.name ?? conflicts.crewConflict.crewName}</strong> ya tiene asignado el servicio{" "}
+                    <strong>{conflicts.crewConflict.title}</strong> en la misma fecha (
+                    {formatArgentinaCalendarDate(conflicts.crewConflict.scheduledDate)} {conflicts.crewConflict.windowFrom ?? ""}&ndash;{conflicts.crewConflict.windowTo ?? ""}).
+                  </p>
+                )}
+
+                {backendConflict && !conflicts.crewConflict && !conflicts.vehicleConflict && <p>{backendConflict}</p>}
+
+                {conflicts.vehicleConflict && (
+                  <p>
+                    El vehículo{" "}
+                    <strong>{selectedVehicle?.plate ?? conflicts.vehicleConflict.vehiclePlate}</strong> ya está asignado al servicio{" "}
+                    <strong>{conflicts.vehicleConflict.title}</strong> en la misma fecha (
+                    {formatArgentinaCalendarDate(conflicts.vehicleConflict.scheduledDate)} {conflicts.vehicleConflict.windowFrom ?? ""}&ndash;{conflicts.vehicleConflict.windowTo ?? ""}).
+                  </p>
+                )}
+
+                <p className="flex items-center gap-1.5 border-t border-[var(--color-warning-line)] pt-2 text-xs font-medium">
+                  <Info className="size-3.5 shrink-0" aria-hidden />
+                  Justifique la asignación.
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {needsOverrideNote && (
+            <Field data-invalid={Boolean(fieldErrors.overrideNote) || undefined}>
+              <FieldLabel htmlFor={`${formId}-override-note`}>
+                Justificación de la asignación <span aria-hidden>*</span>
+              </FieldLabel>
+              <Textarea
+                id={`${formId}-override-note`}
+                value={overrideNote}
+                onChange={(e) => {
+                  setOverrideNote(e.target.value);
+                  setErrorMessage(null);
+                  setFieldErrors((prev) => ({ ...prev, overrideNote: undefined }));
+                }}
+                required
+                maxLength={OVERRIDE_NOTE_MAX}
+                rows={3}
+                aria-invalid={Boolean(fieldErrors.overrideNote)}
+                aria-describedby={fieldErrors.overrideNote ? `${formId}-override-note-desc ${formId}-override-note-error` : `${formId}-override-note-desc`}
+              />
+              <FieldDescription id={`${formId}-override-note-desc`}>
+                Entre {OVERRIDE_NOTE_MIN} y {OVERRIDE_NOTE_MAX} caracteres. Ej.: la otra parada termina antes; se coordinó con el jefe de cuadrilla.
+              </FieldDescription>
+              {fieldErrors.overrideNote && <FieldError id={`${formId}-override-note-error`}>{fieldErrors.overrideNote}</FieldError>}
+            </Field>
+          )}
+        </form>
+      </div>
+
+      <DialogFooter className="flex-wrap">
+        <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
+          Cancelar
+        </Button>
+        <Button type="submit" form={formId} disabled={isSubmitting || !ready} aria-busy={isSubmitting}>
+          {isSubmitting ? <Spinner data-icon="inline-start" aria-hidden="true" /> : <Check data-icon="inline-start" aria-hidden />}
+          <span>Confirmar asignación</span>
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}

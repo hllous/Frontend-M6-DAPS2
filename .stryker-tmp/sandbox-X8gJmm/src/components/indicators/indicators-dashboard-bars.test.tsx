@@ -1,0 +1,129 @@
+// @ts-nocheck
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { setupServer } from "msw/node";
+
+import { scenarios } from "@/lib/scenarios";
+import { olvidarCatalogoDeEtiquetas } from "@/lib/service-labels";
+import { handlers } from "@/mocks/handlers";
+
+import { IndicatorsDashboard } from "./indicators-dashboard";
+
+const server = setupServer(...handlers);
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => {
+  const getBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const chart = this.closest<HTMLElement>('[data-slot="chart"]');
+    if (!chart) return getBoundingClientRect.call(this);
+    const height = Number.parseFloat(chart.style.height) || 56;
+    return { x: 0, y: 0, width: 720, height, top: 0, right: 720, bottom: height, left: 0, toJSON: () => ({}) } as DOMRect;
+  });
+});
+afterEach(() => {
+  server.resetHandlers();
+  olvidarCatalogoDeEtiquetas();
+  vi.restoreAllMocks();
+  window.history.replaceState(null, "", "/");
+});
+afterAll(() => server.close());
+
+describe("IndicatorsDashboard: barras accesibles (#778)", () => {
+  it("muestra la pista textual del tono junto a cada categoría", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Cumplimiento" }));
+
+    const chart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
+    expect(within(chart).getByText("Favorable")).toBeVisible();
+    expect(within(chart).getByText("Atención")).toBeVisible();
+  });
+
+  it("permite seleccionar una barra de Cumplimiento con el teclado y cerrar su detalle con Escape", async () => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Cumplimiento/i }));
+
+    const chart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
+    const bar = within(chart).getByRole("button", { name: /En fecha.*344 servicios/i });
+    bar.focus();
+    expect(bar).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(bar).toHaveAttribute("aria-pressed", "true");
+    expect(within(chart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("status", { name: /Detalle .*En fecha/ })).not.toBeInTheDocument();
+    expect(bar).toHaveFocus();
+  });
+
+  it.each([
+    {
+      family: "Cumplimiento",
+      chart: "Barras de finalización en fecha",
+      barName: /En fecha: 344 servicios/,
+    },
+    {
+      family: "Incidencias",
+      chart: "Barras de contenedores por zona",
+      barName: /Centro: 8 incidentes/,
+    },
+    {
+      family: "Residuos",
+      chart: "Barras de residuos por destino",
+      barName: /Centro de recuperación: 10\.620 kg/,
+    },
+  ])("mantiene accesibles las barras y la tabla alternativa de $family", async ({ family, chart: chartName, barName }) => {
+    const user = userEvent.setup();
+    render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+
+    await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+    await user.click(await screen.findByRole("menuitem", { name: family }));
+
+    const chart = await screen.findByRole("group", { name: chartName });
+    const bar = within(chart).getByRole("button", { name: barName });
+    bar.focus();
+    expect(bar).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(bar).toHaveAttribute("aria-pressed", "true");
+    expect(within(chart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("status", { name: /Detalle .*Centro/ })).not.toBeInTheDocument();
+    expect(bar).toHaveFocus();
+    expect(bar).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Ver tabla" }));
+    const tableRegion = await screen.findByRole("region", { name: `Tabla de datos de ${family}` });
+    expect(within(tableRegion).getAllByRole("table")[0]).toBeVisible();
+  });
+});
+
+it("no muestra detalles emergentes al pasar por las barras de zona y familia", async () => {
+  const user = userEvent.setup();
+  render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+  const zones = await screen.findByRole("region", { name: "¿Dónde se concentra?" });
+  const zoneChart = await within(zones).findByRole("group", { name: /Barras de/ });
+  await user.hover(within(zoneChart).getAllByRole("button")[0]);
+  expect(within(zoneChart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Detalle por familia" }));
+  await user.click(await screen.findByRole("menuitem", { name: "Cumplimiento" }));
+  const familyChart = await screen.findByRole("group", { name: "Barras de finalización en fecha" });
+  await user.hover(within(familyChart).getAllByRole("button")[0]);
+  expect(within(familyChart).queryByRole("status", { name: /Detalle/ })).not.toBeInTheDocument();
+});
+
+it("ofrece controles de vista con nombres accesibles", async () => {
+  render(<IndicatorsDashboard scenario={scenarios.officeDutyQueue} />);
+  const zones = await screen.findByRole("region", { name: "¿Dónde se concentra?" });
+  expect(within(zones).getByRole("button", { name: "Ver tabla" })).toBeVisible();
+});
+

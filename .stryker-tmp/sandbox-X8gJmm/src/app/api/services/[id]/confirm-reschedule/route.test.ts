@@ -1,0 +1,197 @@
+// @ts-nocheck
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { resetServiceFixtures, serviceFixtures } from "@/lib/services-fixtures";
+import { POST } from "./route";
+import { loginAs } from "@/test/session";
+
+beforeEach(() => {
+  resetServiceFixtures();
+});
+
+afterEach(() => {
+  delete process.env.M6_AUTH_MODE;
+  delete process.env.M6_BACKEND_ORIGIN;
+  vi.restoreAllMocks();
+});
+
+
+
+const confirmBody = {
+  scheduledDate: "2099-09-10",
+  timeWindow: { start: "09:00", end: "13:00" },
+};
+
+describe("POST /api/services/[id]/confirm-reschedule BFF route", () => {
+  it("requires an active session and returns 401", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1053/confirm-reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(confirmBody),
+      }),
+      { params: Promise.resolve({ id: "SVC-1053" }) },
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns 403 for a Field actor (reschedule is an Office decision)", async () => {
+    const cookie = await loginAs("field-crew-leader-route", { mode: "mock" });
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1053/confirm-reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(confirmBody),
+      }),
+      { params: Promise.resolve({ id: "SVC-1053" }) },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 400 when the new date/window is invalid", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1053/confirm-reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ scheduledDate: "not-a-date", timeWindow: { start: "09:00", end: "13:00" } }),
+      }),
+      { params: Promise.resolve({ id: "SVC-1053" }) },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 404 if the target service does not exist", async () => {
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-NONEXISTENT/confirm-reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(confirmBody),
+      }),
+      { params: Promise.resolve({ id: "SVC-NONEXISTENT" }) },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("returns 409 when the service is not RESCHEDULED", async () => {
+    // SVC-1050 is SCHEDULED
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1050/confirm-reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(confirmBody),
+      }),
+      { params: Promise.resolve({ id: "SVC-1050" }) },
+    );
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.message).toBe("Solo se puede confirmar la nueva fecha de servicios a reprogramar (estado actual: Programado).");
+  });
+
+  it("moves a rescheduled service back to SCHEDULED with the new date/window, preserving zoneIds verbatim", async () => {
+    // SVC-1053 is RESCHEDULED
+    const before = serviceFixtures.find((s) => s.id === "SVC-1053");
+    const originalZoneIds = [...(before?.zoneIds ?? [])];
+
+    const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1053/confirm-reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(confirmBody),
+      }),
+      { params: Promise.resolve({ id: "SVC-1053" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.status).toBe("SCHEDULED");
+    expect(body.statusReason).toBeNull();
+    expect(body.scheduledDate).toBe(confirmBody.scheduledDate);
+    expect(body.windowFrom).toBe(confirmBody.timeWindow.start);
+    expect(body.windowTo).toBe(confirmBody.timeWindow.end);
+    expect(body.zoneIds).toEqual(originalZoneIds);
+    expect(body.history).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "Programado", done: true })]),
+    );
+
+    const updatedFixture = serviceFixtures.find((s) => s.id === "SVC-1053");
+    expect(updatedFixture?.status).toBe("SCHEDULED");
+  });
+
+  it("forwards the DTO-shaped body and JSON content type in real-m1 mode", async () => {
+    process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+    const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
+
+    const response = await POST(
+      new Request("http://localhost/api/services/SVC-1053/confirm-reschedule", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify(confirmBody),
+      }),
+      { params: Promise.resolve({ id: "SVC-1053" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const requestInit = backendFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("content-type")).toBe("application/json");
+    expect(JSON.parse(String(requestInit.body))).toEqual({
+      scheduledDate: "2099-09-10",
+      windowFrom: "09:00",
+      windowTo: "13:00",
+    });
+  });
+});
+
+it.each(["mock", "real-m1"] as const)("denies limited Office planning before forwarding (%s)", async (mode) => {
+  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+  const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
+  const cookie = await loginAs("office-limited-intake", { mode: mode, accessToken: ((mode) === "real-m1") ? ("header.eyJleHAiOjQxMDAwMDAwMDB9.signature") : undefined });
+  backendFetch.mockClear();
+  const response = await POST(new Request("http://localhost/api/services/real-service/confirm-reschedule", {
+    method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(confirmBody),
+  }), { params: Promise.resolve({ id: "real-service" }) });
+  expect(response.status).toBe(403);
+  expect(backendFetch).not.toHaveBeenCalled();
+});
+
+it("rejects malformed JSON with 400", async () => {
+  const cookie = await loginAs("office-duty-queue", { mode: "mock" });
+  const response = await POST(new Request("http://localhost/api/services/real-service/confirm-reschedule", {
+    method: "POST", headers: { cookie, "content-type": "application/json" }, body: "{",
+  }), { params: Promise.resolve({ id: "real-service" }) });
+  expect(response.status).toBe(400);
+  expect((await response.json()).message).toContain("JSON válido");
+});
+
+it.each([401, 403, 409, 503])("preserves backend error status and body (%s)", async (status) => {
+  process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
+  const error = { statusCode: status, message: "El backend rechazó la operación." };
+  const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+    if (String(url).endsWith("/crews")) return Response.json({ data: [{ id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección" }] });
+    if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
+    return Response.json(error, { status });
+  });
+  const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
+  backendFetch.mockClear();
+  const response = await POST(new Request("http://localhost/api/services/real-service/confirm-reschedule", {
+    method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(confirmBody),
+  }), { params: Promise.resolve({ id: "real-service" }) });
+  expect(response.status).toBe(status);
+  expect(await response.json()).toEqual({ ...error, message: status < 500
+    ? "No se pudo realizar la operación. Revise los datos e inténtelo nuevamente."
+    : "No se pudo confirmar el resultado de la operación. Verifique si se completó antes de reintentar." });
+  const forwards = backendFetch.mock.calls.filter(([, init]) => init?.method === "POST");
+  expect(forwards).toHaveLength(1);
+  expect(String(forwards[0][0])).toBe("https://backend.internal/services/real-service/confirm-reschedule");
+});

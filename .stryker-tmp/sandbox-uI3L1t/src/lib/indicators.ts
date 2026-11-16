@@ -1,0 +1,573 @@
+// @ts-nocheck
+import { z } from "zod";
+
+import { todayInArgentina } from "./argentina-date";
+import { CONTAINER_STATUS_LABELS } from "./containers";
+import { ENVIRONMENTAL_REPORT_STATUS_LABELS, ENVIRONMENTAL_REPORT_TYPE_LABELS } from "./environmental-reports";
+import { WASTE_TYPE_LABELS } from "./green-points";
+import { NOT_SERVICED_REASON_LABEL } from "./services";
+import { RISK_LEVEL_LABELS } from "./tree-surveys";
+import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
+import { recordTelemetryEvent } from "./telemetry";
+
+const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use una fecha con formato AAAA-MM-DD.");
+const dateTimeSchema = z.string().datetime({ offset: true });
+
+export const INVERTED_RANGE_MESSAGE = "La fecha «Desde» no puede ser posterior a «Hasta».";
+
+export const indicatorQuerySchema = z.object({
+  from: calendarDateSchema.optional(),
+  to: calendarDateSchema.optional(),
+  zoneId: z.string().trim().min(1).optional(),
+  serviceTypeId: z.string().trim().min(1).optional(),
+}).strict().refine((query) => !query.from || !query.to || query.from <= query.to, {
+  path: ["to"],
+  message: INVERTED_RANGE_MESSAGE,
+});
+export type IndicatorQuery = z.infer<typeof indicatorQuerySchema>;
+
+/** Mensaje de rango invertido si el error lo incluye; si no, el genérico de formato. */
+export function indicatorQueryErrorMessage(error: { issues: Array<{ message: string }> }) {
+  return error.issues.some((issue) => issue.message === INVERTED_RANGE_MESSAGE)
+    ? INVERTED_RANGE_MESSAGE
+    : "Los filtros de indicadores no respetan el formato esperado.";
+}
+
+export type ResolvedIndicatorQuery = Required<Pick<IndicatorQuery, "from" | "to">> &
+  Omit<IndicatorQuery, "from" | "to">;
+
+const periodSchema = z.object({ from: calendarDateSchema, to: calendarDateSchema });
+const count = z.number().finite().nonnegative();
+const percent = z.number().finite().min(0).max(100);
+
+const targetSchema = z.object({ value: z.number().finite().nullable(), direction: z.string() }).nullable();
+
+const coverageTotalsSchema = z.object({ scheduled: count, served: count, partial: count, notServiced: count, pending: count, upcoming: count.optional(), coveragePct: percent });
+const finishedSchema = z.object({ total: count, onTime: count, late: count, onTimePct: percent });
+const deviationSchema = z.object({ total: count, deviated: count, deviatedPct: percent });
+const historyTotalsSchema = z.object({ overflowIncidents: count, damageIncidents: count, pendingDamage: count.nullable() });
+const deadlineSchema = z.object({ resolved: count, withinDeadline: count, pct: percent.nullable() });
+const incidentTotalsSchema = z.object({ total: count, avgResolutionDays: count.nullable(), avgResolutionBusinessDays: count.nullable().optional(), withinDeadline: deadlineSchema.optional(), containers: historyTotalsSchema.optional() });
+const wasteTotalsSchema = z.object({ weightKg: count, volumeM3: count, divertedKg: count, divertedPct: percent });
+const deltaNumber = z.number().finite().nullable();
+const blocks = <T extends z.ZodTypeAny, D extends z.ZodTypeAny, G extends z.ZodTypeAny>(totals: T, delta: D, targets: G) => ({
+  targets: targets.optional(),
+  series: z.array(totals.and(periodSchema)).optional(),
+  previous: z.object({ period: periodSchema, totals }).optional(),
+  delta: delta.optional(),
+});
+
+// Los enums viajan como string, no como z.enum: un valor nuevo del backend debe
+// mostrarse crudo en una etiqueta, no dejar el tablero entero en error.
+function labelFor(labels: Record<string, string>, value: string) {
+  return labels[value] ?? value;
+}
+
+const coverageRowSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+  scheduled: count,
+  served: count,
+  partial: count,
+  notServiced: count,
+  pending: count,
+  coveragePct: percent,
+  upcoming: count.optional(),
+  lowSample: z.boolean().optional(),
+});
+
+export const coverageWireSchema = z.object({
+  period: periodSchema,
+  totals: coverageTotalsSchema,
+  ...blocks(coverageTotalsSchema, z.object({ coveragePct: deltaNumber }), z.object({ coveragePct: targetSchema })),
+  byZone: z.array(coverageRowSchema),
+  byServiceType: z.array(coverageRowSchema),
+});
+export type CoverageWire = z.infer<typeof coverageWireSchema>;
+
+export const complianceWireSchema = z.object({
+  period: periodSchema,
+  finished: finishedSchema,
+  schedulingDeviation: deviationSchema.optional(),
+  ...blocks(z.object({ finished: finishedSchema, schedulingDeviation: deviationSchema.optional() }), z.object({ onTimePct: deltaNumber, deviatedPct: deltaNumber.optional() }), z.object({ compliancePct: targetSchema, schedulingDeviationPct: targetSchema.optional() })),
+  notServicedRanking: z.array(z.object({
+    zoneId: z.string(),
+    code: z.string(),
+    name: z.string(),
+    count,
+    reasons: z.array(z.object({ reason: z.string().nullable(), count })),
+  })),
+});
+export type ComplianceWire = z.infer<typeof complianceWireSchema>;
+
+export const incidentsWireSchema = z.object({
+  period: periodSchema,
+  ...blocks(incidentTotalsSchema, z.object({ withinDeadlinePct: deltaNumber.optional(), overflowIncidents: deltaNumber.optional(), pendingDamage: deltaNumber.optional(), avgResolutionDays: deltaNumber, avgResolutionBusinessDays: deltaNumber.optional() }), z.object({ resolutionBusinessDays: targetSchema, reportsWithinDeadlinePct: targetSchema.optional(), reportsOverduePct: targetSchema.optional(), overflowTrend: targetSchema.optional(), pendingDamageTrend: targetSchema.optional() })),
+  containers: z.object({
+    history: historyTotalsSchema.extend({ trackingSince: dateTimeSchema.nullable() }).optional(),
+    byStatus: z.array(z.object({ status: z.string(), count })),
+    byZone: z.array(z.object({ zoneId: z.string(), code: z.string(), name: z.string(), overflowed: count, damaged: count, total: count })),
+  }),
+  trees: z.object({ byRiskLevel: z.array(z.object({ riskLevel: z.string(), count })) }),
+  reports: z.object({
+    total: count,
+    byType: z.array(z.object({ reportType: z.string(), count })),
+    byStatus: z.array(z.object({ status: z.string(), count })),
+    // null cuando no se cerró ningún reporte en el período.
+    avgResolutionDays: z.number().finite().nonnegative().nullable(),
+    avgResolutionBusinessDays: count.nullable().optional(),
+    deadlineBusinessDays: count.optional(),
+    withinDeadline: deadlineSchema.optional(),
+    overdue: z.object({ open: count, overdue: count, pct: percent.nullable() }).optional(),
+  }),
+});
+export type IncidentsWire = z.infer<typeof incidentsWireSchema>;
+
+export const wasteWireSchema = z.object({
+  period: periodSchema,
+  totals: wasteTotalsSchema,
+  ...blocks(wasteTotalsSchema, z.object({ divertedPct: deltaNumber }), z.object({ landfillDiversionPct: targetSchema })),
+  byWasteType: z.array(z.object({ wasteType: z.string(), weightKg: count, volumeM3: count })),
+  byDisposalSite: z.array(z.object({ disposalSiteId: z.string(), code: z.string(), name: z.string(), siteType: z.string(), weightKg: count, volumeM3: count })),
+  records: count,
+});
+export type WasteWire = z.infer<typeof wasteWireSchema>;
+
+/** `value: null` = no hay base para calcular la métrica (p. ej. ningún reporte cerrado). */
+export type IndicatorMetric = { value: number | null; label: string; unit: string };
+export type IndicatorPointDetail = { label: string; value: number | null; unit: string };
+export type IndicatorPoint = { id: string; label: string; value: number; unit: string; note?: string; details?: IndicatorPointDetail[]; tone?: "primary" | "success" | "warning" | "danger"; lowSample?: boolean };
+export type IndicatorTarget = { value: number | null; direction: string } | null;
+export type IndicatorBreakdown = { target?: IndicatorTarget; id: string; title: string; description: string; points: IndicatorPoint[] };
+export type IndicatorPeriod = { from: string; to: string };
+export type IndicatorFreshness = { updatedAt: string };
+
+export type CoverageIndicator = Pick<CoverageWire, "totals" | "targets" | "series" | "previous" | "delta"> & {
+  family: "coverage";
+  seriesBucket?: "week" | "month";
+  /** Mensaje del backend cuando rechazó el intervalo de la serie; el resto de la familia sí llegó. */
+  seriesError?: string;
+  period: IndicatorPeriod;
+  freshness: IndicatorFreshness;
+  primary: IndicatorMetric;
+  summaryMetrics: IndicatorMetric[];
+  breakdowns: IndicatorBreakdown[];
+};
+export type ComplianceIndicator = Pick<ComplianceWire, "finished" | "targets" | "series" | "previous" | "delta" | "schedulingDeviation"> & {
+  family: "compliance";
+  period: IndicatorPeriod;
+  freshness: IndicatorFreshness;
+  primary: IndicatorMetric;
+  summaryMetrics: IndicatorMetric[];
+  breakdowns: IndicatorBreakdown[];
+};
+export type IncidentsIndicator = Pick<IncidentsWire, "targets" | "series" | "previous" | "delta" | "containers" | "reports"> & {
+  family: "incidents";
+  period: IndicatorPeriod;
+  freshness: IndicatorFreshness;
+  primary: IndicatorMetric;
+  breakdowns: IndicatorBreakdown[];
+};
+export type WasteIndicator = Pick<WasteWire, "targets" | "series" | "previous" | "delta"> & {
+  family: "waste";
+  period: IndicatorPeriod;
+  freshness: IndicatorFreshness;
+  primary: IndicatorMetric;
+  summaryMetrics: IndicatorMetric[];
+  breakdowns: IndicatorBreakdown[];
+};
+
+export class IndicatorContractError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "IndicatorContractError";
+  }
+}
+
+export class IndicatorRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "IndicatorRequestError";
+    this.status = status;
+  }
+}
+
+function formatCalendarDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+export function defaultIndicatorQuery(now = new Date()): ResolvedIndicatorQuery {
+  const to = todayInArgentina(now);
+  const from = new Date(`${to}T00:00:00.000Z`);
+  from.setUTCDate(from.getUTCDate() - 29);
+  return { from: formatCalendarDate(from), to };
+}
+
+export function resolveIndicatorQuery(query: IndicatorQuery = {}, now = new Date()): ResolvedIndicatorQuery {
+  const parsed = indicatorQuerySchema.safeParse(query);
+  if (!parsed.success) throw new IndicatorContractError(indicatorQueryErrorMessage(parsed.error), { cause: parsed.error });
+  const defaults = defaultIndicatorQuery(now);
+  return { ...defaults, ...parsed.data };
+}
+
+export const INDICATOR_FAMILIES = ["coverage", "compliance", "incidents", "waste"] as const;
+export type IndicatorFamily = (typeof INDICATOR_FAMILIES)[number];
+export const indicatorBucketSchema = z.enum(["day", "week", "month"]);
+export type IndicatorBucket = z.infer<typeof indicatorBucketSchema>;
+
+// openapi.json del backend: sólo coverage y compliance reciben zoneId/serviceTypeId;
+// incidents y waste aceptan únicamente from/to.
+export function familyAppliesCatalogFilters(family: string) {
+  return family === "coverage" || family === "compliance";
+}
+
+export type IndicatorUrlState = {
+  query: ResolvedIndicatorQuery;
+  family: IndicatorFamily;
+  view: "bars" | "table";
+  /** Señal elegida: `breakdownId:pointId`. */
+  signal?: { breakdownId: string; pointId: string };
+};
+
+/** Estado del tablero desde la URL; lo inválido cae al valor por defecto, sin lanzar. */
+export function parseIndicatorUrlState(params: { get(name: string): string | null }, now = new Date()): IndicatorUrlState {
+  const raw = Object.fromEntries(["from", "to", "zoneId", "serviceTypeId"].flatMap((key) => params.get(key) ? [[key, params.get(key)]] : []));
+  const parsed = indicatorQuerySchema.safeParse(raw);
+  const query = { ...defaultIndicatorQuery(now), ...(parsed.success ? parsed.data : {}) };
+  const family = params.get("family");
+  const separator = params.get("signal")?.indexOf(":") ?? -1;
+  const signal = params.get("signal");
+  return {
+    query,
+    family: INDICATOR_FAMILIES.find((item) => item === family) ?? "coverage",
+    view: params.get("view") === "table" ? "table" : "bars",
+    signal: signal && separator > 0 ? { breakdownId: signal.slice(0, separator), pointId: signal.slice(separator + 1) } : undefined,
+  };
+}
+
+/** Copia `base` (conserva p. ej. `destination`) y pisa los parámetros del tablero. */
+export function serializeIndicatorUrlState(state: Omit<IndicatorUrlState, "query"> & { query: IndicatorQuery }, base = ""): string {
+  const params = new URLSearchParams(base);
+  for (const key of ["from", "to", "zoneId", "serviceTypeId", "family", "view", "signal"]) params.delete(key);
+  const { query } = state;
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  if (query.zoneId) params.set("zoneId", query.zoneId);
+  if (query.serviceTypeId) params.set("serviceTypeId", query.serviceTypeId);
+  params.set("family", state.family);
+  if (state.view === "table") params.set("view", "table");
+  if (state.signal) params.set("signal", `${state.signal.breakdownId}:${state.signal.pointId}`);
+  return params.toString();
+}
+
+export function coverageBucket(query: IndicatorQuery): "week" | "month" {
+  const resolved = resolveIndicatorQuery(query);
+  const start = new Date(`${resolved.from}T00:00:00Z`);
+  const days = (Date.parse(`${resolved.to}T00:00:00Z`) - start.getTime()) / 86400000 + 1;
+  const weeks = Math.ceil((days + (start.getUTCDay() + 6) % 7) / 7);
+  return weeks > 90 ? "month" : "week";
+}
+
+function queryString(query: IndicatorQuery, family: string, withSeries = true) {
+  const resolved = resolveIndicatorQuery(query);
+  const params = new URLSearchParams({ from: resolved.from, to: resolved.to, compare: "previous" });
+  if (withSeries && family !== "waste") params.set("bucket", coverageBucket(resolved));
+  if (familyAppliesCatalogFilters(family)) {
+    if (resolved.zoneId) params.set("zoneId", resolved.zoneId);
+    if (resolved.serviceTypeId) params.set("serviceTypeId", resolved.serviceTypeId);
+  }
+  return `?${params.toString()}`;
+}
+
+async function request(path: string) {
+  let response: Response;
+  try {
+    response = await authenticatedFetch(path);
+  } catch (cause) {
+    if (cause instanceof NetworkFailureError) recordTelemetryEvent({ name: "request_network_failure", resource: "indicators" });
+    throw cause;
+  }
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (cause) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "indicators" });
+    throw new IndicatorContractError("No se pudo obtener información válida de indicadores. Reintente en unos segundos.", { cause });
+  }
+  if (!response.ok) {
+    const parsed = z.object({ statusCode: z.number(), message: z.union([z.string(), z.array(z.string())]) }).safeParse(payload);
+    if (!parsed.success) throw new IndicatorContractError("No se pudo obtener información válida de error de indicadores. Reintente en unos segundos.", { cause: parsed.error });
+    const message = Array.isArray(parsed.data.message) ? parsed.data.message.join(" ") : parsed.data.message;
+    throw new IndicatorRequestError(message, parsed.data.statusCode);
+  }
+  return payload;
+}
+
+function isTooManySeriesPoints(error: unknown): error is IndicatorRequestError {
+  if (!(error instanceof IndicatorRequestError) || error.status !== 400) return false;
+  const message = error.message.toLocaleLowerCase("es-AR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return message.includes("90")
+    && /\b(?:puntos?|intervalos?)\b/.test(message)
+    && /\b(?:supera|excede|maximo|limite|mas de|more than|maximum|exceeds?|too many)\b/.test(message);
+}
+
+const RISK_LEVEL_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NONE"];
+
+function coveragePoints(rows: CoverageWire["byZone"]): IndicatorPoint[] {
+  return rows.map((row) => ({
+    id: row.id,
+    lowSample: row.lowSample,
+    label: row.name,
+    value: row.coveragePct,
+    unit: "%",
+    note: `${row.served} de ${row.scheduled} objetivos`,
+    details: [
+      { label: "Atendidos", value: row.served, unit: "objetivos" },
+      { label: "Parciales", value: row.partial, unit: "objetivos" },
+      { label: "No atendidos", value: row.notServiced, unit: "objetivos" },
+      { label: "Pendientes", value: row.pending, unit: "objetivos" },
+      { label: "Programado a futuro", value: row.upcoming ?? null, unit: "objetivos" },
+      { label: "Programados", value: row.scheduled, unit: "objetivos" },
+    ],
+  }));
+}
+
+function normalizeCoverage(wire: CoverageWire, readAt: string): CoverageIndicator {
+  const coverageTarget = wire.targets === undefined ? defaultIndicatorTarget("coverage") : wire.targets.coveragePct ?? null;
+  return {
+    totals: wire.totals,
+    targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
+    family: "coverage", period: wire.period, freshness: { updatedAt: readAt },
+    primary: { value: wire.totals.coveragePct, label: "Cobertura de objetivos", unit: "%" },
+    summaryMetrics: [
+      { value: wire.totals.served, label: "Atendidos", unit: "objetivos" },
+      { value: wire.totals.partial, label: "Parciales", unit: "objetivos" },
+      { value: wire.totals.pending, label: "Pendientes", unit: "objetivos" },
+      { value: wire.totals.upcoming ?? null, label: "Programado a futuro", unit: "objetivos" },
+      { value: wire.totals.scheduled, label: "Programados", unit: "objetivos" },
+    ],
+    breakdowns: [
+      { target: coverageTarget, id: "zones", title: "Cobertura por zona", description: "Objetivos atendidos sobre objetivos programados.", points: coveragePoints(wire.byZone) },
+      { target: coverageTarget, id: "service-types", title: "Cobertura por tipo de servicio", description: "Comparación de cobertura entre servicios.", points: coveragePoints(wire.byServiceType) },
+    ],
+  };
+}
+
+function normalizeCompliance(wire: ComplianceWire, readAt: string): ComplianceIndicator {
+  const reasonLabel = (reason: string | null) => reason === null
+    ? "Sin motivo registrado"
+    : labelFor(NOT_SERVICED_REASON_LABEL, reason);
+  return {
+    targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
+    schedulingDeviation: wire.schedulingDeviation,
+    finished: wire.finished,
+    family: "compliance", period: wire.period, freshness: { updatedAt: readAt },
+    primary: { value: wire.finished.onTimePct, label: "Cumplimiento en fecha", unit: "%" },
+    summaryMetrics: [
+      { value: wire.finished.total, label: "Finalizados", unit: "servicios" },
+      { value: wire.finished.onTime, label: "En fecha", unit: "servicios" },
+      { value: wire.finished.late, label: "Demorados", unit: "servicios" },
+    ],
+    breakdowns: [
+      { id: "completion", title: "Finalización en fecha", description: `${wire.finished.total} servicios finalizados en el período.`, points: [{ id: "on-time", label: "En fecha", value: wire.finished.onTime, unit: "servicios", tone: "success" }, { id: "delayed", label: "Demorados", value: wire.finished.late, unit: "servicios", tone: "warning" }] },
+      { id: "unattended-zones", title: "Zonas sin atención", description: "Ranking de zonas no atendidas y motivos registrados.", points: wire.notServicedRanking.map((zone): IndicatorPoint => ({
+        id: zone.zoneId,
+        label: zone.name,
+        value: zone.count,
+        unit: "objetivos",
+        note: zone.reasons.map((item) => reasonLabel(item.reason)).join(" · ") || "Sin motivo registrado",
+        details: zone.reasons.map((item) => ({ label: reasonLabel(item.reason), value: item.count, unit: "objetivos" })),
+        tone: "warning",
+      })) },
+    ],
+  };
+}
+
+function normalizeIncidents(wire: IncidentsWire, readAt: string): IncidentsIndicator {
+  const riskLevels = [...wire.trees.byRiskLevel].sort((a, b) => RISK_LEVEL_ORDER.indexOf(a.riskLevel) - RISK_LEVEL_ORDER.indexOf(b.riskLevel));
+  return {
+    targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
+    containers: wire.containers, reports: wire.reports,
+    family: "incidents", period: wire.period, freshness: { updatedAt: readAt },
+    primary: wire.reports.avgResolutionBusinessDays === undefined
+      ? { value: wire.reports.avgResolutionDays, label: "Resolución media de reportes", unit: "días corridos" }
+      : { value: wire.reports.avgResolutionBusinessDays, label: "Resolución media de reportes", unit: "días hábiles" },
+    breakdowns: [
+      { id: "containers", title: "Contenedores por zona", description: "Estado actual de desbordes y daños por zona; valores en incidentes.", points: wire.containers.byZone.map((zone): IndicatorPoint => ({
+        id: zone.zoneId,
+        label: zone.name,
+        value: zone.overflowed + zone.damaged,
+        unit: "incidentes",
+        note: `${zone.overflowed} desbordes · ${zone.damaged} daños sobre ${zone.total} contenedores`,
+        details: [{ label: "Desbordes", value: zone.overflowed, unit: "incidentes" }, { label: "Daños", value: zone.damaged, unit: "incidentes" }, { label: "Contenedores", value: zone.total, unit: "contenedores" }],
+        tone: zone.overflowed + zone.damaged > 4 ? "danger" : "primary",
+      })) },
+      { id: "container-status", title: "Contenedores por estado", description: "Estado actual del parque de contenedores.", points: wire.containers.byStatus.map((item): IndicatorPoint => ({
+        id: item.status,
+        label: labelFor(CONTAINER_STATUS_LABELS, item.status),
+        value: item.count,
+        unit: "contenedores",
+        tone: item.status === "ACTIVE" ? "success" : item.status === "OVERFLOWED" || item.status === "DAMAGED" ? "danger" : "warning",
+      })) },
+      { id: "tree-risk", title: "Riesgo de arbolado", description: "Inventario actual por nivel de riesgo; valores en árboles.", points: riskLevels.map((item): IndicatorPoint => ({
+        id: item.riskLevel,
+        label: labelFor(RISK_LEVEL_LABELS, item.riskLevel),
+        value: item.count,
+        unit: "árboles",
+        tone: item.riskLevel === "CRITICAL" || item.riskLevel === "HIGH" ? "danger" : item.riskLevel === "NONE" ? "success" : "warning",
+      })) },
+      { id: "reports", title: "Reportes por tipo", description: `${wire.reports.total} reportes recibidos en el período; valores en reportes.`, points: wire.reports.byType.map((item) => ({
+        id: item.reportType,
+        label: labelFor(ENVIRONMENTAL_REPORT_TYPE_LABELS, item.reportType),
+        value: item.count,
+        unit: "reportes",
+      })) },
+      { id: "report-status", title: "Reportes por estado", description: "Reportes recibidos en el período, distribuidos por estado.", points: wire.reports.byStatus.map((item): IndicatorPoint => ({
+        id: item.status,
+        label: labelFor(ENVIRONMENTAL_REPORT_STATUS_LABELS, item.status),
+        value: item.count,
+        unit: "reportes",
+        tone: item.status === "CLOSED" ? "success" : item.status === "RECEIVED" ? "danger" : "warning",
+      })) },
+    ],
+  };
+}
+
+function normalizeWaste(wire: WasteWire, readAt: string): WasteIndicator {
+  const massPoint = (id: string, label: string, weightKg: number, volumeM3: number): IndicatorPoint => ({
+    id,
+    label,
+    value: weightKg,
+    unit: "kg",
+    note: `${volumeM3.toLocaleString("es-AR")} m³`,
+    details: [{ label: "Metros cúbicos", value: volumeM3, unit: "m³" }],
+  });
+  return {
+    targets: wire.targets, series: wire.series, previous: wire.previous, delta: wire.delta,
+    family: "waste", period: wire.period, freshness: { updatedAt: readAt },
+    primary: { value: wire.totals.divertedPct, label: "Desvío de relleno sanitario", unit: "%" },
+    summaryMetrics: [
+      { value: wire.totals.weightKg, label: "Peso registrado", unit: "kg" },
+      { value: wire.totals.divertedKg, label: "Desviado del relleno", unit: "kg" },
+      { value: wire.totals.volumeM3, label: "Volumen registrado", unit: "m³" },
+    ],
+    breakdowns: [
+      { id: "types", title: "Residuos por tipo", description: `${wire.records} registros de disposición en el período.`, points: wire.byWasteType.map((item) => massPoint(item.wasteType, labelFor(WASTE_TYPE_LABELS, item.wasteType), item.weightKg, item.volumeM3)) },
+      { id: "destinations", title: "Residuos por destino", description: "Kilogramos y metros cúbicos enviados a cada destino.", points: wire.byDisposalSite.map((item) => massPoint(item.disposalSiteId, item.name, item.weightKg, item.volumeM3)) },
+    ],
+  };
+}
+
+async function get<T>(family: string, query: IndicatorQuery, schema: z.ZodType<T>, normalize: (wire: T, readAt: string) => T extends CoverageWire ? CoverageIndicator : T extends ComplianceWire ? ComplianceIndicator : T extends IncidentsWire ? IncidentsIndicator : WasteIndicator, message: string, withSeries = true) {
+  const parsed = schema.safeParse(await request(`/api/indicators/${family}${queryString(query, family, withSeries)}`));
+  if (!parsed.success) {
+    recordTelemetryEvent({ name: "request_malformed_response", resource: "indicators" });
+    throw new IndicatorContractError(message, { cause: parsed.error });
+  }
+  // El backend calcula los indicadores en cada consulta y no devuelve una marca
+  // de actualización, así que la frescura es el momento de la lectura.
+  return normalize(parsed.data, new Date().toISOString());
+}
+
+export const indicatorsAdapter = {
+  async getCoverage(query: IndicatorQuery = {}): Promise<CoverageIndicator> {
+    const contractMessage = "La cobertura no respeta el contrato de indicadores.";
+    const seriesBucket = coverageBucket(query);
+    try {
+      return { ...await get("coverage", query, coverageWireSchema, normalizeCoverage, contractMessage), seriesBucket };
+    } catch (error) {
+      if (!isTooManySeriesPoints(error)) throw error;
+      // Si el rango no admite serie, el resto de la familia se muestra igual y la tendencia explica el rechazo.
+      try {
+        return { ...await get("coverage", query, coverageWireSchema, normalizeCoverage, contractMessage, false), seriesBucket, seriesError: error.message };
+      } catch {
+        throw error;
+      }
+    }
+  },
+  getCompliance(query: IndicatorQuery = {}) { return get("compliance", query, complianceWireSchema, normalizeCompliance, "El cumplimiento no respeta el contrato de indicadores."); },
+  getIncidents(query: IndicatorQuery = {}) { return get("incidents", query, incidentsWireSchema, normalizeIncidents, "Las incidencias no respetan el contrato de indicadores."); },
+  getWaste(query: IndicatorQuery = {}) { return get("waste", query, wasteWireSchema, normalizeWaste, "Los residuos no respetan el contrato de indicadores."); },
+};
+
+export const getCoverage = indicatorsAdapter.getCoverage;
+export const getCompliance = indicatorsAdapter.getCompliance;
+export const getIncidents = indicatorsAdapter.getIncidents;
+export const getWaste = indicatorsAdapter.getWaste;
+
+export type IndicatorTargetDefinition = {
+  target: { comparator: "≥" | "≤"; value: number; unit: "%" | "días" | "días hábiles" } | null;
+  direction: "more-is-better" | "less-is-better";
+};
+
+export const INDICATOR_TARGETS = {
+  coverage: { target: { comparator: "≥", value: 95, unit: "%" }, direction: "more-is-better" },
+  compliance: { target: { comparator: "≥", value: 90, unit: "%" }, direction: "more-is-better" },
+  incidents: { target: { comparator: "≤", value: 5, unit: "días hábiles" }, direction: "less-is-better" },
+  waste: { target: null, direction: "more-is-better" },
+} as const satisfies Record<IndicatorFamily, IndicatorTargetDefinition>;
+
+export function defaultIndicatorTarget(family: IndicatorFamily): IndicatorTarget {
+  const { target, direction } = INDICATOR_TARGETS[family];
+  if (!target) return null;
+  return { value: target.value, direction: direction === "less-is-better" ? "max" : "min" };
+}
+
+export function hasNumericThreshold(target: IndicatorTarget | undefined): target is { value: number; direction: "min" | "max" } {
+  return target !== undefined && target !== null && target.value !== null
+    && (target.direction === "min" || target.direction === "max");
+}
+
+export type CoverageCsvRow = {
+  name: string;
+  scheduled: number;
+  served: number;
+  partial: number;
+  notServiced: number;
+  pending: number;
+  coveragePct: number;
+  upcoming?: number | null;
+  lowSample?: boolean;
+};
+
+export function isCoverageBelowTarget(scheduled: number, coveragePct: number, target: IndicatorTarget = defaultIndicatorTarget("coverage")) {
+  return scheduled > 0 && hasNumericThreshold(target) && (target.direction === "min" ? coveragePct < target.value : coveragePct > target.value);
+}
+
+const coverageCsvIntegerFormat = new Intl.NumberFormat("es-AR");
+const coverageCsvDecimalFormat = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
+
+function csvCell(value: string) {
+  return /[;"\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+function csvTextValue(value: string) {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+/** Serializa las filas ordenadas de cobertura para Excel con configuración regional argentina. */
+export function coverageRowsToCsv(rows: CoverageCsvRow[], nameHeading: string, target?: IndicatorTarget) {
+  const header = [nameHeading, "Programados", "Atendidos", "Parciales", "No atendidos", "Pendientes", "Cobertura %", "Bajo la meta", "Programado a futuro", "Muestra baja"];
+  const lines = [
+    header,
+    ...rows.map((row) => [
+      csvTextValue(row.name),
+      coverageCsvIntegerFormat.format(row.scheduled),
+      coverageCsvIntegerFormat.format(row.served),
+      coverageCsvIntegerFormat.format(row.partial),
+      coverageCsvIntegerFormat.format(row.notServiced),
+      coverageCsvIntegerFormat.format(row.pending),
+      row.scheduled === 0 ? "Sin programados" : coverageCsvDecimalFormat.format(row.coveragePct),
+      isCoverageBelowTarget(row.scheduled, row.coveragePct, target) ? "Sí" : "No",
+      row.upcoming == null ? "Sin dato" : coverageCsvIntegerFormat.format(row.upcoming),
+      row.lowSample ? "Sí" : "No",
+    ]),
+  ];
+
+  return `\uFEFF${lines.map((line) => line.map(csvCell).join(";")).join("\r\n")}`;
+}
+
+export type IndicatorData = Awaited<ReturnType<typeof indicatorsAdapter.getCoverage>> | Awaited<ReturnType<typeof indicatorsAdapter.getCompliance>> | Awaited<ReturnType<typeof indicatorsAdapter.getIncidents>> | Awaited<ReturnType<typeof indicatorsAdapter.getWaste>>;

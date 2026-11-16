@@ -1,0 +1,3 @@
+# Trivy — HIGH/CRITICAL sin fix disponible (#924).
+# Una línea por CVE, con justificación y mitigación. Las que tienen fix NO se
+# ignoran: se corrigen. Formato: CVE-AAAA-NNNN  # justificación | mitigación

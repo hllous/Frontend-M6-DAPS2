@@ -1,0 +1,17 @@
+.desktopLayout {
+  display: block;
+}
+
+.mobileLayout {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .desktopLayout {
+    display: none;
+  }
+
+  .mobileLayout {
+    display: block;
+  }
+}

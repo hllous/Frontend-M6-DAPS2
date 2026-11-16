@@ -1,0 +1,1103 @@
+// @ts-nocheck
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { setupServer } from "msw/node";
+import { HttpResponse, http } from "msw";
+
+import { handlers } from "@/mocks/handlers";
+import { NetworkFailureError } from "./authenticated-fetch";
+import { EMPTY_SERVICES_QUERY } from "./services-fixtures";
+import {
+  BackendServiceZoneSelectionError,
+  assignCrewInputSchema,
+  checkAssignmentConflicts,
+  confirmRescheduleInputSchema,
+  createServiceInputSchema,
+  checkServiceWindowTiming,
+  ServiceContractError,
+  ServiceRequestError,
+  ServiceStartBlockedError,
+  servicesAdapter,
+  suspendServiceInputSchema,
+  suspendServiceRequestSchema,
+  toSuspendServiceBackendInput,
+  toCreateServiceBackendInput,
+} from "./services";
+import { olvidarCatalogoDeEtiquetas } from "./service-labels";
+
+const server = setupServer(...handlers);
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => {
+  server.resetHandlers();
+  olvidarCatalogoDeEtiquetas();
+  vi.restoreAllMocks();
+});
+afterAll(() => server.close());
+
+describe("service backend input mapping", () => {
+  const baseInput = {
+    serviceTypeId: "service-type-1",
+    origin: "PLANNED" as const,
+    zoneIds: ["zone-1"],
+    scheduledDate: "2026-09-30",
+    timeWindow: { start: "08:00", end: "12:00" },
+  };
+
+  it("lets routes and inventory targets derive their zones", () => {
+    expect(toCreateServiceBackendInput({ ...baseInput, routeId: "route-1", zoneIds: ["zone-1", "zone-2"] }))
+      .not.toHaveProperty("zoneId");
+    expect(toCreateServiceBackendInput({
+      ...baseInput,
+      origin: "INSPECTION",
+      inspectionId: "inspection-1",
+      targetType: "TREE",
+      targetId: "tree-1",
+      targetRef: "ARB-001",
+    })).toEqual({
+      serviceTypeId: "service-type-1",
+      scheduledDate: "2026-09-30",
+      origin: "INSPECTION",
+      routeId: undefined,
+      targetType: "TREE",
+      targetId: "tree-1",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      ticketId: undefined,
+      inspectionId: "inspection-1",
+      notes: undefined,
+    });
+  });
+
+  it("forwards crew and overrideNote so an inspection Service is created and assigned in one write (#320)", () => {
+    expect(toCreateServiceBackendInput({ ...baseInput, origin: "INSPECTION", inspectionId: "inspection-1", crewId: "crew-1", overrideNote: "Coordinado con el jefe." }))
+      .toMatchObject({ origin: "INSPECTION", inspectionId: "inspection-1", crewId: "crew-1", overrideNote: "Coordinado con el jefe." });
+  });
+
+  it("sends each link only with its own origin, trimmed (#289)", () => {
+    const links = { inspectionId: " 3f2b8c1e-4d5a-4e6f-8a9b-0c1d2e3f4a5b ", weatherAlertId: " ALERT-7 " };
+    const byOrigin = (origin: "INSPECTION" | "WEATHER_ALERT" | "PLANNED") => {
+      const mapped = toCreateServiceBackendInput({ ...baseInput, ...links, origin });
+      return { inspectionId: mapped.inspectionId, weatherAlertId: mapped.weatherAlertId };
+    };
+
+    expect(byOrigin("INSPECTION")).toEqual({ inspectionId: "3f2b8c1e-4d5a-4e6f-8a9b-0c1d2e3f4a5b", weatherAlertId: undefined });
+    expect(byOrigin("WEATHER_ALERT")).toEqual({ inspectionId: undefined, weatherAlertId: "ALERT-7" });
+    expect(byOrigin("PLANNED")).toEqual({ inspectionId: undefined, weatherAlertId: undefined });
+    expect(toCreateServiceBackendInput({ ...baseInput, origin: "WEATHER_ALERT", weatherAlertId: "   " }).weatherAlertId).toBeUndefined();
+  });
+
+  it("requires a UUID inspectionId and caps weatherAlertId like the backend (#289)", () => {
+    const base = { ...baseInput, origin: "INSPECTION" as const };
+    expect(createServiceInputSchema.safeParse({ ...base, inspectionId: "INSP-12" }).success).toBe(false);
+    expect(createServiceInputSchema.safeParse({ ...base, inspectionId: "3f2b8c1e-4d5a-4e6f-8a9b-0c1d2e3f4a5b" }).success).toBe(true);
+    const alert = { ...baseInput, origin: "WEATHER_ALERT" as const };
+    expect(createServiceInputSchema.safeParse({ ...alert, weatherAlertId: "A".repeat(100) }).success).toBe(true);
+    expect(createServiceInputSchema.safeParse({ ...alert, weatherAlertId: "A".repeat(101) }).success).toBe(false);
+  });
+
+  it("sends a loose target as a zone with the text kept in the notes", () => {
+    expect(toCreateServiceBackendInput({
+      ...baseInput,
+      targetType: "CONTAINER",
+      targetRef: "Av. Cabildo 2100",
+      notes: "Llevar conos.",
+    })).toEqual({
+      serviceTypeId: "service-type-1",
+      scheduledDate: "2026-09-30",
+      origin: "PLANNED",
+      routeId: undefined,
+      targetType: undefined,
+      targetId: undefined,
+      zoneId: "zone-1",
+      windowFrom: "08:00",
+      windowTo: "12:00",
+      ticketId: undefined,
+      notes: "Objetivo: Av. Cabildo 2100 — Llevar conos.",
+    });
+  });
+
+  it("rejects multiple loose-location zones instead of discarding one", () => {
+    expect(() => toCreateServiceBackendInput({ ...baseInput, zoneIds: ["zone-1", "zone-2"] }))
+      .toThrow(BackendServiceZoneSelectionError);
+  });
+});
+
+describe("services adapter", () => {
+  it("accepts the real backend shape: zones: [{zoneId, sequence}] and no title (#255)", async () => {
+    server.use(
+      // Tal cual responde GET /services del backend: sin title y con las zonas anidadas,
+      // a proposito desordenadas para comprobar que se respeta el sequence.
+      http.get("*/api/services", () => HttpResponse.json({
+        data: [{
+          id: "9837fac5-22f5-4a39-bdef-6eb029a7db6f",
+          serviceTypeId: "02c17693-4fd9-473b-bc38-299dae4d8fcb",
+          mode: "ROUTE", status: "SCHEDULED", statusReason: null, origin: "MANUAL",
+          routeId: null, targetType: null, targetId: null,
+          scheduledDate: "2026-09-30T00:00:00.000Z", windowFrom: "10:00", windowTo: "11:00",
+          crewId: null, vehicleId: null, ticketId: null, notes: null,
+          zones: [{ zoneId: "zona-palermo", sequence: 2 }, { zoneId: "zona-belgrano", sequence: 1 }],
+          zoneResults: [], collectionRecords: [],
+          createdBy: "dev-local-user",
+          createdAt: "2026-09-20T00:39:42.432Z", updatedAt: "2026-09-20T00:39:42.432Z",
+        }],
+        meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+      })),
+      http.get("*/api/service-types", () => HttpResponse.json({
+        data: [{ id: "02c17693-4fd9-473b-bc38-299dae4d8fcb", code: "REC-DOM", name: "Recolección domiciliaria", category: "WASTE_COLLECTION", mode: "ROUTE", requiresVehicle: true, active: true }],
+        meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+      http.get("*/api/zones", () => HttpResponse.json({
+        data: [
+          { id: "zona-belgrano", code: "Z-BEL", name: "Belgrano", active: true },
+          { id: "zona-palermo", code: "Z-PAL", name: "Palermo", active: true },
+        ],
+        meta: { total: 2, page: 1, pageSize: 100, totalPages: 1 },
+      })),
+    );
+
+    const page = await servicesAdapter.list();
+    const servicio = page.services[0];
+
+    // El sequence manda: Belgrano (1) antes que Palermo (2).
+    expect(servicio?.zoneIds).toEqual(["zona-belgrano", "zona-palermo"]);
+    expect(servicio?.zoneNames).toEqual(["Belgrano", "Palermo"]);
+    expect(servicio?.serviceTypeName).toBe("Recolección domiciliaria");
+    expect(servicio?.serviceTypeCategory).toBe("WASTE_COLLECTION");
+    expect(servicio?.title).toBe("Recolección domiciliaria — Belgrano, Palermo");
+    expect(servicio?.title).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/);
+  });
+
+  it("falls back to a readable title when the catalogs fail, instead of breaking the list (#255)", async () => {
+    server.use(
+      http.get("*/api/services", () => HttpResponse.json({
+        data: [{
+          id: "svc-sin-catalogo",
+          serviceTypeId: "tipo-desconocido",
+          mode: "POINT", status: "SCHEDULED", origin: "MANUAL",
+          scheduledDate: "2026-09-30T00:00:00.000Z",
+          zones: [{ zoneId: "zona-x", sequence: 1 }],
+          createdAt: "2026-09-20T00:39:42.432Z", updatedAt: "2026-09-20T00:39:42.432Z",
+        }],
+        meta: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+      })),
+      http.get("*/api/service-types", () => HttpResponse.json({ statusCode: 503, message: "no disponible", error: "Service Unavailable", timestamp: "2026-09-20T00:00:00.000Z", path: "/api/service-types" }, { status: 503 })),
+      http.get("*/api/zones", () => HttpResponse.error()),
+    );
+
+    const page = await servicesAdapter.list();
+
+    expect(page.services[0]?.title).toBe("Servicio puntual — 2026-09-30");
+  });
+
+  it("normalizes a successful paginated response into frontend-owned shapes", async () => {
+    const page = await servicesAdapter.list();
+
+    expect(page.services.length).toBeGreaterThan(0);
+    const first = page.services[0];
+    expect(first).toMatchObject({
+      id: expect.any(String),
+      title: expect.any(String),
+      mode: expect.stringMatching(/ROUTE|POINT/),
+      status: expect.stringMatching(/SCHEDULED|RESCHEDULED|IN_PROGRESS|SUSPENDED|COMPLETED|PARTIALLY_COMPLETED|CANCELLED/),
+      zoneIds: expect.any(Array),
+    });
+    expect(page).toMatchObject({
+      page: 1,
+      pageSize: expect.any(Number),
+      total: expect.any(Number),
+      totalPages: expect.any(Number),
+    });
+  });
+
+  it("reports how many records of the page it dropped for an unknown enum, apart from the paging total (#651)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const [known] = (await servicesAdapter.list()).services;
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      data: [known, { ...known, id: "svc-future", status: "FUTURE_STATUS" }],
+      meta: { total: 50, page: 1, pageSize: 2, totalPages: 25 },
+    })));
+    const page = await servicesAdapter.list();
+    expect(page.services.map((service) => service.id)).toEqual([known.id]);
+    expect(page.dropped).toBe(1);
+    server.use(http.get("*/api/services", () => HttpResponse.json({
+      data: [known], meta: { total: 50, page: 1, pageSize: 1, totalPages: 50 },
+    })));
+    expect((await servicesAdapter.list()).dropped).toBe(0);
+  });
+
+  it("normalizes the named empty-results scenario", async () => {
+    const page = await servicesAdapter.list(EMPTY_SERVICES_QUERY);
+
+    expect(page.services).toEqual([]);
+    expect(page.total).toBe(0);
+  });
+
+  it("fetches a single service by ID and validates its contract", async () => {
+    const service = await servicesAdapter.get("SVC-1042");
+
+    expect(service.id).toBe("SVC-1042");
+    expect(service.title).toContain("Recolección");
+    expect(service.mode).toBe("ROUTE");
+  });
+
+  it("fails explicitly on a malformed success payload instead of returning partial data", async () => {
+    server.use(http.get("*/api/services", () => HttpResponse.json({ services: "not-an-envelope" })));
+
+    await expect(servicesAdapter.list()).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("surfaces a documented error response as a typed request error", async () => {
+    server.use(
+      http.get("*/api/services", () =>
+        HttpResponse.json(
+          {
+            statusCode: 401,
+            message: "La sesión no está activa.",
+            error: "Unauthorized",
+            timestamp: new Date().toISOString(),
+            path: "/services",
+          },
+          { status: 401 },
+        ),
+      ),
+    );
+
+    const error = await servicesAdapter.list().catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ServiceRequestError);
+    expect((error as ServiceRequestError).status).toBe(401);
+  });
+
+  it("fails explicitly when an error response does not respect the documented error contract", async () => {
+    server.use(http.get("*/api/services", () => HttpResponse.json({ oops: true }, { status: 500 })));
+
+    await expect(servicesAdapter.list()).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("exposes a transport failure as a retryable network error and records allowlisted telemetry", async () => {
+    server.use(http.get("*/api/services", () => HttpResponse.error()));
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await expect(servicesAdapter.list()).rejects.toBeInstanceOf(NetworkFailureError);
+
+    expect(infoSpy).toHaveBeenCalledWith(
+      "[m6-telemetry]",
+      { name: "request_network_failure", resource: "services" },
+    );
+  });
+
+  it("creates a new unassigned ROUTE service and validates the response through the contract", async () => {
+    server.use(
+      http.post("*/api/services", async ({ request }) => {
+        const body = (await request.json()) as any;
+        return HttpResponse.json(
+          {
+            id: "SVC-9999",
+            serviceTypeId: body.serviceTypeId,
+            serviceTypeName: "Recolección de residuos",
+            title: "Recolección de residuos — Recorrido 4",
+            mode: "ROUTE",
+            status: "SCHEDULED",
+            origin: body.origin,
+            zoneIds: body.zoneIds,
+            zoneNames: ["Zona Norte"],
+            routeId: body.routeId,
+            routeName: "Recorrido 4 Norte",
+            scheduledDate: body.scheduledDate,
+            windowFrom: body.timeWindow.start,
+            windowTo: body.timeWindow.end,
+            crewId: null,
+            crewName: null,
+            vehicleId: null,
+            vehiclePlate: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const created = await servicesAdapter.create({
+      serviceTypeId: "st-waste-route",
+      origin: "PLANNED",
+      routeId: "route-4",
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-10",
+      timeWindow: { start: "08:00", end: "12:00" },
+      notes: "Turno mañana",
+    });
+
+    expect(created.id).toBe("SVC-9999");
+    expect(created.status).toBe("SCHEDULED");
+    expect(created.mode).toBe("ROUTE");
+    expect(created.crewId).toBeNull();
+    expect(created.vehicleId).toBeNull();
+    expect(created.zoneIds).toEqual(["zone-1"]);
+  });
+
+  it("creates a new unassigned POINT service linked to a ticket", async () => {
+    server.use(
+      http.post("*/api/services", async ({ request }) => {
+        const body = (await request.json()) as any;
+        return HttpResponse.json(
+          {
+            id: "SVC-9998",
+            serviceTypeId: body.serviceTypeId,
+            serviceTypeName: "Mantenimiento de contenedores",
+            title: "Reparación de contenedor CT-0442",
+            mode: "POINT",
+            status: "SCHEDULED",
+            origin: body.origin,
+            ticketId: body.ticketId,
+            zoneIds: body.zoneIds,
+            zoneNames: ["Zona Norte"],
+            targetType: body.targetType,
+            targetRef: body.targetRef,
+            scheduledDate: body.scheduledDate,
+            windowFrom: body.timeWindow.start,
+            windowTo: body.timeWindow.end,
+            crewId: null,
+            crewName: null,
+            vehicleId: null,
+            vehiclePlate: null,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const created = await servicesAdapter.create({
+      serviceTypeId: "st-container-repair",
+      origin: "TICKET",
+      ticketId: "TK-9921",
+      targetType: "CONTAINER",
+      targetRef: "CT-0442",
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-11",
+      timeWindow: { start: "14:00", end: "18:00" },
+    });
+
+    expect(created.id).toBe("SVC-9998");
+    expect(created.mode).toBe("POINT");
+    expect(created.origin).toBe("TICKET");
+    expect(created.ticketId).toBe("TK-9921");
+    expect(created.crewId).toBeNull();
+    expect(created.zoneIds).toEqual(["zone-1"]);
+  });
+
+  it("rejects invalid create input with ServiceContractError before sending request", async () => {
+    // Missing zoneIds
+    await expect(
+      servicesAdapter.create({
+        serviceTypeId: "st-waste-route",
+        origin: "PLANNED",
+        zoneIds: [] as unknown as [string, ...string[]],
+        scheduledDate: "2026-09-10",
+        timeWindow: { start: "08:00", end: "12:00" },
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+
+    // Origin TICKET without ticketId
+    await expect(
+      servicesAdapter.create({
+        serviceTypeId: "st-waste-route",
+        origin: "TICKET",
+        zoneIds: ["zone-1"],
+        scheduledDate: "2026-09-10",
+        timeWindow: { start: "08:00", end: "12:00" },
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("fails explicitly when the server response for create is malformed", async () => {
+    server.use(
+      http.post("*/api/services", () =>
+        HttpResponse.json({ broken: true }, { status: 201 }),
+      ),
+    );
+
+    await expect(
+      servicesAdapter.create({
+        serviceTypeId: "st-waste-route",
+        origin: "PLANNED",
+        zoneIds: ["zone-1"],
+        scheduledDate: "2026-09-10",
+        timeWindow: { start: "08:00", end: "12:00" },
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("attaches a crew and vehicle to an already-scheduled service via assignCrew", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/assign-crew", async ({ params, request }) => {
+        const body = (await request.json()) as any;
+        return HttpResponse.json({
+          id: params.serviceId,
+          serviceTypeId: "st-waste-route",
+          serviceTypeName: "Recolección de residuos",
+          title: "Recolección de residuos — Recorrido 4",
+          mode: "ROUTE",
+          status: "SCHEDULED",
+          origin: "PLANNED",
+          zoneIds: ["zone-1"],
+          zoneNames: ["Zona Norte"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "09:00",
+          windowTo: "13:00",
+          crewId: body.crewId,
+          crewName: "Cuadrilla A · López",
+          vehicleId: body.vehicleId ?? null,
+          vehiclePlate: body.vehicleId ? "AF 123 CD" : null,
+          history: [
+            { label: "Programado", at: "2026-09-04 18:40", done: true },
+            { label: "Asignado", at: "2026-09-05 10:00", done: true },
+          ],
+        });
+      }),
+    );
+
+    const updated = await servicesAdapter.assignCrew("SVC-1043", {
+      crewId: "crew-a",
+      vehicleId: "veh-101",
+    });
+
+    expect(updated.id).toBe("SVC-1043");
+    expect(updated.crewId).toBe("crew-a");
+    expect(updated.crewName).toBe("Cuadrilla A · López");
+    expect(updated.vehicleId).toBe("veh-101");
+    expect(updated.vehiclePlate).toBe("AF 123 CD");
+  });
+
+  it("rejects invalid assignCrew input with ServiceContractError before sending request", async () => {
+    await expect(
+      servicesAdapter.assignCrew("SVC-1043", {
+        crewId: "",
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("fails explicitly when the server response for assignCrew is malformed", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/assign-crew", () =>
+        HttpResponse.json({ unexpected: 123 }, { status: 200 }),
+      ),
+    );
+
+    await expect(
+      servicesAdapter.assignCrew("SVC-1043", {
+        crewId: "crew-a",
+      }),
+    ).rejects.toBeInstanceOf(ServiceContractError);
+  });
+
+  it("detects non-authoritative double-booking conflicts for overlapping crew and vehicle assignments", () => {
+    const targetService = {
+      id: "SVC-TARGET",
+      serviceTypeId: "st-waste-route",
+      title: "Servicio Objetivo",
+      mode: "ROUTE" as const,
+      status: "SCHEDULED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "10:00",
+      windowTo: "14:00",
+    };
+
+    const overlappingOther = {
+      id: "SVC-OTHER",
+      serviceTypeId: "st-waste-route",
+      title: "Otro servicio en el mismo horario",
+      mode: "ROUTE" as const,
+      status: "SCHEDULED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "11:00",
+      windowTo: "13:00",
+      crewId: "crew-a",
+      crewName: "Cuadrilla A · López",
+      vehicleId: "veh-101",
+      vehiclePlate: "AF 123 CD",
+    };
+
+    const nonOverlappingDifferentDate = {
+      id: "SVC-DIFF-DATE",
+      serviceTypeId: "st-waste-route",
+      title: "Servicio en otra fecha",
+      mode: "ROUTE" as const,
+      status: "SCHEDULED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-06",
+      windowFrom: "10:00",
+      windowTo: "14:00",
+      crewId: "crew-a",
+      vehicleId: "veh-101",
+    };
+
+    const cancelledServiceSameTime = {
+      id: "SVC-CANCELLED",
+      serviceTypeId: "st-waste-route",
+      title: "Servicio cancelado",
+      mode: "ROUTE" as const,
+      status: "CANCELLED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "10:00",
+      windowTo: "14:00",
+      crewId: "crew-a",
+      vehicleId: "veh-101",
+    };
+
+    const allServices = [
+      targetService as any,
+      overlappingOther as any,
+      nonOverlappingDifferentDate as any,
+      cancelledServiceSameTime as any,
+    ];
+
+    // Conflict detected when crew-a and veh-101 are selected
+    const conflictResult = checkAssignmentConflicts({
+      service: targetService as any,
+      crewId: "crew-a",
+      vehicleId: "veh-101",
+      allServices,
+    });
+
+    expect(conflictResult.crewConflict).not.toBeNull();
+    expect(conflictResult.crewConflict?.id).toBe("SVC-OTHER");
+    expect(conflictResult.vehicleConflict).not.toBeNull();
+    expect(conflictResult.vehicleConflict?.id).toBe("SVC-OTHER");
+
+    // No conflict when assigning different crew and vehicle
+    const noConflictResult = checkAssignmentConflicts({
+      service: targetService as any,
+      crewId: "crew-b",
+      vehicleId: "veh-102",
+      allServices,
+    });
+
+    expect(noConflictResult.crewConflict).toBeNull();
+    expect(noConflictResult.vehicleConflict).toBeNull();
+  });
+
+  it("starts a service via servicesAdapter.start and returns updated service in IN_PROGRESS", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/start", ({ params }) => {
+        return HttpResponse.json({
+          id: params.serviceId,
+          serviceTypeId: "st-street-cleaning",
+          serviceTypeName: "Barrido mecánico",
+          title: "Barrido mecánico — Bulevar Costero",
+          mode: "ROUTE",
+          status: "IN_PROGRESS",
+          origin: "PLANNED",
+          zoneIds: ["zone-3"],
+          zoneNames: ["Zona Centro"],
+          scheduledDate: "2026-09-05",
+          windowFrom: "08:00",
+          windowTo: "12:00",
+          crewId: "crew-b",
+          crewName: "Cuadrilla B · Fernández",
+          vehicleId: "veh-102",
+          vehiclePlate: "AE 456 FG",
+          history: [
+            { label: "Programado", at: "2026-09-05 06:00", done: true },
+            { label: "Asignado", at: "2026-09-05 06:30", done: true },
+            { label: "En curso", at: "2026-09-05 09:15", done: true },
+          ],
+        });
+      }),
+    );
+
+    const started = await servicesAdapter.start("SVC-1051");
+    expect(started.id).toBe("SVC-1051");
+    expect(started.status).toBe("IN_PROGRESS");
+    expect(started.history).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "En curso", done: true })]),
+    );
+  });
+
+  it("does not call the Service start endpoint while a linked closure is pending", async () => {
+    const startAttempt = vi.fn();
+    server.use(
+      http.post("*/api/services/:serviceId/start", () => {
+        startAttempt();
+        return HttpResponse.json({});
+      }),
+    );
+
+    await expect(servicesAdapter.start("SVC-1050")).rejects.toBeInstanceOf(ServiceStartBlockedError);
+    expect(startAttempt).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a 409 error response from the backend during start as a ServiceRequestError", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/start", () => {
+        return HttpResponse.json(
+          {
+            statusCode: 409,
+            message: "El tipo de servicio requiere un vehículo operativo asignado para iniciar.",
+            error: "Conflict",
+            timestamp: new Date().toISOString(),
+            path: "/api/services/SVC-1054/start",
+          },
+          { status: 409 },
+        );
+      }),
+    );
+
+    await expect(servicesAdapter.start("SVC-1054")).rejects.toThrow(
+      "El tipo de servicio requiere un vehículo operativo asignado para iniciar.",
+    );
+  });
+
+  it("fails explicitly when the server response for start is malformed", async () => {
+    server.use(
+      http.post("*/api/services/:serviceId/start", () =>
+        HttpResponse.json({ unexpected: 123 }, { status: 200 }),
+      ),
+    );
+
+    await expect(servicesAdapter.start("SVC-1051")).rejects.toBeInstanceOf(
+      ServiceContractError,
+    );
+  });
+
+  describe("servicesAdapter suspend, resume and reschedule", () => {
+    it("suspends a service via servicesAdapter.suspend with a required reason and note", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/suspend", async ({ params, request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "SUSPENDED",
+            statusReason: "Desperfecto vehicular",
+            statusNote: body.note,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "Suspendido", at: "2026-09-05 11:00", done: true }],
+          });
+        }),
+      );
+
+      const suspended = await servicesAdapter.suspend("SVC-1050", {
+        reason: "VEHICLE_BREAKDOWN",
+        note: "El camión no arranca.",
+      });
+
+      expect(suspended.status).toBe("SUSPENDED");
+      expect(suspended.statusReason).toBe("Desperfecto vehicular");
+      expect(suspended.statusNote).toBe("El camión no arranca.");
+    });
+
+    it("rejects invalid suspend input (missing note) with ServiceContractError before sending request", async () => {
+      await expect(
+        servicesAdapter.suspend("SVC-1050", {
+          reason: "VEHICLE_BREAKDOWN",
+          note: "",
+        }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+    });
+
+    it("resumes a service via servicesAdapter.resume with no body and clears the reason", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/resume", ({ params }) => {
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "IN_PROGRESS",
+            statusReason: null,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "Reanudado", at: "2026-09-05 12:00", done: true }],
+          });
+        }),
+      );
+
+      const resumed = await servicesAdapter.resume("SVC-1050");
+      expect(resumed.status).toBe("IN_PROGRESS");
+      expect(resumed.statusReason).toBeNull();
+    });
+
+    it("reschedules a service via servicesAdapter.reschedule, moving it to RESCHEDULED with a reason", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/reschedule", async ({ params, request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "RESCHEDULED",
+            statusReason: body.reason,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "A reprogramar", at: "2026-09-05 08:00", done: true }],
+          });
+        }),
+      );
+
+      const rescheduled = await servicesAdapter.reschedule("SVC-1051", {
+        reason: "Alerta meteorológica",
+      });
+
+      expect(rescheduled.status).toBe("RESCHEDULED");
+      expect(rescheduled.statusReason).toBe("Alerta meteorológica");
+    });
+
+    it("rejects invalid reschedule input (missing reason) with ServiceContractError before sending request", async () => {
+      await expect(
+        servicesAdapter.reschedule("SVC-1051", { reason: "" }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+    });
+
+    it("confirms a new date/window via servicesAdapter.confirmReschedule, moving it back to SCHEDULED", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/confirm-reschedule", async ({ params, request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "SCHEDULED",
+            statusReason: null,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: body.scheduledDate,
+            windowFrom: body.timeWindow.start,
+            windowTo: body.timeWindow.end,
+            history: [{ label: "Programado", at: "2026-09-05 09:00", done: true }],
+          });
+        }),
+      );
+
+      const confirmed = await servicesAdapter.confirmReschedule("SVC-1053", {
+        scheduledDate: "2099-09-12",
+        timeWindow: { start: "09:00", end: "13:00" },
+      });
+
+      expect(confirmed.status).toBe("SCHEDULED");
+      expect(confirmed.scheduledDate).toBe("2099-09-12");
+      expect(confirmed.windowFrom).toBe("09:00");
+    });
+
+    it("rejects a reschedule date before today in Argentina, with a clear message, and accepts today", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-09-21T01:30:00Z"));
+      try {
+        const timeWindow = { start: "09:00", end: "13:00" };
+        const past = confirmRescheduleInputSchema.safeParse({ scheduledDate: "2026-09-19", timeWindow });
+        expect(past.success).toBe(false);
+        expect(past.error?.issues[0]).toMatchObject({ path: ["scheduledDate"], message: "La nueva fecha no puede ser anterior a hoy." });
+        // 2026-09-21T01:30Z is still 2026-09-20 in Argentina.
+        expect(confirmRescheduleInputSchema.safeParse({ scheduledDate: "2026-09-20", timeWindow }).success).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not send a reschedule with a past date to the backend", async () => {
+      const fetchMock = vi.spyOn(globalThis, "fetch");
+      await expect(
+        servicesAdapter.confirmReschedule("SVC-1053", { scheduledDate: "2020-01-01", timeWindow: { start: "09:00", end: "13:00" } }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects invalid confirmReschedule input with ServiceContractError before sending request", async () => {
+      await expect(
+        servicesAdapter.confirmReschedule("SVC-1053", {
+          scheduledDate: "not-a-date",
+          timeWindow: { start: "09:00", end: "13:00" },
+        }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+    });
+
+    it("cancels a service via servicesAdapter.cancel with a required reason", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/cancel", async ({ params, request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: params.serviceId,
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "CANCELLED",
+            statusReason: body.reason,
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "Cancelado", at: "2026-09-05 08:00", done: true }],
+          });
+        }),
+      );
+
+      const cancelled = await servicesAdapter.cancel("SVC-1050", {
+        reason: "Solicitud del cliente",
+      });
+
+      expect(cancelled.status).toBe("CANCELLED");
+      expect(cancelled.statusReason).toBe("Solicitud del cliente");
+    });
+
+    it("rejects invalid cancel input (missing reason) with ServiceContractError before sending request", async () => {
+      await expect(
+        servicesAdapter.cancel("SVC-1050", { reason: "" }),
+      ).rejects.toBeInstanceOf(ServiceContractError);
+    });
+  });
+
+  describe("checkServiceWindowTiming", () => {
+    const testService = {
+      id: "SVC-TEST",
+      serviceTypeId: "st-street-cleaning",
+      title: "Test Service",
+      mode: "ROUTE" as const,
+      status: "SCHEDULED" as const,
+      origin: "PLANNED" as const,
+      zoneIds: ["zone-1"],
+      scheduledDate: "2026-09-05",
+      windowFrom: "10:00",
+      windowTo: "14:00",
+    };
+
+    it("detects when starting early (before window start on the scheduled date)", () => {
+      // 09:00 on 2026-09-05 is before 10:00
+      const earlyDate = new Date(2026, 8, 5, 9, 0);
+      const result = checkServiceWindowTiming(testService as any, earlyDate);
+      expect(result.isOutside).toBe(true);
+      expect(result.timing).toBe("early");
+      expect(result.message).toMatch(/Inicio fuera de ventana horaria/i);
+    });
+
+    it("detects when starting late (after window end on the scheduled date)", () => {
+      // 15:00 on 2026-09-05 is after 14:00
+      const lateDate = new Date(2026, 8, 5, 15, 0);
+      const result = checkServiceWindowTiming(testService as any, lateDate);
+      expect(result.isOutside).toBe(true);
+      expect(result.timing).toBe("late");
+      expect(result.message).toMatch(/Inicio fuera de ventana horaria/i);
+    });
+
+    it("detects when within the planned window", () => {
+      // 12:00 on 2026-09-05 is between 10:00 and 14:00
+      const withinDate = new Date(2026, 8, 5, 12, 0);
+      const result = checkServiceWindowTiming(testService as any, withinDate);
+      expect(result.isOutside).toBe(false);
+      expect(result.timing).toBe("within");
+      expect(result.message).toBeNull();
+    });
+
+    it("detects when scheduled date is in the past", () => {
+      const pastDate = new Date(2026, 8, 6, 12, 0);
+      const result = checkServiceWindowTiming(testService as any, pastDate);
+      expect(result.isOutside).toBe(true);
+      expect(result.timing).toBe("late");
+    });
+
+    it("uses the Argentine day at 22:30 even when UTC has crossed into tomorrow", () => {
+      const result = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-09-22", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2026-09-23T01:30:00Z"),
+      );
+
+      expect(result).toEqual({ isOutside: false, timing: "within", message: null });
+    });
+
+    it("uses the Argentine day across month and year boundaries", () => {
+      const monthEnd = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-02-28", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2026-03-01T02:30:00Z"),
+      );
+      const yearEnd = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-12-31", windowFrom: "00:00", windowTo: "23:59" } as any,
+        new Date("2027-01-01T02:30:00Z"),
+      );
+
+      expect(monthEnd).toEqual({ isOutside: false, timing: "within", message: null });
+      expect(yearEnd).toEqual({ isOutside: false, timing: "within", message: null });
+    });
+
+    it("formats the scheduled calendar date in outside-window messages", () => {
+      const result = checkServiceWindowTiming(
+        { ...testService, scheduledDate: "2026-09-23" } as any,
+        new Date("2026-09-22T15:00:00Z"),
+      );
+
+      expect(result.message).toContain("23 sept 2026");
+      expect(result.message).not.toContain("2026-09-23");
+    });
+  });
+
+  describe("servicesAdapter zone results and completion", () => {
+    it("reads the documented bare GET /evidence array using the zone result ID", async () => {
+      // docs/backend-context/api/endpoints.md: {id,url,filename,contentType,uploadedAt}.
+      server.use(http.get("*/api/evidence", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("ownerType")).toBe("ZONE_RESULT");
+        expect(url.searchParams.get("ownerId")).toBe("resultado/316");
+        return HttpResponse.json([{
+          id: "att-316", url: "https://evidence.example.com/acceso.jpg",
+          filename: "acceso.jpg", contentType: "image/jpeg",
+          uploadedAt: "2026-09-22T10:16:00.000Z",
+        }]);
+      }));
+      expect(await servicesAdapter.getZoneResultEvidence("resultado/316")).toEqual([{
+        id: "att-316", url: "https://evidence.example.com/acceso.jpg",
+        filename: "acceso.jpg", contentType: "image/jpeg",
+        uploadedAt: "2026-09-22T10:16:00.000Z",
+      }]);
+    });
+
+    it("rejects a paginated evidence envelope instead of the documented array", async () => {
+      server.use(http.get("*/api/evidence", () => HttpResponse.json({ data: [], total: 0 })));
+      await expect(servicesAdapter.getZoneResultEvidence("ZR-316")).rejects.toBeInstanceOf(ServiceContractError);
+    });
+
+    it("filters mock evidence by zone result and rejects a zone ID as owner", async () => {
+      expect(await servicesAdapter.getZoneResultEvidence("ZR-1061-1"))
+        .toEqual([expect.objectContaining({ id: "att-1061-1", filename: "calzada_bloqueada.jpg" })]);
+      await expect(servicesAdapter.getZoneResultEvidence("zone-2")).rejects.toMatchObject({ status: 404 });
+    });
+
+    it("fetches recorded zone results via servicesAdapter.getZoneResults", async () => {
+      server.use(
+        http.get("*/api/services/:serviceId/zone-results", () => {
+          return HttpResponse.json([
+            {
+              id: "ZR-1",
+              serviceId: "SVC-1050",
+              zoneId: "zone-3",
+              status: "SERVICED",
+              reason: null,
+              notes: "Ok",
+              attachments: [],
+              recordedAt: "2026-09-05 10:00",
+            },
+          ]);
+        }),
+      );
+
+      const results = await servicesAdapter.getZoneResults("SVC-1050");
+      expect(results).toHaveLength(1);
+      expect(results[0].zoneId).toBe("zone-3");
+      expect(results[0].status).toBe("SERVICED");
+    });
+
+    it("records a zone result via servicesAdapter.recordZoneResult", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/zone-results", async ({ request }) => {
+          const body = (await request.json()) as any;
+          return HttpResponse.json({
+            id: "ZR-NEW",
+            serviceId: "SVC-1050",
+            zoneId: body.zoneId,
+            status: body.status,
+            reason: body.reason ?? null,
+            notes: body.notes ?? null,
+            attachments: [],
+            recordedAt: "2026-09-05 10:30",
+          });
+        }),
+      );
+
+      const result = await servicesAdapter.recordZoneResult("SVC-1050", {
+        zoneId: "zone-3",
+        status: "SERVICED",
+        notes: "Completado sin problemas",
+      });
+
+      expect(result.id).toBe("ZR-NEW");
+      expect(result.status).toBe("SERVICED");
+      expect(result.notes).toBe("Completado sin problemas");
+    });
+
+    it("uploads evidence via servicesAdapter.uploadEvidence", async () => {
+      server.use(
+        http.post("*/api/evidence", () => {
+          return HttpResponse.json({
+            id: "att-999",
+            url: "/mock/evidence/foto_calle.jpg",
+            filename: "foto_calle.jpg",
+            contentType: "image/jpeg",
+            uploadedAt: "2026-09-05 10:35",
+          });
+        }),
+      );
+
+      const file = new File(["dummy"], "foto calle.jpg", { type: "image/jpeg" });
+      const attachment = await servicesAdapter.uploadEvidence({
+        file,
+        ownerType: "ZONE_RESULT",
+        ownerId: "ZR-NEW",
+        idempotencyKey: "test-key-123",
+      });
+
+      expect(attachment.id).toBe("att-999");
+      expect(attachment.filename).toBe("foto_calle.jpg");
+    });
+
+    it("completes a service via servicesAdapter.complete with no body and returns updated service", async () => {
+      server.use(
+        http.post("*/api/services/:serviceId/complete", () => {
+          return HttpResponse.json({
+            id: "SVC-1050",
+            serviceTypeId: "st-street-cleaning",
+            title: "Barrido mecánico",
+            mode: "ROUTE",
+            status: "COMPLETED",
+            origin: "PLANNED",
+            zoneIds: ["zone-3"],
+            scheduledDate: "2026-09-05",
+            history: [{ label: "Completado", at: "2026-09-05 11:00", done: true }],
+          });
+        }),
+      );
+
+      const completed = await servicesAdapter.complete("SVC-1050");
+      expect(completed.id).toBe("SVC-1050");
+      expect(completed.status).toBe("COMPLETED");
+    });
+  });
+});
+
+describe("suspension reason contract", () => {
+  it("sends the reason label and the trimmed note as separate fields", () => {
+    const input = suspendServiceInputSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "  El camión no arranca.  " });
+    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular", note: "El camión no arranca." });
+  });
+  it("omits a whitespace-only optional note from the backend payload", () => {
+    const input = suspendServiceRequestSchema.parse({ reason: "VEHICLE_BREAKDOWN", note: "   " });
+    expect(toSuspendServiceBackendInput(input)).toEqual({ reason: "Desperfecto vehicular" });
+  });
+  it.each([[500, true], [501, false]])("caps the note alone at 500 characters (note %s)", (length, valid) => {
+    const parsed = suspendServiceInputSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
+    expect(parsed.success).toBe(valid);
+    if (!parsed.success) expect(parsed.error.issues[0].message).toContain("500 caracteres");
+  });
+  it.each([[500, true], [501, false]])("caps the optional BFF note at 500 characters (note %s)", (length, valid) => {
+    const parsed = suspendServiceRequestSchema.safeParse({ reason: "OTHER", note: "a".repeat(length) });
+    expect(parsed.success).toBe(valid);
+  });
+});
+
+describe("planning overrideNote boundaries", () => {
+  it.each([[9, false], [10, true], [500, true], [501, false]])("validates overrideNote length %s for scheduling and assignment", (length, valid) => {
+    const overrideNote = "a".repeat(length);
+    expect(assignCrewInputSchema.safeParse({ crewId: "crew-real", overrideNote }).success).toBe(valid);
+    expect(createServiceInputSchema.safeParse({
+      serviceTypeId: "type-real", origin: "PLANNED", zoneIds: ["zone-real"],
+      scheduledDate: "2099-09-10", timeWindow: { start: "09:00", end: "13:00" }, overrideNote,
+    }).success).toBe(valid);
+  });
+});

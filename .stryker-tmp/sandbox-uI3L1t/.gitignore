@@ -1,0 +1,63 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage*
+/.vitest/
+/.eslintcache
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright-cli/
+
+# next.js
+/.next/
+/.next-*/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# agent scratch reports — belong at a worktree root during orchestration,
+# never in a commit (see docs/agents/e2e-local-debugging.md)
+/HANDOFF_REPORT.md
+
+# skills
+.claude/skills
+.agents/skills
+.github/skills
+.github/agents
+.github/hooks
+.codex*
+skills-lock.json
+.impeccable/
+
+# orca
+/.orca/
+/reports/

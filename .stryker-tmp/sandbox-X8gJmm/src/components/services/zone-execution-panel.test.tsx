@@ -1,0 +1,726 @@
+// @ts-nocheck
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { setupServer } from "msw/node";
+import { HttpResponse, http } from "msw";
+
+import { handlers } from "@/mocks/handlers";
+import { ZoneExecutionPanel } from "./zone-execution-panel";
+import {
+  resetServiceFixtures,
+  resetZoneResultFixtures,
+  serviceFixtures,
+  updateServiceFixture,
+} from "@/lib/services-fixtures";
+import type { Service } from "@/lib/services";
+
+const server = setupServer(...handlers);
+
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+  server.listen({ onUnhandledRequest: "error" });
+});
+beforeEach(() => {
+  resetServiceFixtures();
+  resetZoneResultFixtures();
+});
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
+afterAll(() => server.close());
+
+const mockRouteService: Service = {
+  id: "SVC-TEST-ROUTE",
+  serviceTypeId: "st-street-cleaning",
+  serviceTypeName: "Barrido mecánico",
+  title: "Barrido mecánico — Bulevar Costero",
+  mode: "ROUTE",
+  status: "IN_PROGRESS",
+  origin: "PLANNED",
+  zoneIds: ["zone-3", "zone-1"],
+  zoneNames: ["Zona Centro", "Zona Norte"],
+  scheduledDate: "2026-09-05",
+  windowFrom: "08:00",
+  windowTo: "12:00",
+  crewId: "crew-b",
+  crewName: "Cuadrilla B · Fernández",
+  vehicleId: "veh-102",
+  vehiclePlate: "AE 456 FG",
+  coordinates: { x: -34.6037, y: -58.3816 },
+  attachments: [],
+  history: [],
+};
+
+const mockPointService: Service = {
+  id: "SVC-TEST-POINT",
+  serviceTypeId: "st-container-repair",
+  serviceTypeName: "Mantenimiento de contenedores",
+  title: "Reparación de contenedor CT-0112",
+  mode: "POINT",
+  status: "IN_PROGRESS",
+  origin: "MANUAL",
+  zoneIds: ["zone-3"],
+  zoneNames: ["Zona Centro"],
+  scheduledDate: "2026-09-05",
+  windowFrom: "14:00",
+  windowTo: "17:00",
+  crewId: "crew-b",
+  crewName: "Cuadrilla B · Fernández",
+  coordinates: { x: -34.6037, y: -58.3816 },
+  attachments: [],
+  history: [],
+};
+
+describe("ZoneExecutionPanel component", () => {
+  // GET /evidence: bare Attachment[] (CONTRACTS.md, backend api/endpoints.md).
+  it.each([true, false])("loads persisted zone evidence after reload (canExecute=%s)", async (canExecute) => {
+    const requests: string[] = [];
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-PERSISTED-316", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "NOT_SERVICED", reason: "BLOCKED_ACCESS", notes: null,
+        recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", ({ request }) => {
+        requests.push(new URL(request.url).search);
+        return HttpResponse.json([{
+          id: "att-persisted-316", url: "https://evidence.example.com/acceso.jpg",
+          filename: "acceso.jpg", contentType: "image/jpeg",
+          uploadedAt: "2026-09-22T10:16:00.000Z",
+        }]);
+      }),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} canExecute={canExecute} />);
+    expect(await screen.findByText("Evidencia adjunta (1):")).toBeVisible();
+    expect(screen.getByText("acceso.jpg")).toBeVisible();
+    expect(requests).toEqual(["?ownerType=ZONE_RESULT&ownerId=ZR-PERSISTED-316"]);
+  });
+
+  it("shows an evidence skeleton while the files load and replaces it with the list", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-SKEL-588", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "SERVICED", reason: null, notes: null, recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", async () => { await gate; return HttpResponse.json([]); }),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} />);
+
+    const region = await screen.findByRole("region", { name: "Evidencia de la zona" });
+    expect(region).toHaveAttribute("aria-busy", "true");
+    expect(within(region).getByRole("status")).toHaveTextContent("Cargando");
+    expect(screen.queryByText(/Cargando\.\.\.|Cargando…/)).not.toBeInTheDocument();
+    release();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(within(region).getByText("Sin archivos.")).toBeVisible();
+  });
+
+  it("keeps the empty evidence state for a recorded zone without files", async () => {
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-EMPTY-316", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "SERVICED", reason: null, notes: null,
+        recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", () => HttpResponse.json([])),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} />);
+    expect(await screen.findByText("Sin archivos.")).toBeVisible();
+    expect(screen.getByText("Evidencia adjunta (0):")).toBeVisible();
+  });
+
+  it("merges embedded and fetched evidence by ID while retaining files with the same name", async () => {
+    const attachment = {
+      id: "att-316-a", url: "https://evidence.example.com/a/acceso.jpg",
+      filename: "acceso.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-22T10:16:00.000Z",
+    };
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-316", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "SERVICED", reason: null, notes: null, attachments: [attachment],
+        recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", () => HttpResponse.json([
+        attachment, { ...attachment, id: "att-316-b", url: "https://evidence.example.com/b/acceso.jpg" },
+      ])),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} />);
+    expect(await screen.findByText("Evidencia adjunta (2):")).toBeVisible();
+    expect(screen.getAllByText("acceso.jpg")).toHaveLength(2);
+  });
+
+  it("shows a loading failure instead of claiming there are no attachments", async () => {
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-316", serviceId: mockPointService.id, zoneId: "zone-3",
+        status: "SERVICED", reason: null, notes: null, recordedAt: "2026-09-22T10:15:00.000Z",
+      }])),
+      http.get("*/api/evidence", () => HttpResponse.error()),
+    );
+    render(<ZoneExecutionPanel service={mockPointService} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo cargar la evidencia.");
+    expect(screen.queryByText("Sin archivos.")).not.toBeInTheDocument();
+  });
+
+  it("fetches the newly selected result without showing evidence from the previous zone", async () => {
+    const owners: string[] = [];
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([
+        { id: "ZR-CENTRO-316", serviceId: mockRouteService.id, zoneId: "zone-3", status: "SERVICED", recordedAt: "2026-09-22T10:15:00.000Z" },
+        { id: "ZR-NORTE-316", serviceId: mockRouteService.id, zoneId: "zone-1", status: "SERVICED", recordedAt: "2026-09-22T10:17:00.000Z" },
+      ])),
+      http.get("*/api/evidence", ({ request }) => {
+        const owner = new URL(request.url).searchParams.get("ownerId")!;
+        owners.push(owner);
+        return HttpResponse.json(owner === "ZR-CENTRO-316" ? [{
+          id: "att-centro-316", url: "https://evidence.example.com/centro.jpg",
+          filename: "centro.jpg", contentType: "image/jpeg", uploadedAt: "2026-09-22T10:16:00.000Z",
+        }] : []);
+      }),
+    );
+    const user = userEvent.setup();
+    render(<ZoneExecutionPanel service={mockRouteService} />);
+    expect(await screen.findByText("centro.jpg")).toBeVisible();
+    await user.click(screen.getAllByRole("button", { name: /zona norte/i })[0]);
+    expect(await screen.findByText("Sin archivos.")).toBeVisible();
+    expect(screen.queryByText("centro.jpg")).not.toBeInTheDocument();
+    expect(owners).toEqual(["ZR-CENTRO-316", "ZR-NORTE-316"]);
+  });
+
+  it("renders desktop zone navigation with descriptive tags in one uninterrupted form", () => {
+    render(
+      <ZoneExecutionPanel service={mockRouteService} canExecute={true} />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Zonas" })).toBeVisible();
+
+    // Check desktop zone navigation list items
+    const nav = screen.getByRole("region", { name: /^zonas$/i });
+    expect(nav).toBeVisible();
+
+    // Both zones are listed with initial "Pendiente" tags
+    const pendingBadges = screen.getAllByText("Pendiente");
+    expect(pendingBadges.length).toBeGreaterThanOrEqual(2);
+
+    // Initial selected zone is shown in form header
+    expect(screen.getByRole("heading", { name: "Zona Centro" })).toBeVisible();
+    expect(screen.getByText("Resultado *")).toBeVisible();
+  });
+
+  it("supports mobile disclosure toggle and restores focus to toggle button on zone selection", async () => {
+    const user = userEvent.setup();
+    render(
+      <ZoneExecutionPanel service={mockRouteService} canExecute={true} />,
+    );
+
+    // Find disclosure toggle button
+    const toggle = screen.getByRole("button", { name: /zona: zona centro/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    // Click disclosure to open mobile navigation
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    // Select second zone (Zona Norte) from mobile list
+    const mobileList = screen.getByRole("list", { name: "Zonas" });
+    expect(mobileList).toHaveAttribute("data-slot", "item-group");
+    const zonaNorteButton = within(mobileList).getByRole("button", { name: /Zona Norte/ });
+    await user.click(zonaNorteButton);
+
+    // Disclosure collapses
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // Focus restored to the disclosure toggle button
+    expect(toggle).toHaveFocus();
+  });
+
+  it("enforces reason and evidence when selecting a non-SERVICED outcome (PARTIAL / NOT_SERVICED)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ZoneExecutionPanel service={mockRouteService} canExecute={true} />,
+    );
+
+    expect(screen.getByRole("radio", { name: "Atendida" })).toHaveAttribute("data-slot", "radio-group-item");
+    expect(screen.getByRole("textbox", { name: /observaciones operativas/i })).toHaveAttribute("data-slot", "textarea");
+    expect(screen.getByLabelText("Seleccionar archivo")).toHaveAttribute("data-slot", "input");
+
+    // Select Parcial
+    const partialRadio = screen.getByRole("radio", { name: "Parcial" });
+    await user.click(partialRadio);
+
+    // Reason dropdown appears
+    const reasonCombobox = screen.getByRole("combobox", { name: /^motivo/i });
+    expect(reasonCombobox).toBeVisible();
+    expect(reasonCombobox).toHaveAttribute("data-slot", "combobox");
+
+    // Try submitting without reason and without evidence
+    const submitBtn = screen.getByRole("button", { name: /guardar zona/i });
+    await user.click(submitBtn);
+
+    // Validation alert surfaces required reason
+    expect(screen.getByRole("alert")).toHaveTextContent(/indique el motivo/i);
+    // A validation problem is not a failed save: don't tell the user to retry.
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/no se pudo guardar/i);
+
+    // Select a reason
+    await user.click(reasonCombobox);
+    await user.click(await screen.findByRole("option", { name: "Acceso bloqueado" }));
+
+    // Try submitting with reason but without evidence
+    await user.click(submitBtn);
+    expect(screen.getByRole("alert")).toHaveTextContent(/adjunte una foto o un acta/i);
+  });
+
+  it("submits a clean SERVICED result for ROUTE zone in any order and updates result tag", async () => {
+    const user = userEvent.setup();
+
+    let recordedResults: any[] = [];
+
+    server.use(
+      http.post("*/api/services/:serviceId/zone-results", async ({ request }) => {
+        const body = (await request.json()) as any;
+        const newRecord = {
+          id: "ZR-MOCK-1",
+          serviceId: "SVC-TEST-ROUTE",
+          zoneId: body.zoneId,
+          status: body.status,
+          reason: null,
+          notes: body.notes ?? null,
+          attachments: [],
+          recordedAt: "2026-09-05 10:15",
+        };
+        recordedResults = [newRecord];
+        return HttpResponse.json(newRecord);
+      }),
+      http.get("*/api/services/:serviceId/zone-results", () => {
+        return HttpResponse.json(recordedResults);
+      }),
+    );
+
+    render(
+      <ZoneExecutionPanel service={mockRouteService} canExecute={true} />,
+    );
+
+    // Select Zona Norte first (navigating out of order)
+    const zonaNorteButtons = screen.getAllByRole("button", { name: /zona norte/i });
+    await user.click(zonaNorteButtons[0]);
+
+    // Fill notes
+    const notesInput = screen.getByPlaceholderText(/detalle \(opcional\)/i);
+    await user.type(notesInput, "Barrido completado en Zona Norte");
+
+    // Submit clean SERVICED result
+    const submitBtn = screen.getByRole("button", { name: /guardar zona/i });
+    await user.click(submitBtn);
+
+    // Result tag updates to "Atendida"
+    await waitFor(() => {
+      expect(screen.getAllByText("Atendida").length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("uploads evidence with local filename displayed until success, switching to canonical filename, and supporting retry with same idempotency key", async () => {
+    const user = userEvent.setup();
+
+    let uploadAttempts = 0;
+    const capturedIdempotencyKeys: string[] = [];
+    const capturedServiceIds: (FormDataEntryValue | null)[] = [];
+    let recordedResults: any[] = [];
+
+    server.use(
+      http.post("*/api/services/:serviceId/zone-results", async ({ request }) => {
+        const body = (await request.json()) as any;
+        const result = {
+          id: "ZR-MOCK-PARTIAL",
+          serviceId: "SVC-TEST-ROUTE",
+          zoneId: body.zoneId,
+          status: body.status,
+          reason: body.reason,
+          notes: body.notes,
+          attachments: [],
+          recordedAt: "2026-09-05 10:20",
+        };
+        recordedResults = [result];
+        return HttpResponse.json(result);
+      }),
+      http.post("*/api/evidence", async ({ request }) => {
+        uploadAttempts++;
+        capturedServiceIds.push((await request.formData()).get("serviceId"));
+        const idempKey = request.headers.get("Idempotency-Key") || "";
+        capturedIdempotencyKeys.push(idempKey);
+
+        if (uploadAttempts === 1) {
+          // Fail the first attempt to verify retry
+          return HttpResponse.json(
+            {
+              statusCode: 500,
+              message: "Fallo transitorio de red en almacenamiento",
+              error: "Internal Server Error",
+              timestamp: new Date().toISOString(),
+              path: "/api/evidence",
+            },
+            { status: 500 },
+          );
+        }
+
+        // Second attempt succeeds with canonical sanitized filename
+        return HttpResponse.json({
+          id: "att-mock-1",
+          url: "/mock/evidence/calle_bloqueada_obra.jpg",
+          filename: "calle_bloqueada_obra.jpg",
+          contentType: "image/jpeg",
+          uploadedAt: "2026-09-05 10:22",
+        });
+      }),
+      http.get("*/api/services/:serviceId/zone-results", () => {
+        if (recordedResults.length === 0) {
+          return HttpResponse.json([]);
+        }
+        return HttpResponse.json([
+          {
+            ...recordedResults[0],
+            attachments: uploadAttempts > 1
+              ? [
+                  {
+                    id: "att-mock-1",
+                    url: "/mock/evidence/calle_bloqueada_obra.jpg",
+                    filename: "calle_bloqueada_obra.jpg",
+                    contentType: "image/jpeg",
+                    uploadedAt: "2026-09-05 10:22",
+                  },
+                ]
+              : [],
+          },
+        ]);
+      }),
+    );
+
+    render(
+      <ZoneExecutionPanel service={mockRouteService} canExecute={true} />,
+    );
+
+    // Select Parcial and reason
+    await user.click(screen.getByRole("radio", { name: "Parcial" }));
+    await user.click(screen.getByRole("combobox", { name: /^motivo/i }));
+    await user.click(await screen.findByRole("option", { name: "Acceso bloqueado" }));
+
+    // Select file with raw local filename
+    const file = new File(["dummy-content"], "Foto Calle Bloqueada (Obra).jpg", {
+      type: "image/jpeg",
+    });
+    const fileInput = screen.getByLabelText("Seleccionar archivo") as HTMLInputElement;
+    await user.upload(fileInput, file);
+
+    // Displays local filename before upload
+    expect(screen.getByText("Foto Calle Bloqueada (Obra).jpg")).toBeVisible();
+    expect(screen.getAllByText("Pendiente").length).toBeGreaterThanOrEqual(1);
+
+    // Submit form (first attempt fails in mock handler)
+    const submitBtn = screen.getByRole("button", { name: /guardar zona/i });
+    await user.click(submitBtn);
+
+    // Retry button appears for that file
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
+    });
+
+    // Local filename is still displayed
+    expect(screen.getByText("Foto Calle Bloqueada (Obra).jpg")).toBeVisible();
+
+    // Click retry
+    await user.click(screen.getByRole("button", { name: "Reintentar" }));
+
+    // Upon success, switches to sanitized canonical filename
+    await waitFor(() => {
+      expect(screen.getByText("calle_bloqueada_obra.jpg")).toBeVisible();
+    });
+
+    // Idempotency key reused
+    expect(capturedIdempotencyKeys.length).toBe(2);
+    expect(capturedIdempotencyKeys[0]).toBe(capturedIdempotencyKeys[1]);
+    expect(capturedServiceIds).toEqual([mockRouteService.id, mockRouteService.id]);
+    expect(screen.getByText("Evidencia adjunta (1):")).toBeVisible();
+  });
+
+  it("keeps each zone's evidence queue and retry state when switching zones", async () => {
+    const user = userEvent.setup();
+    let uploadAttempts = 0;
+    let recordedResults: any[] = [];
+    const uploadedAttachment = {
+      id: "att-zone-a-success-398",
+      url: "/mock/evidence/zona-a-subida.jpg",
+      filename: "zona-a-subida.jpg",
+      contentType: "image/jpeg",
+      uploadedAt: "2026-09-05 10:22",
+    };
+
+    server.use(
+      http.post("*/api/services/:serviceId/zone-results", async ({ request }) => {
+        const body = (await request.json()) as any;
+        const result = {
+          id: "ZR-QUEUE-PER-ZONE-398",
+          serviceId: mockRouteService.id,
+          zoneId: body.zoneId,
+          status: body.status,
+          reason: body.reason,
+          notes: body.notes,
+          attachments: [],
+          recordedAt: "2026-09-05 10:20",
+        };
+        recordedResults = [result];
+        return HttpResponse.json(result);
+      }),
+      http.post("*/api/evidence", () => {
+        uploadAttempts += 1;
+        if (uploadAttempts === 1) return HttpResponse.json(uploadedAttachment);
+        return HttpResponse.json(
+          {
+            statusCode: 500,
+            message: "Falló la carga de esta evidencia.",
+            error: "Internal Server Error",
+            timestamp: "2026-09-05T10:22:00.000Z",
+            path: "/api/evidence",
+          },
+          { status: 500 },
+        );
+      }),
+      http.get("*/api/services/:serviceId/zone-results", () =>
+        HttpResponse.json(
+          recordedResults.map((result) => ({
+            ...result,
+            attachments: uploadAttempts > 0 ? [uploadedAttachment] : [],
+          })),
+        ),
+      ),
+      http.get("*/api/evidence", () => HttpResponse.json([uploadedAttachment])),
+    );
+
+    render(<ZoneExecutionPanel service={mockRouteService} canExecute />);
+    await user.click(screen.getByRole("radio", { name: "Parcial" }));
+    await user.click(screen.getByRole("combobox", { name: /^motivo/i }));
+    await user.click(await screen.findByRole("option", { name: "Acceso bloqueado" }));
+    await user.upload(screen.getByLabelText("Seleccionar archivo") as HTMLInputElement, [
+      new File(["primera"], "zona-a-local.jpg", { type: "image/jpeg" }),
+      new File(["segunda"], "zona-a-reintentar.jpg", { type: "image/jpeg" }),
+    ]);
+    await user.click(screen.getByRole("button", { name: /guardar zona/i }));
+
+    expect(await screen.findByRole("button", { name: "Reintentar" })).toBeVisible();
+    expect(await screen.findByText("zona-a-subida.jpg")).toBeVisible();
+    expect(screen.getByText("zona-a-reintentar.jpg")).toBeVisible();
+    expect(screen.getByText("Falló la carga de esta evidencia.")).toBeVisible();
+
+    await user.click(screen.getAllByRole("button", { name: /zona norte/i })[0]);
+    expect(await screen.findByRole("heading", { name: "Zona Norte" })).toBeVisible();
+    expect(screen.queryByText("zona-a-subida.jpg")).not.toBeInTheDocument();
+    expect(screen.queryByText("zona-a-reintentar.jpg")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /zona centro/i }));
+    expect(await screen.findByText("zona-a-subida.jpg")).toBeVisible();
+    expect(screen.getByText("zona-a-reintentar.jpg")).toBeVisible();
+    expect(screen.getByText("Falló la carga de esta evidencia.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeVisible();
+  });
+
+  it("keeps completion button disabled until all zones are recorded, then invokes complete with no request body", async () => {
+    const user = userEvent.setup();
+    const handleServiceUpdated = vi.fn();
+
+    let capturedCompleteBody: any = "NOT_CALLED";
+
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => {
+        return HttpResponse.json([
+          {
+            id: "ZR-1",
+            serviceId: "SVC-TEST-ROUTE",
+            zoneId: "zone-3",
+            status: "SERVICED",
+            reason: null,
+            notes: null,
+            attachments: [],
+            recordedAt: "2026-09-05 10:00",
+          },
+          {
+            id: "ZR-2",
+            serviceId: "SVC-TEST-ROUTE",
+            zoneId: "zone-1",
+            status: "PARTIAL",
+            reason: "WEATHER",
+            notes: "Lluvia",
+            attachments: [],
+            recordedAt: "2026-09-05 10:30",
+          },
+        ]);
+      }),
+      http.post("*/api/services/:serviceId/complete", async ({ request }) => {
+        const text = await request.text();
+        capturedCompleteBody = text;
+        return HttpResponse.json({
+          ...mockRouteService,
+          status: "PARTIALLY_COMPLETED",
+          statusReason: "Lluvia",
+        });
+      }),
+    );
+
+    render(
+      <ZoneExecutionPanel
+        service={mockRouteService}
+        canExecute={true}
+        onServiceUpdated={handleServiceUpdated}
+      />
+    );
+
+    // All zones are recorded (2 of 2)
+    await waitFor(() => {
+      expect(screen.getByText("Falta solo completar el servicio.")).toBeVisible();
+    });
+
+    const completeBtn = screen.getByRole("button", { name: "Completar servicio" });
+    expect(completeBtn).toBeEnabled();
+
+    // Click complete
+    await user.click(completeBtn);
+
+    // Request body was empty
+    await waitFor(() => {
+      expect(capturedCompleteBody).toBe("");
+    });
+
+    // Service updated callback was called with backend-computed PARTIALLY_COMPLETED status
+    expect(handleServiceUpdated).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "PARTIALLY_COMPLETED" }),
+    );
+
+    // Rendered result matches exactly what backend returned
+    expect(screen.getByText(/Servicio parcial/i)).toBeVisible();
+  });
+
+  it("rejects a cleared relocation coordinate before completing the service", async () => {
+    const user = userEvent.setup();
+    const relocationService: Service = {
+      ...mockPointService,
+      id: "SVC-TEST-RELOCATION",
+      targetType: "CONTAINER",
+      targetId: "cont-5",
+      targetRef: "CT-0442",
+    };
+    let completionRequests = 0;
+
+    server.use(
+      http.get("*/api/services/:serviceId/zone-results", () => HttpResponse.json([{
+        id: "ZR-RELOCATION",
+        serviceId: relocationService.id,
+        zoneId: "zone-3",
+        status: "SERVICED",
+        reason: null,
+        notes: null,
+        recordedAt: "2026-09-05T15:00:00.000Z",
+      }])),
+      http.post("*/api/services/:serviceId/complete", () => {
+        completionRequests += 1;
+        return HttpResponse.json({ ...relocationService, status: "COMPLETED" });
+      }),
+    );
+
+    render(<ZoneExecutionPanel service={relocationService} canExecute />);
+
+    await screen.findByText("Falta solo completar el servicio.");
+    const latitude = await screen.findByLabelText("Latitud");
+    const longitude = screen.getByLabelText("Longitud");
+    expect(latitude).toHaveAttribute("data-slot", "input");
+    expect(longitude).toHaveAttribute("data-slot", "input");
+    await user.type(latitude, "-34.6037");
+    await user.clear(latitude);
+    await user.type(longitude, "-58.3816");
+    await user.click(screen.getByRole("button", { name: "Completar servicio" }));
+
+    expect(
+      await screen.findByText("Complete la latitud para finalizar."),
+    ).toBeVisible();
+    expect(completionRequests).toBe(0);
+  });
+
+  it("uses the same interaction for POINT mode single zone", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ZoneExecutionPanel service={mockPointService} canExecute={true} />,
+    );
+
+    // Only single zone is listed
+    expect(screen.getAllByText("Zona Centro").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: /guardar zona/i })).toBeVisible();
+  });
+
+  it("saves a ZoneResult draft on a network failure, then resolves a drift as an explicit conflict rather than applying it", async () => {
+    const user = userEvent.setup();
+
+    let submitAttempts = 0;
+    server.use(
+      http.post("*/api/services/:serviceId/zone-results", () => {
+        submitAttempts += 1;
+        return HttpResponse.error();
+      }),
+      http.get("*/api/services/:serviceId", () =>
+        // Service was reassigned server-side while the crew leader was offline.
+        HttpResponse.json({
+          ...mockRouteService,
+          crewId: "crew-c",
+          crewName: "Cuadrilla C · Ibáñez",
+          updatedAt: "2026-09-05T12:00:00.000Z",
+        }),
+      ),
+    );
+
+    render(<ZoneExecutionPanel service={mockRouteService} canExecute={true} />);
+
+    const notesInput = screen.getByPlaceholderText(/detalle \(opcional\)/i);
+    await user.type(notesInput, "Zona Centro completada normalmente");
+
+    await user.click(screen.getByRole("button", { name: /guardar zona/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(/Sin conexión\. Se guardó en este dispositivo/i);
+    });
+    // The draft notice is the only message: no contradictory "failed to save" alert.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(submitAttempts).toBe(1);
+
+    const retryButton = await screen.findByRole("button", { name: "Reenviar" });
+    await user.click(retryButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Compare y elija qué hacer con lo que cargó/i)).toBeVisible();
+    });
+    expect(screen.getByText("Cuadrilla C · Ibáñez")).toBeVisible();
+    // The draft was never silently applied: no second POST attempt was made
+    expect(submitAttempts).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: "Descartar lo cargado" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /guardar zona/i })).toBeVisible();
+  });
+
+  it("shows read-only view with no state-changing actions for Crew Member (canExecute = false)", () => {
+    render(
+      <ZoneExecutionPanel service={mockRouteService} canExecute={false} />,
+    );
+
+    // Explanatory guidance
+    expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(1);
+
+    // No submit or complete buttons
+    expect(screen.queryByRole("button", { name: /guardar zona/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Completar servicio" })).toBeNull();
+  });
+});
