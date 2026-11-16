@@ -20,7 +20,11 @@ Los criterios de testing de la cátedra (Clase 15) piden un mutation score de al
 
 ## Resultado
 
-Se completa con la primera corrida del workflow (ver el PR de este ADR y el run enlazado ahí). Mediciones previas con 7 de 8 shards del primer reparto, sin los archivos de rutas dinámicas (`[id]`), que el primer reparto no mutaba por un error de glob ya corregido: 56,2 % (3885 de 6916 mutantes válidos). Los puntos débiles son los textos de error sin verificar, los enumerados de Zod sin un test por valor y las ramas del modo mock de las rutas BFF.
+Primera corrida completa ([run 43952775688](https://github.com/hllous/Frontend-M6-DAPS2/actions/runs/43952775688)), con 15 de los 16 shards terminados al escribir esto: **56,4 %** (4202 de 7445 mutantes válidos, 110 archivos), por debajo del 60 % de la cátedra. Los shards tardaron entre 18 y 64 min; el shard 0, que lleva un tramo de `src/lib/services.ts`, tardó mucho más. El número final y el detalle por archivo quedan en el artifact `mutation-summary` del run.
+
+Limitación conocida: los handlers de rutas dinámicas (`src/app/api/**/[id]/**/route.ts`) no se mutan. Stryker no resuelve los corchetes del nombre de carpeta en `mutate`, ni escapados. Quedan como seguimiento (por ejemplo, con un comodín `?` en lugar de cada corchete). El resumen cuenta solo los mutantes de los archivos y rangos que le tocaron a cada shard, porque el modo incremental arrastra resultados viejos de otros archivos.
+
+Los puntos débiles son los textos de error sin verificar, los enumerados de Zod sin un test por valor y las ramas del modo mock de las rutas BFF.
 
 ## Consecuencias
 

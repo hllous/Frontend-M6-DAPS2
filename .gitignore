@@ -62,3 +62,4 @@ skills-lock.json
 /.orca/
 /reports/
 /.stryker-tmp/
+/mutation-summary.md

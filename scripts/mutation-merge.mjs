@@ -2,6 +2,11 @@
 // calcula el mutation score global y falla si queda por debajo de `thresholds.break` de
 // stryker.config.json. Fórmula de Stryker: (killed + timeout) / (killed + timeout + survived +
 // noCoverage); los mutantes ignorados y los que no compilan o fallan en runtime no cuentan.
+//
+// Con el modo incremental, el reporte de un shard también trae resultados viejos de archivos que
+// ya no son suyos (vienen del cache restaurado). Por eso cada carpeta debe traer
+// `stryker.shard.json` y solo se cuentan los mutantes de los archivos y rangos de líneas que le
+// tocaron a ese shard.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -10,32 +15,52 @@ const breakAt = JSON.parse(readFileSync("stryker.config.json", "utf8")).threshol
 const detected = new Set(["Killed", "Timeout"]);
 const undetected = new Set(["Survived", "NoCoverage"]);
 
-const perFile = [];
-let totalDetected = 0;
-let totalValid = 0;
+/** `src/a/\[id\]/route.ts:10-20` -> { file: "src/a/[id]/route.ts", from: 10, to: 20 } */
+function parseSpec(spec) {
+  const clean = spec.replaceAll("\\", "");
+  const match = /^(.*):(\d+)-(\d+)$/.exec(clean);
+  return match ? { file: match[1], from: Number(match[2]), to: Number(match[3]) } : { file: clean, from: 1, to: Infinity };
+}
+
+const perFile = new Map();
 for (const dir of dirs) {
-  const path = join(dir, "mutation.json");
-  if (!existsSync(path)) {
-    console.error(`Falta ${path}`);
+  const reportPath = join(dir, "mutation.json");
+  const configPath = join(dir, "stryker.shard.json");
+  if (!existsSync(reportPath) || !existsSync(configPath)) {
+    console.error(`Falta mutation.json o stryker.shard.json en ${dir}`);
     process.exit(1);
   }
-  const report = JSON.parse(readFileSync(path, "utf8"));
+  const specs = JSON.parse(readFileSync(configPath, "utf8")).mutate.map(parseSpec);
+  const report = JSON.parse(readFileSync(reportPath, "utf8"));
   for (const [file, data] of Object.entries(report.files)) {
-    const hit = data.mutants.filter((m) => detected.has(m.status)).length;
-    const valid = hit + data.mutants.filter((m) => undetected.has(m.status)).length;
-    totalDetected += hit;
-    totalValid += valid;
-    perFile.push({ file, hit, valid, score: valid === 0 ? 100 : (hit / valid) * 100 });
+    const ranges = specs.filter((s) => s.file === file);
+    if (ranges.length === 0) continue;
+    const entry = perFile.get(file) ?? { hit: 0, valid: 0 };
+    for (const mutant of data.mutants) {
+      const line = mutant.location.start.line;
+      if (!ranges.some((r) => line >= r.from && line <= r.to)) continue;
+      if (detected.has(mutant.status)) {
+        entry.hit += 1;
+        entry.valid += 1;
+      } else if (undetected.has(mutant.status)) {
+        entry.valid += 1;
+      }
+    }
+    perFile.set(file, entry);
   }
 }
 
-perFile.sort((a, b) => a.score - b.score);
+const rows = [...perFile.entries()]
+  .map(([file, { hit, valid }]) => ({ file, hit, valid, score: valid === 0 ? 100 : (hit / valid) * 100 }))
+  .sort((a, b) => a.score - b.score);
+const totalDetected = rows.reduce((sum, r) => sum + r.hit, 0);
+const totalValid = rows.reduce((sum, r) => sum + r.valid, 0);
+const score = totalValid === 0 ? 100 : (totalDetected / totalValid) * 100;
 const lines = [
   "| Archivo | Score | Detectados / válidos |",
   "| --- | ---: | ---: |",
-  ...perFile.map((f) => `| ${f.file} | ${f.score.toFixed(1)} % | ${f.hit} / ${f.valid} |`),
+  ...rows.map((f) => `| ${f.file} | ${f.score.toFixed(1)} % | ${f.hit} / ${f.valid} |`),
 ];
-const score = totalValid === 0 ? 100 : (totalDetected / totalValid) * 100;
 const summary = `Mutation score global: ${score.toFixed(2)} % (${totalDetected} / ${totalValid}); umbral ${breakAt} %\n\n${lines.join("\n")}\n`;
 writeFileSync("mutation-summary.md", summary);
 console.log(summary);
