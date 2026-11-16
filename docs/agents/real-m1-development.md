@@ -37,7 +37,7 @@ En otra terminal, configurá Next para conectarse al servidor falso y cargar el 
 $env:M6_AUTH_MODE = "real-m1"
 $env:M1_BASE_URL = "http://127.0.0.1:3120/api/v1/"
 $env:M1_FAKE_ENABLED = "true"
-$env:M6_BACKEND_ORIGIN = "http://m6-demo-backend.invalid"
+$env:M6_BACKEND_ORIGIN = "https://m6-demo-backend.invalid"
 $env:M6_REAL_M1_MOCK_BACKEND = "true"
 $env:NODE_OPTIONS = "--import=./scripts/msw-real-m1-backend.mjs"
 $env:NEXT_PUBLIC_DISABLE_MSW = "true"

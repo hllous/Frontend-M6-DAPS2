@@ -36,12 +36,14 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   changes:
     name: changes
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
     steps:
@@ -374,7 +376,7 @@ jobs:
           LYCHEE_SHA256: 1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
         run: |
           asset=lychee-x86_64-unknown-linux-gnu.tar.gz
-          curl -sSfL "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_TAG}/${asset}" -o "${asset}"
+          curl --proto "=https" --tlsv1.2 -sSfL "https://github.com/lycheeverse/lychee/releases/download/${LYCHEE_TAG}/${asset}" -o "${asset}"
           echo "${LYCHEE_SHA256}  ${asset}" | sha256sum --check
           tar -xzf "${asset}" --strip-components=1 "${asset%.tar.gz}/lychee"
 

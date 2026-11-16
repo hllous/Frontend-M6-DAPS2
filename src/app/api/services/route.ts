@@ -31,6 +31,7 @@ import { droppedRecords } from "@/lib/tolerant-records";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
+import { randomInt } from "@/lib/random-id";
 
 
 
@@ -147,7 +148,7 @@ export async function POST(request: Request) {
     if ((fit.zone || fit.specialty) && !input.overrideNote) return errorResponse(409, "La asignacion tiene reparos: la zona o especialidad de la cuadrilla no coincide; hace falta 'overrideNote' explicando por que.", path);
 
     const newService: Service = {
-      id: `SVC-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `SVC-${randomInt(1000, 9999)}`,
       serviceTypeId: input.serviceTypeId,
       serviceTypeName: serviceType?.name ?? "Servicio urbano",
       title: input.title || `${serviceType?.name ?? "Servicio"} — ${route?.name ?? input.targetRef ?? "Programado"}`,
