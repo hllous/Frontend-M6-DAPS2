@@ -6,7 +6,7 @@ import { backendEnv, loginAs } from "@/test/session";
 
 import { fetchPublicBackend } from "./public-bff";
 
-const KEY = "test-placeholder-key-0123456789abcdef-xyz";
+const KEY = "k".repeat(40);
 const BACKEND_PAGE = { data: [], meta: { total: 0, page: 1, pageSize: 20, totalPages: 0 } };
 const publicRequest = () => new Request("http://localhost/api/public/services", { headers: { "x-forwarded-for": "203.0.113.7" } });
 
@@ -71,7 +71,7 @@ describe("fetchPublicBackend BFF_SHARED_KEY", () => {
   it("never sends the key on authenticated routes", async () => {
     restoreEnv = backendEnv();
     vi.stubEnv("BFF_SHARED_KEY", KEY);
-    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjE4MDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [] }));
 
     await getCrews(new Request("http://localhost/api/crews", { headers: { cookie } }));

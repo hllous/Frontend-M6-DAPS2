@@ -10,6 +10,8 @@ Estos registros documentan decisiones técnicas que afectan la arquitectura o lo
 - [ADR-0006 — Frontend security controls are defense-in-depth only](0006-frontend-security-controls-are-defense-in-depth-only.md)
 - [ADR-0007 — Explicit external referrals and Office reconciliation](0007-explicit-external-referrals-and-office-reconciliation.md)
 - [ADR-0008 — SonarCloud, Trivy y ZAP en el CI del Frontend](0008-sonarcloud-trivy-y-zap-en-el-ci.md)
+- [ADR-0009 — Límite de intentos de ingreso fallidos en memoria](0009-limite-de-intentos-de-ingreso-en-memoria.md)
+- [ADR-0010 — Concurrencia optimista con ETag y timeout de 5 s en el BFF](0010-concurrencia-optimista-y-timeout-del-bff.md)
 - [ADR-0011 — Mutation testing con Stryker en el Frontend](0011-mutation-testing-con-stryker.md)
 
 Para registrar una decisión nueva, copiá la [plantilla](0000-template.md).

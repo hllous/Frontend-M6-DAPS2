@@ -6,14 +6,14 @@ Guía de los análisis de calidad y seguridad del Frontend: qué corre, cómo le
 
 | Workflow o job | Archivo | Cuándo | Qué hace |
 | --- | --- | --- | --- |
-| `unit` (4 shards) | `ci.yml` | PR y push a `develop`, `test`, `main` | Vitest con cobertura v8; cada shard sube un reporte `blob` (`vitest-blob-N`) |
-| `unit-coverage` | `ci.yml` | Después de los shards | Combina los blobs con `vitest --merge-reports --coverage` y sube `coverage-lcov` (`coverage/lcov.info`) |
-| `sonar` | `ci.yml` | Después de `unit-coverage` | Análisis de SonarCloud con esa cobertura. Se saltea sin `SONAR_TOKEN` (forks) |
+| `unit` (4 shards) | `ci.yml` | PR y push a `develop`, `test`, `main` | Vitest con cobertura v8 y `COVERAGE_THRESHOLDS=off` (cada shard ve solo una parte); sube un reporte `blob` (`vitest-blob-N`) |
+| `unit-coverage` | `ci.yml` | Después de los shards | Combina los blobs con `vitest --merge-reports --coverage`, **exige los umbrales de cobertura** y sube `coverage-lcov` (`coverage/lcov.info`). En pushes a `develop` y `test` se saltea |
+| `sonar` | `ci.yml` | Después de `unit-coverage` | Análisis de SonarCloud con esa cobertura. Espera el Quality Gate (`sonar.qualitygate.wait=true`) y falla si da rojo. Se saltea sin `SONAR_TOKEN` (forks) |
 | `trivy` | `trivy.yml` | PR y push a `develop`, `test`, `main` | Dependencias (SBOM del lockfile), secretos, imagen del `Dockerfile` y configuración |
 | `mutation shard N/16` y `mutation score` | `mutation.yml` | A demanda y cada lunes 06:00 UTC | Stryker sobre `src/lib` y las rutas BFF, repartido en 16 jobs; `mutation score` junta los reportes y falla bajo el umbral (`break` en `stryker.config.json`) |
 | `zap baseline (Vercel)` y `zap active (build del CI)` | `dast.yml` | A demanda y cada lunes 06:00 UTC | ZAP pasivo contra Vercel y activo contra la app construida en el CI |
 
-La cobertura se mide y no frena nada: no hay umbral. El gate de Sonar todavía no es un check requerido (Opción C; ver el ADR).
+La cobertura tiene umbrales (#975) en `coverage.thresholds` de `vitest.config.ts`: líneas 92 %, sentencias 90 %, funciones 87 % y ramas 83 %, que son lo medido redondeado hacia abajo. Se aplican solo en `unit-coverage`, sobre el informe fusionado; los shards los desactivan con `COVERAGE_THRESHOLDS=off`. `unit-coverage` está en `needs` del job agregador `test` (el check requerido), así que una cobertura bajo el umbral frena el merge; el agregador acepta que esté salteado solo en pushes a `develop` y `test`. Los umbrales solo suben: si un cambio los incumple, se agregan tests, no se bajan. Corrida local con los mismos umbrales: `pnpm exec vitest run --coverage`. El job `sonar` falla si el Quality Gate de SonarCloud da rojo; para que frene el merge, el check `sonar` tiene que figurar como requerido en la protección de `develop` (lo configura el líder; ver el ADR).
 
 ## Cómo leer los resultados
 

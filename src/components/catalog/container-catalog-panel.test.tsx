@@ -831,7 +831,7 @@ describe("ContainerCatalogPanel", () => {
       expect(within(screen.getByRole("dialog")).queryByRole("button", { name: "Vaciar contenedor" })).not.toBeInTheDocument();
     });
 
-    it("allows Office actor to initiate and confirm relocation (ACTIVE -> RELOCATING -> ACTIVE with new address)", { timeout: 15000 }, async () => {
+    it("allows Office actor to initiate and confirm relocation (ACTIVE -> RELOCATING -> ACTIVE with new address)", async () => {
       const user = userEvent.setup({ delay: null });
       render(<ContainerCatalogPanel scenario={scenarios.officeDutyQueue} />);
 

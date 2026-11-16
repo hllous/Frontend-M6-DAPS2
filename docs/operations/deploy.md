@@ -53,6 +53,7 @@ La lista para desarrollo está en [`.env.example`](../../.env.example). En Verce
 | `M6_BACKEND_ORIGIN` | Origen de M6 Backend; requerido en `real-m1`. |
 | `BFF_SHARED_KEY` | Opcional. Secreto compartido con el backend: el **mismo** valor que su `BFF_SHARED_KEY` (Render), 32 caracteres o más (`openssl rand -base64 32`; en el repositorio solo placeholders). Con él, `fetchPublicBackend` manda `X-M6-BFF-Key` y el backend cuenta, en el límite de tasa del portal, la IP del vecino que va en `X-Forwarded-For`; sin él (o con otro valor) cuenta la IP del BFF y todos los vecinos comparten un solo límite. Se manda solo en `/api/public/*`, nunca en las rutas autenticadas ni al navegador; solo servidor, sin `NEXT_PUBLIC_`. Se rota cambiándolo en Vercel y Render a la vez. |
 | `M1_BASE_URL` | Base de M1, requerida en `real-m1`: login (`POST /auth/usuario/login`) y renovación (`POST /auth/refresh`). Producción: `https://ciudadanos-m1-backend.onrender.com/`. |
+| `M6_TRUST_PROXY` | Opcional. `true` solo si un proxy propio sobrescribe `X-Forwarded-For`; habilita la IP del cliente en el límite de intentos de ingreso ([ADR-0009](../adr/0009-limite-de-intentos-de-ingreso-en-memoria.md)). En Vercel no hace falta. |
 | `M6_SESSION_SECRET` | Secreto aleatorio de al menos 32 bytes para sellar la cookie del BFF (generalo con `openssl rand -base64 32`). Obligatorio cuando `NODE_ENV=production`; el desarrollo local tiene un valor de respaldo. |
 | `NEXT_PUBLIC_DISABLE_MSW` | Solo para desarrollo y depuración de pruebas; desactiva el service worker de MSW. |
 

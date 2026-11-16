@@ -84,7 +84,7 @@ describe("ServiceSchedule", () => {
     render(<ServiceSchedule initialZoneId={centro.id} />);
 
     expect(await screen.findByRole("region", { name: "Cargando servicios" })).toHaveAttribute("aria-busy", "true");
-    expect(await screen.findByText(/No hay servicios programados/, undefined, { timeout: 2000 })).toBeVisible();
+    expect(await screen.findByText(/No hay servicios programados/, undefined)).toBeVisible();
     expect(screen.queryByRole("region", { name: "Cargando servicios" })).not.toBeInTheDocument();
   });
 

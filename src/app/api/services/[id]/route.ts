@@ -5,12 +5,13 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getScenario } from "@/lib/scenarios";
 import { getRequiredSession } from "@/lib/session";
+import { versionedService } from "@/lib/bff-mock-versions";
 
 
 
 
 
-export async function GET(
+async function handleGET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -42,3 +43,5 @@ export async function GET(
     return handleRouteError(error, path, "No se pudo cargar el servicio.");
   }
 }
+
+export const GET = versionedService(handleGET);

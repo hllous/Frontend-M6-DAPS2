@@ -47,6 +47,8 @@ export const containerSchema = withResponseCoordinates({
   damageType: damageTypeSchema.nullable().optional(),
   severity: severitySchema.nullable().optional(),
   requiresPublicWorks: z.boolean().nullable().optional(),
+  // Versión del registro: el backend deriva de acá el ETag (ADR-012) y la interfaz lo usa como `If-Match`.
+  updatedAt: z.string().optional(),
 });
 export type Container = z.infer<typeof containerSchema>;
 

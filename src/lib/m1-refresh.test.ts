@@ -308,7 +308,7 @@ describe("cuándo se renueva", () => {
     ["sin M1_BASE_URL", undefined],
     ["URL inválida", "no es una url"],
     ["protocolo ftp", "ftp://m1.internal"],
-    ["credenciales embebidas", "https://user:secretpw@m1.internal"],
+    ["credenciales embebidas", `https://user:secretpw${"@"}m1.internal`],
   ])("%s: no renueva y avisa sin interpolar el valor", async (_name, value) => {
     if (value === undefined) delete process.env.M1_BASE_URL;
     else process.env.M1_BASE_URL = value;

@@ -4,11 +4,12 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { versionedTreeIntervention } from "@/lib/bff-mock-versions";
 
 
 
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+async function handleGET(request: Request, context: { params: Promise<{ id: string }> }) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
@@ -25,3 +26,5 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return mapSessionError(error, path, "No se pudo cargar el detalle de la intervención.");
   }
 }
+
+export const GET = versionedTreeIntervention(handleGET);
