@@ -1,5 +1,9 @@
 # Módulo 6 — Ambiente e Higiene · Frontend
 
+[![CI](https://github.com/hllous/Frontend-M6-DAPS2/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/hllous/Frontend-M6-DAPS2/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=hllous_Frontend-M6-DAPS2&metric=alert_status)](https://sonarcloud.io/summary/overall?id=hllous_Frontend-M6-DAPS2)
+[![Cobertura](https://sonarcloud.io/api/project_badges/measure?project=hllous_Frontend-M6-DAPS2&metric=coverage)](https://sonarcloud.io/summary/overall?id=hllous_Frontend-M6-DAPS2)
+
 Aplicación web interna para planificar y ejecutar servicios municipales de Ambiente, Higiene y Servicios Urbanos. Está dirigida al personal de Oficina y al personal de Campo, con vistas de escritorio y uso móvil.
 
 ## Stack
