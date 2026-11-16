@@ -89,3 +89,21 @@ describe("environmental reports in Field scope (#651)", () => {
     expect(body.meta.dropped).toBe(1);
   });
 });
+
+describe("environmental report search in Field scope (#949)", () => {
+  it("keeps the reports the Backend found by caseNumber instead of filtering search again", async () => {
+    restoreEnv = backendEnv();
+    const cookie = createSessionCookie("field-crew-leader-route", { mode: "real-m1", crew: { id: "crew-b", name: "Cuadrilla B" } });
+    const { environmentalReportFixtures } = await import("@/lib/environmental-report-fixtures");
+    const fromM2 = { ...environmentalReportFixtures[1], address: null, caseNumber: "EXP-2026-000015", assignedCrewId: "crew-b" };
+    const backend = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({
+      data: [fromM2],
+      meta: { total: 1, page: 1, pageSize: 100, totalPages: 1 },
+    }));
+
+    const body = await (await GET(new Request("http://localhost/api/environmental-reports?search=exp-2026-000015", { headers: { cookie } }))).json();
+
+    expect(new URL(String(backend.mock.calls[0][0])).searchParams.get("search")).toBe("exp-2026-000015");
+    expect(body.data.map((report: { id: string }) => report.id)).toEqual([fromM2.id]);
+  });
+});

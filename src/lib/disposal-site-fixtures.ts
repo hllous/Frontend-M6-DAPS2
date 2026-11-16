@@ -1,4 +1,5 @@
 import type { DisposalSite, DisposalSiteQuery } from "./disposal-sites";
+import { matchesSearch } from "./fixture-search";
 
 const initialDisposalSites: DisposalSite[] = [
   { id: "ds-transfer-north", code: "RS-01", siteType: "TRANSFER_STATION", name: "Estación Norte", active: true },
@@ -12,7 +13,7 @@ export function filterDisposalSiteFixtures(query: DisposalSiteQuery) {
   return disposalSiteFixtures.filter((item) => {
     if (query.active !== undefined && item.active !== query.active) return false;
     if (query.siteType && item.siteType !== query.siteType) return false;
-    if (query.search && !`${item.code} ${item.name}`.toLowerCase().includes(query.search.toLowerCase())) return false;
+    if (!matchesSearch(query.search, [item.code, item.name])) return false;
     return true;
   });
 }

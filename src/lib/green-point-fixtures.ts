@@ -1,4 +1,5 @@
 import type { GreenPoint, GreenPointQuery } from "./green-points";
+import { matchesSearch } from "./fixture-search";
 
 const INITIAL_GREEN_POINTS: GreenPoint[] = [
   { id: "green-point-1", code: "GP-001", name: "Punto verde Plaza Mitre", zoneId: "zone-1", wasteTypes: ["RECYCLABLE", "GREEN"], address: "Av. Cabildo 2100", lat: -34.5621, lng: -58.4561, active: true },
@@ -17,7 +18,7 @@ export function filterGreenPointFixtures(query: GreenPointQuery): GreenPoint[] {
     if (query.active !== undefined && item.active !== query.active) return false;
     if (query.zoneId && item.zoneId !== query.zoneId) return false;
     if (query.wasteType && !item.wasteTypes.includes(query.wasteType)) return false;
-    if (query.search && !`${item.name} ${item.address ?? ""}`.toLowerCase().includes(query.search.toLowerCase())) return false;
+    if (!matchesSearch(query.search, [item.code, item.name, item.address])) return false;
     return true;
   });
 }

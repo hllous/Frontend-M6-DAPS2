@@ -2,6 +2,7 @@ import catalog from "@/data/m9-neighborhoods.json";
 
 import type { Neighborhood } from "./neighborhoods";
 import type { Zone, ZoneQuery, ZoneReferenceReport } from "./zones";
+import { matchesSearch } from "./fixture-search";
 
 /** UUID determinístico de comuna (mismo formato que el ejemplo del backend). */
 export function communeFixtureId(number: number): string {
@@ -91,7 +92,7 @@ export function filterZoneFixtures(query: ZoneQuery): Zone[] {
   return zoneFixtures.filter((zone) => {
     if (query.active !== undefined && zone.active !== query.active) return false;
     if (query.communeId && zone.commune?.id !== query.communeId) return false;
-    if (query.search && !zone.name.toLowerCase().includes(query.search.toLowerCase())) return false;
+    if (!matchesSearch(query.search, [zone.name])) return false;
     return true;
   });
 }
