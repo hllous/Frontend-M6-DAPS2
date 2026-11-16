@@ -34,12 +34,21 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# El CMD es `node server.js`: npm, npx, corepack y yarn no se usan en runtime.
+# Se eliminan (no se ocultan en .trivyignore) porque el npm embebido en la imagen
+# base trae CVE HIGH propias (brace-expansion, pacote, sigstore, etc.).
+RUN rm -rf /usr/local/lib/node_modules /opt/yarn-*     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack     /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
 # El standalone ya trae su propio node_modules mínimo + server.js.
-COPY --from=builder /app/.next/standalone ./
+# --chown: el usuario no-root `node` necesita escribir en /app (p. ej. .next/cache).
+COPY --from=builder --chown=node:node /app/.next/standalone ./
 
 # Los assets estáticos NO están incluidos en standalone: se copian aparte.
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
+
+# No correr como root (Trivy DS-0002).
+USER node
 
 # Bind a 0.0.0.0 para que sea accesible desde fuera del contenedor.
 ENV HOSTNAME=0.0.0.0

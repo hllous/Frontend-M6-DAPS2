@@ -1,4 +1,4 @@
-import { backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -6,8 +6,7 @@ import { getEnvironmentalInspectionFixture } from "@/lib/environmental-report-fi
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getRepairRequestFixture } from "@/lib/repair-request-fixtures";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -41,8 +40,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     }
     return item ? NextResponse.json(item) : errorResponse(404, `Derivación ${id} no encontrada.`, path);
   } catch (error) {
-    if (error instanceof InvalidSessionError) { recordTelemetryEvent({ name: "auth_session_expired", status: 401 }); return errorResponse(401, "La sesión no está activa.", path); }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo cargar la derivación.");
+    return handleRouteError(error, path, "No se pudo cargar la derivación.");
   }
 }

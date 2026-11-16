@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -32,17 +32,8 @@ export async function PUT(
 
     authorize(session, { office: true, officeMessage: "Solo el rol de Oficina puede editar la secuencia de paradas de recorridos.", capability: "route:manage", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = setRouteStopsInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
-    }
+    const parsed = await parseJsonBody(request, setRouteStopsInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, `/routes/${pathId(id)}/stops`, "route:manage", {
