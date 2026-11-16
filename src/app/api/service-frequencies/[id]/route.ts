@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { serviceFrequencyResponseFixture, closeServiceFrequencyFixture, serviceFrequencyFixtures, updateServiceFrequencyFixture } from "@/lib/service-frequency-fixtures";
@@ -32,10 +32,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   try {
     const session = requireOfficeCapability(request);
     const id = await targetId(context);
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = serviceFrequencyUpdateInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, serviceFrequencyUpdateInputSchema, path);
+    if (parsed instanceof Response) return parsed;
     if (backendMode(session)) { const response = await fetchBackend(request, `/service-frequencies/${pathId(id)}`, "serviceFrequency:manage", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }); return forwardResponse(response); }
     const updated = updateServiceFrequencyFixture(id, parsed.data);
     return updated ? NextResponse.json(serviceFrequencyResponseFixture(updated)) : errorResponse(404, "Frecuencia no encontrada.", path);

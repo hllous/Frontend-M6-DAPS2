@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { authorize, backendMode, errorResponse, forwardResponse, mapSessionError, FORBIDDEN_CODES } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, forwardResponse, mapSessionError, FORBIDDEN_CODES, parseJsonBody } from "@/lib/bff-route";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalReportFixture, updateEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
 import { requestInformationInputSchema } from "@/lib/environmental-reports";
@@ -17,10 +17,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     authorize(session, { capability: CAPABILITY, throwOnError: true });
     if (getScenario(session).actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede pedir información al vecino.", path);
 
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = requestInformationInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, requestInformationInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     if (backendMode(session)) {
       return forwardResponse(await fetchBackend(request, `/environmental-reports/${pathId(id)}/request-information`, CAPABILITY, {

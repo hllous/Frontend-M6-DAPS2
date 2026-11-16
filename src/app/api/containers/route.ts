@@ -1,4 +1,4 @@
-import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { backendMode, backendQuery, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -16,8 +16,7 @@ import {
   type ContainerQuery,
 } from "@/lib/containers";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
 
 
@@ -57,12 +56,7 @@ export async function GET(request: Request) {
       paginateContainerFixtures(filterContainerFixtures(query), query.page, query.pageSize),
     );
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudieron cargar los contenedores.");
+    return handleRouteError(error, path, "No se pudieron cargar los contenedores.");
   }
 }
 
@@ -78,17 +72,8 @@ export async function POST(request: Request) {
       return errorResponse(403, "Solo el rol de Oficina puede gestionar contenedores.", path);
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = createContainerInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(400, parsed.error.issues.map((i) => i.message).join(" "), path);
-    }
+    const parsed = await parseJsonBody(request, createContainerInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     if (backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/containers", "container:manage", {
@@ -115,11 +100,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(newContainer, { status: 201 });
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo registrar el contenedor.");
+    return handleRouteError(error, path, "No se pudo registrar el contenedor.");
   }
 }

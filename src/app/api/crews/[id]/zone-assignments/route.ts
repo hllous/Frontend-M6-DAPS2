@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, forwardResponse, mapSessionError } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, forwardResponse, mapSessionError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -38,10 +38,8 @@ export async function POST(request: Request, routeContext: Context) {
   try {
     const { id } = await routeContext.params;
     const { session } = authorize(request, { office: true, officeMessage: "Solo Operaciones puede reubicar cuadrillas.", capability: "service:assign", capabilityMessage: "Solo Operaciones puede reubicar cuadrillas.", throwOnError: true });
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = createCrewZoneAssignmentInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, createCrewZoneAssignmentInputSchema, path);
+    if (parsed instanceof Response) return parsed;
     if (backendMode(session)) {
       const response = await fetchBackend(request, `/crews/${pathId(id)}/zone-assignments`, "service:assign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) });
       if (response.status === 409) { void response.body?.cancel().catch(() => undefined); return errorResponse(409, OVERLAP_MESSAGE, path); }
