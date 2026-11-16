@@ -1,4 +1,4 @@
-import { configDefaults, defineConfig, mergeConfig } from "vitest/config";
+import { defineConfig, mergeConfig } from "vitest/config";
 import baseConfig from "./vitest.config";
 
 // Config de Vitest solo para Stryker (`pnpm mutation`). Corre los tests que ejercitan lo que se
@@ -8,13 +8,7 @@ export default mergeConfig(
   baseConfig,
   defineConfig({
     test: {
-      // Sin aislamiento por archivo: crear jsdom en cada uno de los ~150 archivos volvía la
-      // corrida inicial de Stryker más lenta que el timeout.
-      isolate: false,
       include: ["src/lib/**/*.test.{ts,tsx}", "src/app/api/**/*.test.{ts,tsx}"],
-      // Depende del aislamiento de módulos de Vitest (vi.mock de next/headers): con
-      // isolate:false falla. Su fuente (m1-refresh.ts) queda fuera de `mutate`; igual el login (timeout de un test de carga sin aislamiento).
-      exclude: [...configDefaults.exclude, "src/lib/m1-refresh.test.ts", "src/app/api/session/login/route.test.ts"],
     },
   }),
 );
