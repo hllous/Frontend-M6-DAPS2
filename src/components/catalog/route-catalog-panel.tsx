@@ -66,6 +66,7 @@ import {
 } from "@/lib/routes";
 import { type Zone } from "@/lib/zones";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
+import { randomUuid } from "@/lib/random-id";
 
 type LoadState =
   | { status: "loading" }
@@ -376,7 +377,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     setDraftStops((prev) => [
       ...prev,
       {
-        tempId: `stop-draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        tempId: `stop-draft-${randomUuid()}`,
         zoneId: zone.id,
         estimatedDurationMin: Math.round(duration),
         zoneName: zone.name,

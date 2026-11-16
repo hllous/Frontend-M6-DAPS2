@@ -58,6 +58,7 @@ import { OFFLINE_DRAFT_MESSAGE, OfflineDraftNotice } from "./offline-draft-notic
 import { DraftConflictView } from "./draft-conflict-view";
 import { ZoneExecutionPanel } from "./zone-execution-panel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { randomUuid } from "@/lib/random-id";
 
 type QueuedEvidenceFile = {
   id: string;
@@ -82,9 +83,7 @@ const NEXT_STEP_LABELS: Record<NonNullable<EnvironmentalInspection["nextStep"]>,
 };
 
 function randomIdempotencyKey() {
-  return typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return randomUuid();
 }
 
 function validationMessage(error: { issues: Array<{ message: string }> }) {
@@ -212,7 +211,7 @@ export function InspectionExecutionPanel({
         errors.push(`\"${file.name}\" no es una foto ni un PDF.`);
         continue;
       }
-      accepted.push({ id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, file, localFilename: file.name, idempotencyKey: randomIdempotencyKey(), status: "pending" });
+      accepted.push({ id: `file-${randomUuid()}`, file, localFilename: file.name, idempotencyKey: randomIdempotencyKey(), status: "pending" });
     }
     setFileValidationError(errors.length ? errors.join(" ") : null);
     if (accepted.length) setQueuedFiles((current) => [...current, ...accepted]);
