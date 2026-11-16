@@ -153,7 +153,7 @@ describe("POST /api/containers/[id]/report-damage BFF route", () => {
 
   it("forwards an authorized backend damage report with its id, method, and payload", async () => {
     const id = "container_42.3~";
-    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const payload = { damageType: "STRUCTURAL", severity: "CRITICAL", requiresPublicWorks: true };
     const cookie = createSessionCookie("field-crew-leader-route", {
       mode: "real-m1",
