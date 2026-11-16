@@ -1,9 +1,0 @@
-// @ts-nocheck
-import { handleTreeInterventionTransition } from "../_transition";
-
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
-  return handleTreeInterventionTransition(request, context, "authorize");
-}
