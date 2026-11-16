@@ -16,13 +16,13 @@ jobs:
   # La corrida completa (~17 000 mutantes) no entra en un solo job de 6 h: se reparte por
   # archivos en shards (scripts/mutation-shard.mjs) y el job `score` exige el umbral global.
   mutation:
-    name: mutation shard ${{ matrix.shard }}/8
+    name: mutation shard ${{ matrix.shard }}/16
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - uses: actions/checkout@v7
       - name: Setup Node.js and pnpm
@@ -35,17 +35,19 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: reports/mutation/incremental.json
-          key: stryker-incremental-${{ matrix.shard }}-${{ github.run_id }}
-          restore-keys: stryker-incremental-${{ matrix.shard }}-
+          key: stryker-incremental-${{ matrix.shard }}-${{ hashFiles('stryker.config.json', 'vitest.mutation.config.ts') }}-${{ github.run_id }}
+          restore-keys: |
+            stryker-incremental-${{ matrix.shard }}-${{ hashFiles('stryker.config.json', 'vitest.mutation.config.ts') }}-
+            stryker-incremental-${{ matrix.shard }}-
 
-      - run: node scripts/mutation-shard.mjs ${{ matrix.shard }} 8
+      - run: node scripts/mutation-shard.mjs ${{ matrix.shard }} 16
 
       - name: Guardar el incremental de Stryker
         if: always()
         uses: actions/cache/save@v4
         with:
           path: reports/mutation/incremental.json
-          key: stryker-incremental-${{ matrix.shard }}-${{ github.run_id }}
+          key: stryker-incremental-${{ matrix.shard }}-${{ hashFiles('stryker.config.json', 'vitest.mutation.config.ts') }}-${{ github.run_id }}
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -68,7 +70,7 @@ jobs:
           pattern: mutation-report-*
           path: shards
       - name: Mutation score global
-        run: node scripts/mutation-merge.mjs shards/mutation-report-0 shards/mutation-report-1 shards/mutation-report-2 shards/mutation-report-3 shards/mutation-report-4 shards/mutation-report-5 shards/mutation-report-6 shards/mutation-report-7
+        run: node scripts/mutation-merge.mjs shards/mutation-report-0 shards/mutation-report-1 shards/mutation-report-2 shards/mutation-report-3 shards/mutation-report-4 shards/mutation-report-5 shards/mutation-report-6 shards/mutation-report-7 shards/mutation-report-8 shards/mutation-report-9 shards/mutation-report-10 shards/mutation-report-11 shards/mutation-report-12 shards/mutation-report-13 shards/mutation-report-14 shards/mutation-report-15
       - uses: actions/upload-artifact@v4
         if: always()
         with:

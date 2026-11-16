@@ -33,17 +33,36 @@ const files = [
   ...walk("src/app/api").filter((f) => posix.basename(f) === "route.ts"),
 ];
 
-// Reparto voraz por tamaño (aproxima la cantidad de mutantes): el archivo más grande al shard más liviano.
+// Reparto voraz por peso (bytes del archivo, que aproxima la cantidad de mutantes y el costo de
+// probarlos). Un archivo que pesa más que un shard (src/lib/services.ts) se parte en rangos de
+// líneas (`archivo:desde-hasta`, sintaxis de `mutate` de Stryker) para que ningún shard cargue solo con él.
+const totalBytes = files.reduce((sum, f) => sum + statSync(f).size, 0);
+const maxChunk = totalBytes / count / 2;
+const units = [];
+for (const file of files) {
+  const size = statSync(file).size;
+  if (size <= maxChunk) {
+    units.push({ spec: file, size });
+    continue;
+  }
+  const lineCount = readFileSync(file, "utf8").split("\n").length;
+  const parts = Math.ceil(size / maxChunk);
+  const perPart = Math.ceil(lineCount / parts);
+  for (let from = 1; from <= lineCount; from += perPart) {
+    units.push({ spec: `${file}:${from}-${Math.min(from + perPart - 1, lineCount)}`, size: size / parts });
+  }
+}
 const shards = Array.from({ length: count }, () => ({ size: 0, files: [] }));
-for (const file of files.sort((a, b) => statSync(b).size - statSync(a).size)) {
+for (const unit of units.sort((a, b) => b.size - a.size || a.spec.localeCompare(b.spec))) {
   const lightest = shards.reduce((min, s) => (s.size < min.size ? s : min));
-  lightest.files.push(file);
-  lightest.size += statSync(file).size;
+  lightest.files.push(unit.spec);
+  lightest.size += unit.size;
 }
 
 const config = {
   ...base,
-  mutate: shards[index].files,
+  // `mutate` son globs: los corchetes de las rutas dinámicas ([id]) se escapan para que sean literales.
+  mutate: shards[index].files.map((spec) => spec.replace(/[[\]]/g, "\\$&")),
   thresholds: { ...base.thresholds, break: 0 },
 };
 mkdirSync("reports/mutation", { recursive: true });
