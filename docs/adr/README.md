@@ -11,4 +11,6 @@ Estos registros documentan decisiones técnicas que afectan la arquitectura o lo
 - [ADR-0007 — Explicit external referrals and Office reconciliation](0007-explicit-external-referrals-and-office-reconciliation.md)
 - [ADR-0008 — SonarCloud, Trivy y ZAP en el CI del Frontend](0008-sonarcloud-trivy-y-zap-en-el-ci.md)
 
+- [ADR-0009 — Límite de intentos de ingreso fallidos en memoria](0009-limite-de-intentos-de-ingreso-en-memoria.md)
+
 Para registrar una decisión nueva, copiá la [plantilla](0000-template.md).

@@ -1,13 +1,15 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
+import { loginRateLimiter } from "@/lib/login-rate-limit";
 import { handlers } from "@/mocks/handlers";
 import { POST as login } from "./route";
 
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => loginRateLimiter.reset());
 afterEach(() => {
   server.resetHandlers();
   vi.unstubAllEnvs();

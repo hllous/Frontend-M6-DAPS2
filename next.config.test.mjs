@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import nextConfig, { API_CSP, resolveNextDistDir, typescriptConfigPathForDistDir } from "./next.config.mjs";
 
@@ -18,6 +18,17 @@ describe("M6_NEXT_DIST_DIR", () => {
 });
 
 describe("security headers (#956)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("sends HSTS in production only", async () => {
+    const headerKeys = async () => (await nextConfig.headers()).find((rule) => rule.source === "/:path*").headers.map((header) => header.key);
+
+    vi.stubEnv("NODE_ENV", "production");
+    expect(await headerKeys()).toContain("Strict-Transport-Security");
+    vi.stubEnv("NODE_ENV", "development");
+    expect(await headerKeys()).not.toContain("Strict-Transport-Security");
+  });
+
   it("applies the hardening headers to every route", async () => {
     const rules = await nextConfig.headers();
     const all = rules.find((rule) => rule.source === "/:path*");
