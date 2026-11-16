@@ -36,11 +36,6 @@ describe("GET /api/services/:id backend availability", () => {
   it("returns 503 when the backend does not respond before the timeout", async () => {
     const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
     vi.useFakeTimers();
-    vi.spyOn(AbortSignal, "timeout").mockImplementation((timeoutMs) => {
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), timeoutMs);
-      return controller.signal;
-    });
     vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
       const signal = init?.signal;
       if (!signal) return Promise.reject(new TypeError("missing timeout signal"));
@@ -50,7 +45,7 @@ describe("GET /api/services/:id backend availability", () => {
     });
 
     const responsePromise = serviceRequest(cookie);
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(5_000);
     const response = await responsePromise;
 
     expect(response.status).toBe(503);

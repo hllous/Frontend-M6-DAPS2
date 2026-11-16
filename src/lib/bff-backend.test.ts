@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BackendUnavailableError } from "./session";
-import { fetchBackend, isJsonMediaType, pathId } from "./bff-backend";
-import { forwardResponse } from "./bff-route";
+import { BACKEND_TIMEOUT_MS, STALE_RECORD_MESSAGE, fetchBackend, isJsonMediaType, pathId } from "./bff-backend";
+import { forwardResponse, mapSessionError } from "./bff-route";
 import { createSessionCookie } from "@/test/session";
 
 const backendOrigin = "https://backend.internal";
@@ -158,6 +158,16 @@ describe("isJsonMediaType", () => {
   );
 });
 
+function hangingFetch() {
+  return vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
+    const signal = init?.signal;
+    if (!signal) return Promise.reject(new TypeError("missing timeout signal"));
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  });
+}
+
 describe("fetchBackend availability", () => {
   it.each([[200, 502], [201, 502], [503, 503]])(
     "wraps non-JSON upstream %s as status %s and uses the calling BFF path",
@@ -175,37 +185,81 @@ describe("fetchBackend availability", () => {
     },
   );
 
-  it("translates network failures into BackendUnavailableError", async () => {
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+  it("translates network failures into BackendUnavailableError after one bounded GET retry", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
 
     await expect(fetchBackend(backendRequest(), "/services/service-1")).rejects.toMatchObject({
       name: "BackendUnavailableError",
       status: 503,
       message: "El sistema no responde. Reintente en unos segundos.",
     });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("aborts a request at the 15-second default and translates the timeout", async () => {
+  it("recovers a GET when the single retry succeeds", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("socket hang up"))
+      .mockResolvedValueOnce(Response.json({ id: "service-1" }));
+
+    const response = await fetchBackend(backendRequest(), "/services/service-1");
+
+    expect(response.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["POST", "PATCH", "PUT", "DELETE"])("never retries a %s write after a network failure", async (method) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(fetchBackend(backendRequest(), "/services/service-1/start", undefined, { method })).rejects.toBeInstanceOf(BackendUnavailableError);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts the backend fetch at the 5-second default and answers 503 without retrying", async () => {
     vi.useFakeTimers();
-    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockImplementation((timeoutMs) => {
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), timeoutMs);
-      return controller.signal;
-    });
-    vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
-      const signal = init?.signal;
-      if (!signal) return Promise.reject(new TypeError("missing timeout signal"));
-      return new Promise((_resolve, reject) => {
-        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
-      });
-    });
+    try {
+      expect(BACKEND_TIMEOUT_MS).toBe(5_000);
+      const fetchSpy = hangingFetch();
 
-    const request = fetchBackend(backendRequest(), "/services/service-1");
-    const rejection = request.then(() => undefined, (error: unknown) => error);
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect(await rejection).toBeInstanceOf(BackendUnavailableError);
+      const rejection = fetchBackend(backendRequest(), "/services/service-1").then(() => undefined, (error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(4_999);
+      const signal = fetchSpy.mock.calls[0]?.[1]?.signal;
+      expect(signal?.aborted).toBe(false);
 
-    expect(timeoutSpy).toHaveBeenCalledWith(15_000);
+      await vi.advanceTimersByTimeAsync(1);
+      const error = await rejection;
+      expect(error).toBeInstanceOf(BackendUnavailableError);
+      expect(error).toMatchObject({ status: 503, message: "El sistema no responde. Reintente en unos segundos." });
+      expect(signal?.aborted).toBe(true);
+      expect((signal?.reason as DOMException).name).toBe("TimeoutError");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("releases the timer when the request fails before the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+      await expect(fetchBackend(backendRequest(), "/services/service-1/start", undefined, { method: "POST" })).rejects.toBeInstanceOf(BackendUnavailableError);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("turns the timeout into the 503 fallback the screen shows", async () => {
+    vi.useFakeTimers();
+    try {
+      hangingFetch();
+      const pending = fetchBackend(backendRequest(), "/services/service-1").then(() => undefined, (error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(5_000);
+      const response = mapSessionError(await pending, "/api/services/service-1", "fallback");
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({ statusCode: 503, message: "El sistema no responde. Reintente en unos segundos." });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("composes a caller signal with the timeout and preserves caller cancellation", async () => {
@@ -227,24 +281,115 @@ describe("fetchBackend availability", () => {
   });
 
   it("uses the configured timeout and relays upstream error responses unchanged", async () => {
-    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(AbortSignal.abort());
-    const upstream = new Response("upstream error", {
+    vi.useFakeTimers();
+    try {
+      const fetchSpy = hangingFetch();
+      const pending = fetchBackend(backendRequest(), "/evidence", undefined, { method: "POST" }, { timeoutMs: 60_000 })
+        .then(() => undefined, (error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(fetchSpy.mock.calls[0]?.[1]?.signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toBeInstanceOf(BackendUnavailableError);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("upstream error", {
       status: 503,
       headers: { "content-type": "text/plain" },
-    });
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(upstream);
-
-    const response = await fetchBackend(
-      backendRequest(),
-      "/evidence",
-      undefined,
-      { method: "POST" },
-      { timeoutMs: 60_000 },
-    );
-
-    expect(timeoutSpy).toHaveBeenCalledWith(60_000);
+    }));
+    const response = await fetchBackend(backendRequest(), "/evidence", undefined, { method: "POST" }, { timeoutMs: 60_000 });
     expect(response.status).toBe(503);
     expect(response.headers.get("content-type")).toBe("text/plain");
     expect(await response.text()).toBe("upstream error");
+  });
+});
+
+describe("optimistic concurrency (ADR-012 del backend)", () => {
+  function writeRequest(headers: Record<string, string> = {}) {
+    const cookie = createSessionCookie("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin });
+    return new Request("http://localhost/api/containers/cont-1/empty", { method: "POST", headers: { cookie, ...headers } });
+  }
+
+  function sentHeaders(fetchSpy: { mock: { calls: unknown[][] } }) {
+    return new Headers((fetchSpy.mock.calls[0]?.[1] as RequestInit | undefined)?.headers);
+  }
+
+  it("forwards the browser If-Match on a write", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "cont-1" }));
+    await fetchBackend(writeRequest({ "if-match": 'W/"1731700000000"' }), "/containers/cont-1/empty", undefined, { method: "POST" });
+    expect(sentHeaders(fetchSpy).get("if-match")).toBe('W/"1731700000000"');
+  });
+
+  it("does not send If-Match when the browser did not send one", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "cont-1" }));
+    await fetchBackend(writeRequest(), "/containers/cont-1/empty", undefined, { method: "POST" });
+    expect(sentHeaders(fetchSpy).has("if-match")).toBe(false);
+  });
+
+  it("does not forward If-Match on a GET the route makes to check scope", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "cont-1" }));
+    await fetchBackend(writeRequest({ "if-match": 'W/"1"' }), "/containers/cont-1");
+    expect(sentHeaders(fetchSpy).has("if-match")).toBe(false);
+  });
+
+  it("keeps an If-Match the route sets itself", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "cont-1" }));
+    await fetchBackend(writeRequest({ "if-match": 'W/"1"' }), "/containers/cont-1/empty", undefined, { method: "POST", headers: { "if-match": 'W/"2"' } });
+    expect(sentHeaders(fetchSpy).get("if-match")).toBe('W/"2"');
+  });
+
+  it.each(['W/"1", junk', "abc", `W/"${"9".repeat(600)}"`])("drops a malformed If-Match %s", async (value) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "cont-1" }));
+    await fetchBackend(writeRequest({ "if-match": value }), "/containers/cont-1/empty", undefined, { method: "POST" });
+    expect(sentHeaders(fetchSpy).has("if-match")).toBe(false);
+  });
+
+  it.each(["*", 'W/"1", W/"2"', '"strong"'])("accepts If-Match %s", async (value) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "cont-1" }));
+    await fetchBackend(writeRequest({ "if-match": value }), "/containers/cont-1/empty", undefined, { method: "POST" });
+    expect(sentHeaders(fetchSpy).get("if-match")).toBe(value);
+  });
+
+  it("returns the backend ETag to the browser through forwardResponse", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "cont-1" }, { headers: { etag: 'W/"1731700000123"' } }));
+    const response = forwardResponse(await fetchBackend(backendRequest(), "/containers/cont-1"));
+    expect(response.headers.get("etag")).toBe('W/"1731700000123"');
+  });
+
+  it("maps a 412 to the Spanish stale-record notice and keeps the Problem Details fields", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      type: "about:blank",
+      title: "Precondition Failed",
+      status: 412,
+      detail: "Precondition Failed: resource was modified",
+      instance: "/containers/cont-1/empty",
+      statusCode: 412,
+      message: "Precondition Failed: resource was modified",
+      error: "Precondition Failed",
+      path: "/containers/cont-1/empty",
+    }), { status: 412, headers: { "content-type": "application/problem+json" } }));
+
+    const response = forwardResponse(await fetchBackend(writeRequest({ "if-match": 'W/"1"' }), "/containers/cont-1/empty", undefined, { method: "POST" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(412);
+    expect(response.headers.get("content-type")).toBe("application/problem+json");
+    expect(body).toMatchObject({
+      statusCode: 412,
+      status: 412,
+      code: "STALE_RECORD",
+      message: STALE_RECORD_MESSAGE,
+      detail: STALE_RECORD_MESSAGE,
+      instance: "/containers/cont-1/empty",
+    });
+    expect(STALE_RECORD_MESSAGE).toBe("Otra persona modificó este registro. Recargue para ver los cambios.");
+  });
+
+  it("maps a 412 without a JSON body as well", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 412 }));
+    const response = await fetchBackend(writeRequest(), "/containers/cont-1/empty", undefined, { method: "POST" });
+    expect(response.status).toBe(412);
+    expect(await response.json()).toMatchObject({ statusCode: 412, code: "STALE_RECORD", message: STALE_RECORD_MESSAGE });
   });
 });

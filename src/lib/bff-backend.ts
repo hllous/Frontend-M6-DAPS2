@@ -12,11 +12,23 @@ import { canRenew, isNearExpiry, renewRequestSession } from "./m1-refresh";
 import type { Capability } from "./scenarios";
 import { errorResponse } from "./bff-route";
 import { rememberBffPath } from "./bff-response-path";
+import { STALE_RECORD_MESSAGE } from "./record-versions";
+
+export { STALE_RECORD_MESSAGE };
 
 const INVALID_BACKEND_PATH_ID = "\u0000invalid-backend-path-id\u0000";
 const BACKEND_PATH_ID_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
-const DEFAULT_BACKEND_TIMEOUT_MS = 15_000;
-const BACKEND_UNAVAILABLE_MESSAGE = "El sistema no responde. Reintente en unos segundos.";
+/**
+ * Plazo total de un pedido del BFF al backend (criterio de testing: timeout efectivo de 5 s). Cubre la respuesta y la
+ * lectura del cuerpo, y lo comparte el único reintento de un `GET`. Al vencer, el `fetch` se aborta y el pedido termina
+ * en el 503 de `BackendUnavailableError`. No se sube por el arranque en frío de Render: ver `docs/adr/0009-concurrencia-optimista-y-timeout-del-bff.md`.
+ */
+export const BACKEND_TIMEOUT_MS = 5_000;
+export const BACKEND_UNAVAILABLE_MESSAGE = "El sistema no responde. Reintente en unos segundos.";
+/** `If-Match` aceptable: `*` o una lista de entity-tags (RFC 9110 §8.8.3), acotada para no reenviar basura. */
+const IF_MATCH_PATTERN = /^(?:\*|(?:W\/)?"[!#-~]*"(?:\s*,\s*(?:W\/)?"[!#-~]*")*)$/;
+const IF_MATCH_MAX_LENGTH = 512;
+const IDEMPOTENT_METHODS = new Set(["GET", "HEAD"]);
 export type FetchBackendOptions = {
   timeoutMs?: number;
 };
@@ -42,7 +54,33 @@ export function isJsonMediaType(contentType: string | null | undefined): boolean
   return mediaType !== undefined && JSON_MEDIA_TYPES.has(mediaType);
 }
 
+/** El 412 llega del backend en inglés y sin pista de qué hacer: se reescribe al aviso en español, conservando el resto. */
+async function clarifyPreconditionFailed(response: Response): Promise<Response> {
+  const payload: unknown = isJsonMediaType(response.headers.get("content-type"))
+    ? await response.clone().json().catch(() => null)
+    : null;
+  void response.body?.cancel().catch(() => undefined);
+  const record = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+  headers.set("content-type", "application/problem+json");
+  const body = {
+    type: "about:blank",
+    title: "Precondition Failed",
+    status: 412,
+    statusCode: 412,
+    error: "Precondition Failed",
+    ...record,
+    message: STALE_RECORD_MESSAGE,
+    detail: STALE_RECORD_MESSAGE,
+    code: "STALE_RECORD",
+  };
+  return new Response(JSON.stringify(body), { status: 412, statusText: "Precondition Failed", headers });
+}
+
 async function clarifyBackendError(response: Response, method: string): Promise<Response> {
+  if (response.status === 412) return clarifyPreconditionFailed(response);
   if (response.ok || !isJsonMediaType(response.headers.get("content-type"))) return response;
   const payload: unknown = await response.clone().json().catch(() => null);
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return response;
@@ -104,6 +142,14 @@ export async function fetchBackend(
   }
 
   const headers = new Headers(init.headers);
+  const method = (init.method ?? "GET").toUpperCase();
+  // Concurrencia optimista (ADR-012 del backend): el `If-Match` del navegador viaja en las escrituras, salvo que la ruta
+  // ya fije uno. En un GET no se reenvía: la lectura que hace una ruta para chequear alcance no debe fallar por versión.
+  const ifMatch = request.headers.get("if-match")?.trim();
+  if (!IDEMPOTENT_METHODS.has(method) && ifMatch && !headers.has("if-match")
+    && ifMatch.length <= IF_MATCH_MAX_LENGTH && IF_MATCH_PATTERN.test(ifMatch)) {
+    headers.set("If-Match", ifMatch);
+  }
   let accessToken: string = sessionAccessToken;
   // Renovación preventiva contra M1: el access token vence a los 15 min y M6 solo acepta ese token.
   if (canRenew(session) && isNearExpiry(session)) {
@@ -112,11 +158,30 @@ export async function fetchBackend(
     accessToken = renewed.accessToken;
   }
 
+  const timeoutMs = options.timeoutMs ?? BACKEND_TIMEOUT_MS;
   const send = async (token: string) => {
     headers.set("Authorization", `Bearer ${token}`);
-    const timeoutSignal = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_BACKEND_TIMEOUT_MS);
-    const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
-    return fetch(resourceUrl, { ...init, headers, signal });
+    // Un AbortController propio (y no `AbortSignal.timeout`) para que el plazo se pueda probar con fake timers y el
+    // temporizador se libere si el pedido falla antes. Si el pedido sale bien, el temporizador sigue vivo hasta el
+    // plazo para cortar también un cuerpo que se queda a medio llegar; `unref` evita que retenga el proceso.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException("El backend no respondió a tiempo.", "TimeoutError")), timeoutMs);
+    (timer as { unref?: () => void }).unref?.();
+    const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal;
+    try {
+      try {
+        return await fetch(resourceUrl, { ...init, headers, signal });
+      } catch (error) {
+        // Un único reintento, solo para lecturas idempotentes y solo ante una falla de red rápida (conexión cortada
+        // por el proxy de Render, por ejemplo), dentro del mismo plazo: un timeout o una cancelación no se reintentan,
+        // y una escritura nunca, porque el primer intento pudo haberse aplicado.
+        if (signal.aborted || !IDEMPOTENT_METHODS.has(method)) throw error;
+        return await fetch(resourceUrl, { ...init, headers, signal });
+      }
+    } catch (error) {
+      clearTimeout(timer);
+      throw error;
+    }
   };
   const finish = (response: Response): Response => {
     const renewed = wasSessionRenewed(request) ? getSessionFromRequest(request) : undefined;

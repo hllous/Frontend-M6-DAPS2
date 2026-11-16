@@ -8,12 +8,13 @@ import {
 } from "@/lib/services-fixtures";
 import { confirmRescheduleInputSchema, STATUS_LABEL, toConfirmRescheduleBackendInput } from "@/lib/services";
 import { getRequiredSession } from "@/lib/session";
+import { versionedService } from "@/lib/bff-mock-versions";
 
 
 
 
 
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -76,3 +77,5 @@ export async function POST(
     return handleRouteError(error, path, "No se pudo confirmar la reprogramación del servicio.");
   }
 }
+
+export const POST = versionedService(handlePOST);

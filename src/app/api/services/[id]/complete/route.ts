@@ -20,6 +20,7 @@ import {
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 import { recordTelemetryEvent } from "@/lib/telemetry";
+import { versionedService } from "@/lib/bff-mock-versions";
 
 
 
@@ -65,7 +66,7 @@ function capStatusReason(value: string): string {
   return value.length > MAX_NOTES_LENGTH ? `${value.slice(0, MAX_NOTES_LENGTH - 1)}…` : value;
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -187,3 +188,5 @@ export async function POST(
     return mapSessionError(caught, path, "Error interno del servidor.");
   }
 }
+
+export const POST = versionedService(handlePOST);

@@ -713,6 +713,9 @@ INITIAL_SERVICE_FIXTURES.push({
   notes: "Fixture de ejecución para control ambiental (#134).",
 });
 
+// Versión inicial para la concurrencia optimista en modo mock (`src/lib/bff-mock-versions.ts`).
+for (const item of INITIAL_SERVICE_FIXTURES) item.updatedAt ??= "2026-09-01T00:00:00.000Z";
+
 export const serviceFixtures: Service[] = [...INITIAL_SERVICE_FIXTURES];
 
 export function addServiceFixture(service: Service): void {
