@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";

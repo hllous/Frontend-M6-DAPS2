@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { broadcastLogout, onRemoteLogout, registerSessionLogoutCleanup } from "./session-client";
