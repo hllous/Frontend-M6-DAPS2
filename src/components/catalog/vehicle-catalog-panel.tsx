@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { useCatalogSort, withCatalogSorting } from "@/components/catalog/use-catalog-sort";
 import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
@@ -127,12 +128,14 @@ export function VehicleCatalogPanel({
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
 
+  const { sortQuery, tableOptions } = useCatalogSort("vehicles", () => setPage(1));
   const query = useMemo<VehicleQuery>(
     () => ({
       active: activeFilter === "all" ? undefined : activeFilter === "true",
       vehicleType: typeFilter === "all" ? undefined : typeFilter,
+      ...sortQuery,
     }),
-    [activeFilter, typeFilter],
+    [activeFilter, typeFilter, sortQuery],
   );
 
   useEffect(() => {
@@ -262,11 +265,10 @@ export function VehicleCatalogPanel({
     }
   }
 
-  const columns: DataTableColumn<Vehicle>[] = [
+  const columns: DataTableColumn<Vehicle>[] = withCatalogSorting("vehicles", [
     {
       id: "plate",
       header: "Patente",
-      enableSorting: false,
       meta: {
         label: "Patente",
         rowHeader: true,
@@ -293,7 +295,6 @@ export function VehicleCatalogPanel({
     {
       id: "type",
       header: "Tipo",
-      enableSorting: false,
       meta: {
         label: "Tipo",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -307,7 +308,6 @@ export function VehicleCatalogPanel({
     {
       id: "capacity",
       header: "Capacidad (t)",
-      enableSorting: false,
       meta: {
         label: "Capacidad (t)",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -327,7 +327,6 @@ export function VehicleCatalogPanel({
     {
       id: "status",
       header: "Estado",
-      enableSorting: false,
       meta: {
         label: "Estado",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -348,7 +347,6 @@ export function VehicleCatalogPanel({
     {
       id: "detail",
       header: () => <span className="sr-only">Ver detalle</span>,
-      enableSorting: false,
       meta: {
         label: "",
         ariaHidden: true,
@@ -363,12 +361,13 @@ export function VehicleCatalogPanel({
         );
       },
     },
-  ];
+  ]);
 
   const table = useDataTable({
     data: state.status === "ready" ? state.vehicles : NO_VEHICLES,
     columns,
     getRowId: (item) => item.id,
+    ...tableOptions,
   });
 
   return (
