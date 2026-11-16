@@ -1,4 +1,4 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -20,10 +20,8 @@ export async function POST(request: Request, routeContext: PostContext) {
   const path = new URL(request.url).pathname;
   try {
     const session = requireOfficeCapability(request);
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = addCrewMembersInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, addCrewMembersInputSchema, path);
+    if (parsed instanceof Response) return parsed;
     if (backendMode(session)) return forwardResponse(await fetchBackend(request, `/crews/${pathId(id)}/members`, "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(parsed.data.userIds || parsed.data.memberUserIds ? { userIds: parsed.data.userIds ?? parsed.data.memberUserIds } : {}), ...(parsed.data.members ? { members: parsed.data.members } : {}) }) }));
     const crew = crewFixtures.find((item) => item.id === id);
     if (!crew) return errorResponse(404, `La cuadrilla ${id} no existe.`, path);

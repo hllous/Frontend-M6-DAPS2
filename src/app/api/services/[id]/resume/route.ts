@@ -1,15 +1,14 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse, requireCrewScope } from "@/lib/bff-route";
+import { findServiceFixture, serviceHistoryEntry } from "@/lib/bff-service-mock";
+import { authorize, backendMode, errorResponse, forwardResponse, requireCrewScope, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
-  serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { STATUS_LABEL } from "@/lib/services";
 import { getScenario } from "@/lib/scenarios";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -44,10 +43,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (scenario.actor.kind === "FIELD" && scenario.actor.crewId && service.crewId !== scenario.actor.crewId) {
       return errorResponse(403, "Solo la cuadrilla asignada al servicio puede reanudarlo.", path);
@@ -67,23 +64,12 @@ export async function POST(
       statusNote: null,
       history: [
         ...service.history,
-        {
-          label: "Reanudado",
-          at: new Date().toISOString().slice(0, 16).replace("T", " "),
-          done: true,
-        },
+        serviceHistoryEntry("Reanudado"),
       ],
     });
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudo reanudar el servicio.");
+    return handleRouteError(error, path, "No se pudo reanudar el servicio.");
   }
 }
