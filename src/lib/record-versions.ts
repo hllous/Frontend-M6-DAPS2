@@ -39,7 +39,7 @@ function key(resource: string, id: string) {
 function target(input: string): Target | undefined {
   let pathname: string;
   try {
-    pathname = new URL(input, "http://bff.local").pathname;
+    pathname = new URL(input, "https://bff.local").pathname;
   } catch {
     return undefined;
   }
