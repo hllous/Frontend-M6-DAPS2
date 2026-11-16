@@ -26,7 +26,7 @@ export default defineConfig({
     // sonar-project.properties: si cambia una, cambia la otra.
     coverage: {
       provider: "v8",
-      include: ["src/**/*.{ts,tsx}"],
+      include: ["src/**/*.{ts,tsx}", "next.config.mjs"],
       exclude: [
         "src/**/*.{test,spec}.{ts,tsx}",
         "src/**/*.d.ts",
