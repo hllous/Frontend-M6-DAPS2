@@ -114,7 +114,7 @@ describe("owned BFF session", () => {
 
   it("round-trips the server-only M1 credential through the sealed value", () => {
     vi.stubEnv("M6_AUTH_MODE", "real-m1");
-    const token = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const token = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const session = createTestSession("field-crew-leader-route", { accessToken: token });
     const cookie = sealSession(session, secret);
     const unsealed = getSessionFromCookieValue(cookie, secret, Date.now());

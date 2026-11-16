@@ -55,7 +55,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
       .mockResolvedValueOnce(Response.json({ ...inspection, serviceId: "servicio-real-1" }))
       .mockResolvedValueOnce(Response.json({ crewId }))
       .mockResolvedValueOnce(Response.json({ message: "Evidencia no disponible." }, { status: 503 }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -71,7 +71,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
     const backendFetch = fieldBackend()
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json({ id: serviceId, crewId: otherCrewId }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
@@ -84,7 +84,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
 
   it.each([null, undefined])("Campo no recibe una inspección sin servicio (%s)", async (missingServiceId) => {
     const backendFetch = fieldBackend().mockResolvedValueOnce(Response.json({ ...inspection, serviceId: missingServiceId }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect((await response.json()).message).toBe("Inspección no encontrada.");
@@ -95,7 +95,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json([]));
-    const response = await detail(await loginAs("office-duty-queue", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("office-duty-queue", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ...inspection, attachments: [] });
@@ -108,7 +108,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
   it("conserva el 404 del backend sin consultar servicio ni evidencia", async () => {
     const error = { statusCode: 404, message: "Inspección no encontrada en el backend." };
     const backendFetch = fieldBackend().mockResolvedValueOnce(Response.json(error, { status: 404 }));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ ...error, message: "No se pudo obtener la información. Reintente en unos segundos." });
@@ -117,7 +117,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
 
   it("returns 503 with the shared message when the backend request fails", async () => {
     const backendFetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
-    const response = await detail(await loginAs("office-duty-queue", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("office-duty-queue", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
@@ -130,7 +130,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
   it.each(["field-crew-leader-route", "office-duty-queue"])("rechaza un payload inválido para %s", async (scenarioId) => {
     const backendFetch = scenarioId.startsWith("field") ? fieldBackend() : vi.spyOn(globalThis, "fetch");
     backendFetch.mockResolvedValueOnce(Response.json({ ...inspection, reportId: 123 }));
-    const response = await detail(await loginAs(scenarioId, { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs(scenarioId, { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
@@ -143,7 +143,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
 
   it("rechaza JSON malformado sin reenviarlo a Campo", async () => {
     const backendFetch = fieldBackend().mockResolvedValueOnce(new Response('{"inspectorId":"reservado"'));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(502);
     expect((await response.json()).message).toBe("No se pudo obtener la inspección. Reintente en unos segundos.");
@@ -156,7 +156,7 @@ describe("GET /api/environmental-inspections/:id en real-m1", () => {
       .mockResolvedValueOnce(Response.json(inspection))
       .mockResolvedValueOnce(Response.json({ id: serviceId, crewId }))
       .mockResolvedValueOnce(Response.json(evidence));
-    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" }));
+    const response = await detail(await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: crewId, name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({

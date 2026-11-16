@@ -104,7 +104,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
 
   it("forwards an authorized backend Container empty request with its id and method", async () => {
     const id = "container_42.3~";
-    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const cookie = createSessionCookie("field-crew-leader-route", {
       mode: "real-m1",
       accessToken: devJwt,
@@ -126,7 +126,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
   it("denies a backend session without container:empty before forwarding", async () => {
     const cookie = await loginAs("office-limited-intake", {
       mode: "real-m1",
-      accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+      accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature",
       backendOrigin: "https://backend.internal",
     });
     const backendFetch = vi.spyOn(globalThis, "fetch");
@@ -143,7 +143,7 @@ describe("POST /api/containers/[id]/empty BFF route", () => {
   it("fails closed when backend mode has no backend origin", async () => {
     const cookie = createSessionCookie("field-crew-leader-route", {
       mode: "real-m1",
-      accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature",
+      accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature",
       backendOrigin: "https://backend.internal",
     });
     delete process.env.M6_BACKEND_ORIGIN;
