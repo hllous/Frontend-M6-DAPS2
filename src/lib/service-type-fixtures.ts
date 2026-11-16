@@ -1,4 +1,5 @@
 import type { ServiceType, ServiceTypeQuery } from "./service-types";
+import { matchesSearch } from "./fixture-search";
 
 const initialServiceTypes: ServiceType[] = [
   { id: "st-waste-route", code: "WASTE-ROUTE", name: "Recolección domiciliaria", category: "WASTE_COLLECTION", mode: "ROUTE", requiresVehicle: true, active: true },
@@ -29,10 +30,7 @@ export function filterServiceTypeFixtures(query: ServiceTypeQuery): ServiceType[
     if (query.active !== undefined && item.active !== query.active) return false;
     if (query.category && item.category !== query.category) return false;
     if (query.mode && item.mode !== query.mode) return false;
-    if (query.search) {
-      const value = `${item.code} ${item.name}`.toLowerCase();
-      if (!value.includes(query.search.toLowerCase())) return false;
-    }
+    if (!matchesSearch(query.search, [item.code, item.name])) return false;
     return true;
   });
 }

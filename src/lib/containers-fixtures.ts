@@ -1,4 +1,5 @@
 import type { Attachment, ConfirmRelocationInput, Container, ContainerQuery, ReportDamageInput, UpdateContainerInput } from "./containers";
+import { matchesSearch } from "./fixture-search";
 
 const INITIAL_CONTAINER_FIXTURES: Container[] = [
   {
@@ -257,12 +258,7 @@ export function filterContainerFixtures(query: ContainerQuery): Container[] {
     if (query.status && container.status !== query.status) return false;
     if (query.containerType && container.containerType !== query.containerType) return false;
     if (query.zoneId && container.zoneId !== query.zoneId) return false;
-    if (query.search) {
-      const normalizedSearch = query.search.toLowerCase();
-      const matchesCode = container.code.toLowerCase().includes(normalizedSearch);
-      const matchesAddress = (container.address ?? "").toLowerCase().includes(normalizedSearch);
-      if (!matchesCode && !matchesAddress) return false;
-    }
+    if (!matchesSearch(query.search, [container.code, container.address])) return false;
     return true;
   });
 }
