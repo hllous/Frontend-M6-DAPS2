@@ -12,4 +12,5 @@ Estas guías amplían las instrucciones de [`AGENTS.md`](../../AGENTS.md), que s
 - [Domain docs](domain.md): cómo consultar y mantener contexto y decisiones del dominio.
 - [Componentes UI](ui-components.md): regla de pintado de overlays y dueños de las supresiones de ESLint.
 - [MSW y rutas BFF](msw-bff-tests.md): cómo probar rutas reales desde handlers Node y mantener el worker del navegador sin imports server-only.
+- [Calidad y seguridad en el CI](quality-security-ci.md): jobs `sonar`, `unit-coverage`, Trivy y ZAP, cómo leer sus resultados y dónde mirar la calidad del Backend.
 - [Ingreso real con M1 en desarrollo](real-m1-development.md): iniciar el M1 falso local y probar `real-m1`.

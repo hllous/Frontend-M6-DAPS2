@@ -24,6 +24,7 @@ Read the one whose trigger applies:
 - Adding or changing a `src/mocks` handler, or testing a BFF route: [`docs/agents/msw-bff-tests.md`](docs/agents/msw-bff-tests.md)
 - Editing the Orca worktree setup script: [`docs/agents/orca-worktree-setup.md`](docs/agents/orca-worktree-setup.md)
 - Editing overlays (dialogs, sheets, popovers, tooltips) or `eslint-suppressions.json` entries: [`docs/agents/ui-components.md`](docs/agents/ui-components.md)
+- A red `sonar` job, Trivy check or ZAP run, or touching `sonar-project.properties`, coverage settings or the security workflows: [`docs/agents/quality-security-ci.md`](docs/agents/quality-security-ci.md)
 - Changing any `.md`: run the markdownlint and lychee checks in [`docs/README.md`](docs/README.md); CI runs both.
 
 ## Cross-repo changes
