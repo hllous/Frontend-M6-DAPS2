@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { loginViaApi } from "./support/auth";
+import { AUDIT_SCREENS, AUDIT_WIDTHS, openAuditScreen } from "./support/screens";
 
 const NARROW_VIEWPORT = { width: 390, height: 844 };
 const WIDE_VIEWPORT = { width: 1280, height: 900 };
@@ -133,4 +134,32 @@ test.describe("keyboard-only shell operation @smoke", () => {
     await expect(page.getByRole("main")).toBeFocused();
     await expect(page).toHaveTitle("Servicios — Ambiente e Higiene");
   });
+});
+
+// Sin scroll horizontal en las pantallas principales a 360, 768 y 1280 px.
+test.describe("sin scroll horizontal a 360, 768 y 1280 px", () => {
+  for (const size of AUDIT_WIDTHS) {
+    for (const screen of AUDIT_SCREENS) {
+      test(`${screen.id} a ${size.name} px no desborda horizontalmente`, async ({ page }) => {
+        await openAuditScreen(page, screen, size);
+        const overflow = await page.evaluate(() => {
+          const scroller = document.scrollingElement ?? document.documentElement;
+          const wide = [...document.querySelectorAll<HTMLElement>("body *")]
+            .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1 && getComputedStyle(element).position !== "fixed")
+            .filter((element) => {
+              // Un elemento ancho dentro de un contenedor con scroll propio no desborda la página.
+              for (let parent = element.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+                const overflowX = getComputedStyle(parent).overflowX;
+                if (overflowX === "auto" || overflowX === "scroll" || overflowX === "hidden" || overflowX === "clip") return false;
+              }
+              return true;
+            })
+            .slice(0, 5)
+            .map((element) => `${element.tagName.toLowerCase()}.${String(element.className).slice(0, 60)}`);
+          return { scrollWidth: scroller.scrollWidth, clientWidth: scroller.clientWidth, wide };
+        });
+        expect(overflow.scrollWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.clientWidth);
+      });
+    }
+  }
 });

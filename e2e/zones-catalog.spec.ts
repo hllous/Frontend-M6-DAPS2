@@ -44,7 +44,7 @@ test.describe("Zone catalog management #106", () => {
     await expect(page.getByRole("heading", { name: "Nueva zona operativa" })).toBeVisible();
 
     await page.getByLabel("Código").fill("Z-90");
-    await page.getByLabel("Nombre").fill("Zona Cordón Industrial");
+    await page.getByLabel("Nombre", { exact: true }).fill("Zona Cordón Industrial");
 
     await page.getByRole("button", { name: "Crear zona" }).click();
 
@@ -66,7 +66,7 @@ test.describe("Zone catalog management #106", () => {
     await expect(codeInput).toHaveValue("palermo");
 
     // Edit name
-    const nameInput = page.getByLabel("Nombre");
+    const nameInput = page.getByLabel("Nombre", { exact: true });
     await nameInput.fill("Palermo Parque Industrial");
 
     await page.getByRole("button", { name: "Guardar cambios" }).click();
