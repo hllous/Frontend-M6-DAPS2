@@ -1,6 +1,7 @@
+import { serviceHistoryEntry } from "@/lib/bff-service-mock";
 import { crewFit } from "@/lib/crew-fit";
 import { serviceTypeFixtures } from "@/lib/service-type-fixtures";
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -30,6 +31,7 @@ import { droppedRecords } from "@/lib/tolerant-records";
 import { recordTelemetryEvent } from "@/lib/telemetry";
 import { zoneFixtures } from "@/lib/zones-fixtures";
 import { pageParam, pageSizeParam, searchParam } from "@/lib/input-limits";
+import { randomInt } from "@/lib/random-id";
 
 
 
@@ -87,14 +89,7 @@ export async function GET(request: Request) {
     return NextResponse.json(paginateServiceFixtures(filterServiceFixtures(query), query.page, query.pageSize));
   } catch (error) {
     if (error instanceof z.ZodError) return errorResponse(400, "Los filtros de servicios son inválidos.", path);
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudieron cargar los servicios.");
+    return handleRouteError(error, path, "No se pudieron cargar los servicios.");
   }
 }
 
@@ -153,7 +148,7 @@ export async function POST(request: Request) {
     if ((fit.zone || fit.specialty) && !input.overrideNote) return errorResponse(409, "La asignacion tiene reparos: la zona o especialidad de la cuadrilla no coincide; hace falta 'overrideNote' explicando por que.", path);
 
     const newService: Service = {
-      id: `SVC-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `SVC-${randomInt(1000, 9999)}`,
       serviceTypeId: input.serviceTypeId,
       serviceTypeName: serviceType?.name ?? "Servicio urbano",
       title: input.title || `${serviceType?.name ?? "Servicio"} — ${route?.name ?? input.targetRef ?? "Programado"}`,
@@ -182,7 +177,7 @@ export async function POST(request: Request) {
       notes: input.notes ?? null,
       coordinates: { x: 50, y: 50 },
       attachments: [],
-      history: [{ label: "Programado", at: new Date().toISOString().slice(0, 16).replace("T", " "), done: true }],
+      history: [serviceHistoryEntry("Programado")],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

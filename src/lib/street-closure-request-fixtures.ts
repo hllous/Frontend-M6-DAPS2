@@ -5,6 +5,7 @@ import type {
   StreetClosureRequestQuery,
   CreateStreetClosureRequestInput,
 } from "./street-closure-requests";
+import { randomInt } from "./random-id";
 
 const INITIAL_STREET_CLOSURE_REQUESTS: StreetClosureRequest[] = [
   {
@@ -225,7 +226,7 @@ export function createStreetClosureRequestFixture(
     : buildTreeInterventionStreetClosureSourceContext(source as TreeIntervention);
   const now = new Date().toISOString();
   return {
-    id: `SCR-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: `SCR-${randomInt(1000, 9999)}`,
     ...input,
     sourceContext,
     status: "REQUESTED",

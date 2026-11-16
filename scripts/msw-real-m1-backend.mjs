@@ -27,7 +27,7 @@ function tokenClaims(request) {
 }
 
 const server = setupServer(
-  http.get("http://m6-demo-backend.invalid/me", ({ request }) => {
+  http.get("https://m6-demo-backend.invalid/me", ({ request }) => {
     const claims = tokenClaims(request);
     if (!claims || claims.sub_type !== "EMPLEADO") {
       return HttpResponse.json({ message: "Este sistema es solo para personal municipal." }, { status: 403 });

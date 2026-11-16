@@ -66,6 +66,7 @@ import {
 } from "@/lib/routes";
 import { type Zone } from "@/lib/zones";
 import { MAX_SEARCH_LENGTH } from "@/lib/input-limits";
+import { randomUuid } from "@/lib/random-id";
 
 type LoadState =
   | { status: "loading" }
@@ -376,7 +377,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     setDraftStops((prev) => [
       ...prev,
       {
-        tempId: `stop-draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        tempId: `stop-draft-${randomUuid()}`,
         zoneId: zone.id,
         estimatedDurationMin: Math.round(duration),
         zoneName: zone.name,
@@ -1499,9 +1500,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
               </span>
             </DialogDescription>
               <Alert variant="warning" className="text-left">
-                <AlertDescription>{stalenessWarningReason === "unavailable"
-                  ? "Si guarda, reemplaza las paradas actuales."
-                  : "Si guarda, reemplaza las paradas actuales."}</AlertDescription>
+                <AlertDescription>Si guarda, reemplaza las paradas actuales.</AlertDescription>
               </Alert>
           </DialogHeader>
           <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">

@@ -1,14 +1,13 @@
-import { authorize, backendMode, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { findServiceFixture, serviceHistoryEntry } from "@/lib/bff-service-mock";
+import { authorize, backendMode, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import {
-  serviceFixtures,
   updateServiceFixture,
 } from "@/lib/services-fixtures";
 import { cancelServiceInputSchema, STATUS_LABEL } from "@/lib/services";
-import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
+import { getRequiredSession } from "@/lib/session";
 
 
 
@@ -30,21 +29,8 @@ export async function POST(
     // Permission check: cancellation is an Office decision, not a Field action.
     authorize(session, { office: true, officeMessage: "Solo Oficina puede cancelar un servicio.", capability: "service:cancel", throwOnError: true });
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-
-    const parsed = cancelServiceInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(
-        400,
-        parsed.error.issues.map((i) => i.message).join(" "),
-        path,
-      );
-    }
+    const parsed = await parseJsonBody(request, cancelServiceInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     const input = parsed.data;
 
@@ -62,10 +48,8 @@ export async function POST(
             return forwardResponse(backendResponse);
     }
 
-    const service = serviceFixtures.find((s) => s.id === serviceId);
-    if (!service) {
-      return errorResponse(404, `Servicio ${serviceId} no encontrado.`, path);
-    }
+    const service = findServiceFixture(serviceId, path);
+    if (service instanceof Response) return service;
 
     if (!CANCELLABLE_STATUSES.has(service.status)) {
       const message =
@@ -82,23 +66,12 @@ export async function POST(
       statusNote: null,
       history: [
         ...service.history,
-        {
-          label: "Cancelado",
-          at: new Date().toISOString().slice(0, 16).replace("T", " "),
-          done: true,
-        },
+        serviceHistoryEntry("Cancelado"),
       ],
     });
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) {
-      return errorResponse(503, error.message, path);
-    }
-    return mapSessionError(error, path, "No se pudo cancelar el servicio.");
+    return handleRouteError(error, path, "No se pudo cancelar el servicio.");
   }
 }
