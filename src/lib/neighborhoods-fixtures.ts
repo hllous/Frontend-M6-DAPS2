@@ -3,17 +3,17 @@ import catalog from "@/data/m9-neighborhoods.json";
 import type { Commune } from "./communes";
 import { neighborhoodSchema, type Neighborhood, type NeighborhoodQuery } from "./neighborhoods";
 import { zoneFixtures } from "./zones-fixtures";
+import { matchesSearch } from "./fixture-search";
 
 /** Copia del catálogo que M9 carga hoy: 64 barrios, 48 reales (activos) y 16 ficticios dados de baja. */
 export const neighborhoodFixtures: Neighborhood[] = neighborhoodSchema.array().parse(catalog);
 
 export function filterNeighborhoodFixtures(query: NeighborhoodQuery = {}): Neighborhood[] {
-  const search = (query.q ?? "").trim().toLowerCase();
   return neighborhoodFixtures.filter(
     (neighborhood) =>
       (!query.soloActivos || neighborhood.activo) &&
       (!query.zona || neighborhood.zona === query.zona) &&
-      (!search || `${neighborhood.codigo} ${neighborhood.nombre}`.toLowerCase().includes(search)),
+      matchesSearch(query.q, [neighborhood.codigo, neighborhood.nombre]),
   );
 }
 

@@ -63,8 +63,7 @@ function matchesQuery(report: EnvironmentalReport, query: EnvironmentalReportQue
   if (query.priority && report.priority !== query.priority) return false;
   if (query.publicId && report.publicId !== query.publicId) return false;
   if (query.ticketId && report.ticketId !== query.ticketId) return false;
-  const search = query.search?.trim().toLowerCase();
-  if (search && ![report.id, report.address ?? "", report.description ?? "", report.publicId ?? "", report.ticketId ?? ""].some((value) => value.toLowerCase().includes(search))) return false;
+  // `search` ya lo resolvió el Backend (dirección, caseNumber, publicId); repetirlo acá descartaba lo encontrado por EXP-….
   return true;
 }
 
