@@ -190,10 +190,10 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # Análisis de SonarCloud con la cobertura combinada. El gate no bloquea todavía
-  # (sonar.qualitygate.wait=false) y el job no es un check requerido. Sin SONAR_TOKEN
-  # (PRs desde forks) los pasos se saltean y el job termina en verde. Proyecto y
-  # exclusiones en sonar-project.properties.
+  # Análisis de SonarCloud con la cobertura combinada. El gate es bloqueante
+  # (sonar.qualitygate.wait=true, #926): el scanner espera el resultado y el job falla si el
+  # Quality Gate da rojo. Sin SONAR_TOKEN (PRs desde forks) los pasos se saltean y el job
+  # termina en verde. Proyecto y exclusiones en sonar-project.properties.
   sonar:
     name: sonar
     needs: unit-coverage
@@ -224,7 +224,8 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
         with:
           args: >
-            -Dsonar.qualitygate.wait=false
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
             ${{ inputs.sonar_branch_name && format('-Dsonar.branch.name={0}', inputs.sonar_branch_name) || '' }}
 
   test:
