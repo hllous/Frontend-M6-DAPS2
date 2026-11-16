@@ -349,6 +349,25 @@ jobs:
       - name: Dependency vulnerability scan
         run: pnpm audit --prod --audit-level=high
 
+  # Secretos en todo el historial (#964), igual que el backend. Sin filtro de
+  # paths: un secreto puede entrar en cualquier archivo, también en docs.
+  # Reglas y excepciones (por valor exacto) en .gitleaks.toml.
+  secrets:
+    name: secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (historial completo)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1             git /repo --redact --verbose --no-banner --log-opts="--all"
+
   docs:
     name: docs
     runs-on: ubuntu-24.04
