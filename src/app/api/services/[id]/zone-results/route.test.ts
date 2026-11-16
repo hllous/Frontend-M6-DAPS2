@@ -225,7 +225,7 @@ describe("zone-results BFF route", () => {
       }
       return new Response("{}", { status: 201, headers: { "content-type": "application/json" } });
     });
-    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("field-crew-leader-route", { mode: "real-m1", crew: { id: "11111111-1111-4111-8111-111111111111", name: "Cuadrilla Belgrano — Recolección", role: "LEADER" }, accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature" });
     backendFetch.mockClear();
     const input = { zoneId: "zone-3", status: "PARTIAL" as const, reason: "WEATHER" as const, notes: "Lluvia intensa" };
 
