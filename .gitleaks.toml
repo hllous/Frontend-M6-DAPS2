@@ -1,0 +1,6 @@
+# Configuración de gitleaks (job `secrets` del CI, #964).
+# Parte de las reglas por defecto. Una excepción va por VALOR exacto, nunca por
+# archivo: una credencial real en el mismo archivo se sigue detectando.
+
+[extend]
+useDefault = true
