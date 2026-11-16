@@ -50,10 +50,10 @@ it("glides the centre from the previous point to the next on a short hop at the 
   const first = {lat: -34.6036, lng: -58.3809};
   const second = {lat: -34.6037, lng: -58.3810};
   const { rerender } = render(<LocationPickerMap point={first} onPick={vi.fn()} />);
-  await waitFor(() => expect(state.setView).toHaveBeenLastCalledWith([first.lat, first.lng], 15, {animate: false}), {timeout: 3000});
+  await waitFor(() => expect(state.setView).toHaveBeenLastCalledWith([first.lat, first.lng], 15, {animate: false}));
   state.setView.mockClear();
   rerender(<LocationPickerMap point={second} onPick={vi.fn()} />);
-  await waitFor(() => expect(state.setView).toHaveBeenLastCalledWith([second.lat, second.lng], 15, {animate: false}), {timeout: 3000});
+  await waitFor(() => expect(state.setView).toHaveBeenLastCalledWith([second.lat, second.lng], 15, {animate: false}));
   const lats = state.setView.mock.calls.map(([center]) => center[0] as number);
   expect(lats.length).toBeGreaterThan(2);
   expect(lats.every((lat, index) => lat >= second.lat && lat <= state.center.lat && (index === 0 || lat <= lats[index - 1]))).toBe(true);

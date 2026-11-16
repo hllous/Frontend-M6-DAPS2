@@ -46,7 +46,7 @@ describe("ReferralsWorkspace", () => {
     }
     expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
 
-    await waitFor(() => expect(screen.getByRole("region", { name: "Derivaciones" })).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByRole("region", { name: "Derivaciones" })).toHaveAttribute("aria-busy", "false"));
     expect(screen.getByRole("region", { name: "Derivaciones" }).querySelector("[data-skeleton]")).toBeNull();
     expect(screen.getByRole("list", { name: "Derivaciones" })).toBeVisible();
   });

@@ -642,7 +642,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(payloads).toEqual([expect.objectContaining({ address: "Calle Nueva 100", lat: -34.5446871, lng: -58.4386826 })]);
   });
 
-  it("lets Office schedule and assign an inspection from a report under review", { timeout: 15000 }, async () => {
+  it("lets Office schedule and assign an inspection from a report under review", async () => {
     compatibleInspectionCrew();
     const user = userEvent.setup();
     const create = vi.spyOn(servicesAdapter, "create");
@@ -1080,7 +1080,7 @@ describe("internal jargon guard", () => {
 });
 
 
-it("prioriza la cuadrilla de la zona de inspección y advierte una especialidad distinta", { timeout: 15000 }, async () => {
+it("prioriza la cuadrilla de la zona de inspección y advierte una especialidad distinta", async () => {
   server.use(http.get("*/api/crews", () => HttpResponse.json({ data: [
     { id: "other", name: "Otra zona", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-2", specialty: "TREES" },
     { id: "local", name: "Zona elegida", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-1", specialty: "INSPECTION" },
@@ -1102,7 +1102,7 @@ it("prioriza la cuadrilla de la zona de inspección y advierte una especialidad 
 });
 
 
-it("un 409 de zona durante la inspección abre la justificación sin repetir el alta de inspección", { timeout: 15000 }, async () => {
+it("un 409 de zona durante la inspección abre la justificación sin repetir el alta de inspección", async () => {
   compatibleInspectionCrew();
   server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla trabaja en otra zona; hace falta overrideNote", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
   const user = userEvent.setup();
@@ -1125,7 +1125,7 @@ it("un 409 de zona durante la inspección abre la justificación sin repetir el 
   expect(await within(detail).findByText(/^Servicio:/)).toBeVisible();
 });
 
-it("un 409 que no pide justificación durante la inspección muestra su error y no abre la justificación", { timeout: 15000 }, async () => {
+it("un 409 que no pide justificación durante la inspección muestra su error y no abre la justificación", async () => {
   compatibleInspectionCrew();
   server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla está inactiva.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
   const user = userEvent.setup();

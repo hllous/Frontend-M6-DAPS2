@@ -22,7 +22,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { errorMessage } from "@/lib/error-message";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Check, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
@@ -265,18 +265,33 @@ export function GreenPointCatalogPanel({
     setFormOpen(true);
   };
 
+  // Only the latest detail request may write state: a response that arrives
+  // after the sheet was closed (or reopened for another row) would otherwise
+  // reopen it on top of the next dialog (#946).
+  const detailRequestRef = useRef(0);
+
+  const closeDetail = () => {
+    detailRequestRef.current += 1;
+    setDetailPoint(null);
+    setDetailLoading(false);
+  };
+
   const openDetail = async (point: GreenPoint) => {
+    const request = ++detailRequestRef.current;
     setDetailPoint(point);
     setDetailError(null);
     setDetailLoading(true);
     try {
-      setDetailPoint(await greenPointsAdapter.get(point.id));
+      const detail = await greenPointsAdapter.get(point.id);
+      if (request === detailRequestRef.current) setDetailPoint(detail);
     } catch (caught) {
-      setDetailError(
-        errorMessage(caught, "No se pudo cargar el detalle del punto verde."),
-      );
+      if (request === detailRequestRef.current) {
+        setDetailError(
+          errorMessage(caught, "No se pudo cargar el detalle del punto verde."),
+        );
+      }
     } finally {
-      setDetailLoading(false);
+      if (request === detailRequestRef.current) setDetailLoading(false);
     }
   };
 
@@ -915,7 +930,7 @@ export function GreenPointCatalogPanel({
 
       <Sheet
         open={Boolean(detailPoint)}
-        onOpenChange={(open) => !open && setDetailPoint(null)}
+        onOpenChange={(open) => !open && closeDetail()}
       >
         <SheetContent
           side={detailSheetSide}
@@ -1012,7 +1027,7 @@ export function GreenPointCatalogPanel({
                   className="w-full justify-start"
                   onClick={() => {
                     const target = detailPoint;
-                    setDetailPoint(null);
+                    closeDetail();
                     if (target) openEdit(target);
                   }}
                 >
@@ -1032,7 +1047,7 @@ export function GreenPointCatalogPanel({
                   className="w-full justify-start"
                   onClick={() => {
                     const target = detailPoint;
-                    setDetailPoint(null);
+                    closeDetail();
                     void deactivate(target);
                   }}
                 >
