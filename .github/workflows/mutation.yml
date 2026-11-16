@@ -1,0 +1,48 @@
+name: Mutation testing
+
+# Sin trigger por push ni PR: con `break: 60` dejaría develop o un PR en rojo por un
+# umbral que se mide aparte. Manual y semanal; el reporte HTML queda como artifact.
+on:
+  workflow_dispatch:
+  push: # TEMPORAL-MEDICION
+    branches: [infra/966-mutation-testing-stryker]
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    name: mutation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      # Modo incremental: Stryker solo re-prueba los mutantes de lo que cambió desde la
+      # última corrida. Los caches son inmutables: se guarda uno nuevo por corrida y se
+      # restaura el más reciente por prefijo.
+      - name: Restaurar el incremental de Stryker
+        uses: actions/cache/restore@v4
+        with:
+          path: reports/mutation/incremental.json
+          key: stryker-incremental-${{ github.run_id }}
+          restore-keys: stryker-incremental-
+
+      - run: pnpm mutation
+
+      - name: Guardar el incremental de Stryker
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: reports/mutation/incremental.json
+          key: stryker-incremental-${{ github.run_id }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation
