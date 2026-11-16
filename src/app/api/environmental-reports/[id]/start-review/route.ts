@@ -1,6 +1,9 @@
 import { transitionReport } from "../_transition";
+import { versionedEnvironmentalReport } from "@/lib/bff-mock-versions";
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   return transitionReport(request, id, "start-review");
 }
+
+export const POST = versionedEnvironmentalReport(handlePOST);

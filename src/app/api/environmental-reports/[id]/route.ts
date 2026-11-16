@@ -6,10 +6,11 @@ import { getEnvironmentalReportFixture } from "@/lib/environmental-report-fixtur
 import { environmentalReportSchema } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
+import { versionedEnvironmentalReport } from "@/lib/bff-mock-versions";
 
 
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+async function handleGET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const path = new URL(request.url).pathname;
   try {
@@ -48,3 +49,5 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return mapSessionError(error, path, "No se pudo cargar el expediente ambiental.");
   }
 }
+
+export const GET = versionedEnvironmentalReport(handleGET);

@@ -6,6 +6,7 @@ import { containerFixtures, updateContainerFixture } from "@/lib/containers-fixt
 import { updateContainerInputSchema } from "@/lib/containers";
 import { getScenario } from "@/lib/scenarios";
 import { getRequiredSession } from "@/lib/session";
+import { versionedContainer } from "@/lib/bff-mock-versions";
 
 
 
@@ -15,7 +16,7 @@ async function targetId(context: { params: Promise<{ id: string }> }) {
   return (await context.params).id;
 }
 
-export async function GET(
+async function handleGET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -41,7 +42,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -81,3 +82,6 @@ export async function PATCH(
     return handleRouteError(error, path, "No se pudo actualizar el contenedor.");
   }
 }
+
+export const GET = versionedContainer(handleGET);
+export const PATCH = versionedContainer(handlePATCH);

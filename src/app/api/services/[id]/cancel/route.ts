@@ -8,6 +8,7 @@ import {
 } from "@/lib/services-fixtures";
 import { cancelServiceInputSchema, STATUS_LABEL } from "@/lib/services";
 import { getRequiredSession } from "@/lib/session";
+import { versionedService } from "@/lib/bff-mock-versions";
 
 
 
@@ -15,7 +16,7 @@ import { getRequiredSession } from "@/lib/session";
 
 const CANCELLABLE_STATUSES = new Set(["SCHEDULED", "RESCHEDULED", "SUSPENDED"]);
 
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -75,3 +76,5 @@ export async function POST(
     return handleRouteError(error, path, "No se pudo cancelar el servicio.");
   }
 }
+
+export const POST = versionedService(handlePOST);

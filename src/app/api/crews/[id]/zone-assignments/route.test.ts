@@ -50,7 +50,7 @@ describe("crew zone-assignments BFF route", () => {
   });
 
   it("forwards both calls in backend mode and maps the backend 409", async () => {
-    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const cookie = await loginAs("office-operations", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(Response.json([]))

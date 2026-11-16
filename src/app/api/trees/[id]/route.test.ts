@@ -38,7 +38,7 @@ describe("/api/trees/[id]", () => {
   });
 
   it("forwards backend tree detail with the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "tree-backend-1", surveyCode: "ARB-1000" }));
 
@@ -51,7 +51,7 @@ describe("/api/trees/[id]", () => {
   });
 
   it("forwards backend tree updates with the validated body and session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const input = { species: "Ceibo", heightM: 14.5 };
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ id: "tree-backend-1", ...input }));
@@ -70,7 +70,7 @@ describe("/api/trees/[id]", () => {
   });
 
   it("forwards backend tree deactivation with DELETE and the session bearer token", async () => {
-    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: devJwt, backendOrigin: "https://backend.internal" });
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
 

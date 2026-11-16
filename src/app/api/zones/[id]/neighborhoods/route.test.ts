@@ -79,7 +79,7 @@ describe("POST /api/zones/[id]/neighborhoods", () => {
 
   it("proxies the assignment to the backend in real-m1 mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "http://backend-test";
-    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature" });
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "zone-1", code: "Z-01", name: "Zona Norte", active: true, neighborhoodIds: [] }), {
         status: 200,

@@ -37,7 +37,7 @@ describe("authenticated zones [id]/references BFF route", () => {
     ]);
     expect(backendFetch.mock.calls.every(([, init]) => (init?.method ?? "GET") === "GET")).toBe(true);
     expect(backendFetch.mock.calls.every(([, init]) =>
-      new Headers(init?.headers).get("authorization") === `Bearer header.eyJleHAiOjQxMDAwMDAwMDB9.signature`,
+      new Headers(init?.headers).get("authorization") === `Bearer header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature`,
     )).toBe(true);
   });
 
@@ -57,13 +57,14 @@ describe("authenticated zones [id]/references BFF route", () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const id = "ceec08ae-67e7-4739-9677-150f5085bb1a";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ id }));
-    if (failure === "network") backendFetch.mockRejectedValueOnce(new Error("offline"));
+    // Una falla de red en un GET se reintenta una vez (DEF-33, ADR-0010): las dos llamadas fallan.
+    if (failure === "network") backendFetch.mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new Error("offline"));
     else backendFetch.mockResolvedValueOnce(Response.json(failure === "malformed" ? { data: [] } : {}, { status: failure === "http" ? 503 : 200 }));
     const cookie = await loginAs("office-duty-queue", { mode: "real-m1" });
     const response = await GET(new Request(`http://localhost/api/zones/${id}/references`, { headers: { cookie } }), { params: Promise.resolve({ id }) });
     expect(response.status).toBeGreaterThanOrEqual(500);
     expect(await response.json()).not.toHaveProperty("totalReferences");
-    expect(backendFetch).toHaveBeenCalledTimes(2);
+    expect(backendFetch).toHaveBeenCalledTimes(failure === "network" ? 3 : 2);
   });
 
 

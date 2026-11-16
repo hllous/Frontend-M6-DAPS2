@@ -30,6 +30,7 @@ const ERROR_LABELS: Record<number, string> = {
   404: "Not Found",
   405: "Method Not Allowed",
   409: "Conflict",
+  412: "Precondition Failed",
   413: "Payload Too Large",
   415: "Unsupported Media Type",
   422: "Unprocessable Entity",
@@ -275,6 +276,9 @@ export function forwardResponse(response: Response, path = bffPathForResponse(re
       "X-Content-Type-Options": "nosniff",
     },
   });
+  // Concurrencia optimista (ADR-012 del backend): el navegador guarda el ETag y lo devuelve como `If-Match`.
+  const etag = response.headers.get("etag");
+  if (etag) forwarded.headers.set("ETag", etag);
   // Si el pedido renovó los tokens contra M1, la cookie se resella con el material nuevo (no solo se extiende).
   const renewed = renewedSessionForResponse(response);
   if (renewed) forwarded.cookies.set({

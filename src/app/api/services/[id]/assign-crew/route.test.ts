@@ -167,7 +167,7 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
   it("forwards overrideNote to the backend in real-m1 mode", async () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
-    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature" });
     const input = { crewId: "d907516e-ddb7-46d4-a7d4-cd235cbb1529", vehicleId: null, overrideNote: "Coordinado con el jefe de cuadrilla." };
 
     const response = await POST(
@@ -208,7 +208,7 @@ describe("POST /api/services/[id]/assign-crew BFF route", () => {
 it.each(["mock", "real-m1"] as const)("denies limited Office planning before forwarding (%s)", async (mode) => {
   process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
   const backendFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
-  const cookie = await loginAs("office-limited-intake", { mode: mode, accessToken: ((mode) === "real-m1") ? ("header.eyJleHAiOjQxMDAwMDAwMDB9.signature") : undefined });
+  const cookie = await loginAs("office-limited-intake", { mode: mode, accessToken: ((mode) === "real-m1") ? ("header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature") : undefined });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/assign-crew", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ crewId: "crew-a" }),
@@ -234,7 +234,7 @@ it.each([401, 403, 409, 503])("preserves backend error status and body (%s)", as
     if ((init?.method ?? "GET") === "GET") return Response.json({ crewId: "11111111-1111-4111-8111-111111111111" });
     return Response.json(error, { status });
   });
-  const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
+  const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature" });
   backendFetch.mockClear();
   const response = await POST(new Request("http://localhost/api/services/real-service/assign-crew", {
     method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ crewId: "crew-real" }),
