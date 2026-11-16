@@ -49,4 +49,20 @@ describe("optimistic session proxy", () => {
     expect(response?.headers.get("x-middleware-override-headers")).toContain("x-m6-destination");
     expect(response?.headers.get("x-middleware-request-x-m6-destination")).toBe("map");
   });
+
+  it("sends the nonce CSP on public pages without asking for a session", () => {
+    const response = proxy(new NextRequest("http://localhost/login"));
+    const csp = response?.headers.get("content-security-policy") ?? "";
+
+    expect(response?.status).toBe(200);
+    expect(csp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
+    expect(response?.headers.get("x-middleware-request-x-nonce")).toBe(csp.match(/'nonce-([^']+)'/)?.[1]);
+    expect(response?.headers.get("x-middleware-request-x-m6-destination")).toBeNull();
+  });
+
+  it("also sends the CSP on the signed-out redirect", () => {
+    const response = proxy(new NextRequest("http://localhost/app"));
+
+    expect(response?.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+  });
 });
