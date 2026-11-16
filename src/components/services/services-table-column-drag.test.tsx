@@ -11,7 +11,7 @@ const emptyFilters: ColumnFilters = { zones: new Set(), serviceTypes: new Set(),
 const services = serviceFixtures.slice(0, 3);
 
 function Harness({ onFilters = () => undefined, dense = false }: { onFilters?: (filters: ColumnFilters) => void; dense?: boolean }) {
-  const columnPreferences = useServicesColumnPreferences({ userId: "u1", variant: "drag", data: services });
+  const columnPreferences = useServicesColumnPreferences({ userId: "u1", variant: "1", data: services });
   return (
     <ServicesTable
       services={services}

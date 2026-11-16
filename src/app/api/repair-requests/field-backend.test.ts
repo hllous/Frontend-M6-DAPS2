@@ -19,7 +19,7 @@ function fieldCookie(crewId: string | null = OWN_CREW) {
 const get = (cookie: string, query: string) => GET(new Request(`http://localhost/api/repair-requests${query}`, { headers: { cookie } }));
 const body = (detectedInType: "SERVICE" | "INSPECTION", detectedInId: string) => ({ damageType: "BROKEN_SIDEWALK", address: "Av. Rivadavia 2200", severity: "LOW", publicSafetyRisk: true, detectedInType, detectedInId });
 const post = (cookie: string, payload: unknown) => POST(new Request("http://localhost/api/repair-requests", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(payload) }));
-const urls = (spy: ReturnType<typeof vi.spyOn>) => spy.mock.calls.map((call) => String(call[0]).replace("https://backend.internal", ""));
+const urls = (spy: ReturnType<typeof vi.spyOn>) => spy.mock.calls.map((call: unknown[]) => String(call[0]).replace("https://backend.internal", ""));
 
 describe("GET /api/repair-requests as a field crew (real-m1)", () => {
   it("requires the Service the derivations were detected in", async () => {

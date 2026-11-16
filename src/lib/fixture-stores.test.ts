@@ -48,7 +48,7 @@ describe("route fixtures", () => {
     const updated = updateRouteFixture("route-1", { name: "Recorrido renombrado", code: "XX" })!;
     expect(updated.code).toBe(original.code);
     expect(updated.name).toBe("Recorrido renombrado");
-    expect(updated.updatedAt >= original.updatedAt).toBe(true);
+    expect(updated.updatedAt! >= original.updatedAt!).toBe(true);
     expect(updateRouteFixture("route-x", { name: "y" })).toBeNull();
   });
 
