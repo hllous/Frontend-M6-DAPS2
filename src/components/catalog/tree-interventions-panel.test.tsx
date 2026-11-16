@@ -221,7 +221,7 @@ describe("TreeInterventionsPanel", () => {
     expect(within(dialog).getByLabelText(/^Justificación/)).toBeRequired();
     await user.click(within(dialog).getByRole("button", { name: "Crear solicitud de intervención" }));
     expect(await screen.findByText("Solicitud de intervención creada. Estado inicial: solicitada.")).toBeVisible();
-  }, 15_000);
+  });
 
   it("keeps the request action out of read-only sessions", async () => {
     render(<TreeInterventionsPanel scenario={scenarios.officeLimited} />);

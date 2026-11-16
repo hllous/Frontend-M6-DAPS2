@@ -70,8 +70,8 @@ describe("MapaOperativo", () => {
     expect(region.querySelectorAll('[data-skeleton="list-item"]')).toHaveLength(6);
     expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
 
-    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
-    expect(await screen.findByRole("heading", { name: "Elementos" }, { timeout: 3000 })).toBeVisible();
+    await waitFor(() => expect(region).toHaveAttribute("aria-busy", "false"));
+    expect(await screen.findByRole("heading", { name: "Elementos" })).toBeVisible();
     expect(region.querySelector('[data-skeleton="map-context-header"]')).toBeNull();
     expect(region.querySelector('[data-skeleton="map-layer-controls"]')).toBeNull();
   });
@@ -94,7 +94,7 @@ describe("MapaOperativo", () => {
     expect(region.querySelector("[data-skeleton=list]")).not.toBeNull();
     expect(screen.queryByText(/Cargando\.\.\./)).not.toBeInTheDocument();
 
-    await waitFor(() => expect(screen.getByRole("region", { name: label })).toHaveAttribute("aria-busy", "false"), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByRole("region", { name: label })).toHaveAttribute("aria-busy", "false"));
     expect(screen.getByRole("region", { name: label }).querySelector("[data-skeleton=list]")).toBeNull();
   });
 

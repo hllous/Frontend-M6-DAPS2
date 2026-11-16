@@ -148,10 +148,10 @@ jobs:
 
       # Cobertura v8 sin umbrales (#923): cada shard deja un blob con resultados y datos de
       # cobertura; el job unit-coverage los combina. No cambia qué tests corren ni sus
-      # aserciones. La instrumentación v8 vuelve más lentos los tests con jsdom y varios
-      # superaban el timeout de 5 s: se sube solo acá, con la bandera, no en la config.
+      # aserciones. El timeout de 30 s por test vive en vitest.config.ts (#946), igual que
+      # en local: la instrumentación v8 y los runners cargados vuelven lentos los tests con jsdom.
       - name: Unit and component tests
-        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob --testTimeout=30000
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob
 
       - name: Upload Vitest blob report
         uses: actions/upload-artifact@v7

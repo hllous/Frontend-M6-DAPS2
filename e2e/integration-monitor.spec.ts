@@ -17,6 +17,7 @@ async function resetMockData(page: Page) {
   const response = await page.request.post("/api/mock/reset", {
     data: {},
     headers: { "content-type": "application/json", "x-requested-with": "XMLHttpRequest" },
+    maxRetries: 3,
   });
   expect(response.ok()).toBe(true);
 }

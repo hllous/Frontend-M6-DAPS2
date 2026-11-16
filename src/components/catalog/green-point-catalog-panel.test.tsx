@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { setupServer } from "msw/node";
 
@@ -87,5 +87,24 @@ describe("GreenPointCatalogPanel", () => {
     const zoneInput = within(dialog).getByLabelText("Zona operativa");
     expect(zoneInput).toHaveAttribute("aria-invalid", "true");
     expect(zoneInput).toHaveAttribute("aria-describedby", "green-point-zone-error");
+  });
+
+  it("ignores a detail response that arrives after the sheet was closed (#946)", async () => {
+    const user = userEvent.setup();
+    const realGet = greenPointsAdapter.get.bind(greenPointsAdapter);
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    vi.spyOn(greenPointsAdapter, "get").mockImplementation(async (id) => {
+      await gate;
+      return realGet(id);
+    });
+    render(<GreenPointCatalogPanel scenario={scenarios.officeDutyQueue} />);
+    const row = await screen.findByRole("row", { name: /GP-001/ });
+    const detail = await openGreenPointDetail(user, row);
+    await user.click(within(detail).getByRole("button", { name: "Cerrar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
