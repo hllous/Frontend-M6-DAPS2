@@ -260,7 +260,7 @@ jobs:
   # Cada shard arranca solo el frontend mock (E2E_TARGET=mock): el servidor real-m1
   # y el fake M1 los usa únicamente el job "e2e real-m1".
   e2e-shard:
-    name: e2e shard ${{ matrix.shard }}/10
+    name: e2e shard ${{ matrix.shard }}/8
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
@@ -270,7 +270,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -281,32 +281,15 @@ jobs:
       - name: Setup Playwright Chromium
         uses: ./.github/actions/setup-playwright
 
-      # Caché de Turbopack de `next dev` (#981): sin ella cada shard compila en frío todas
-      # las rutas en e2e/global-setup.ts antes del primer test. Turbopack valida el
-      # contenido de cada archivo, así que una caché de otro commit solo ahorra trabajo.
-      # La guarda un solo shard para no subir diez copias iguales.
-      - name: Restore Turbopack dev cache
-        id: next-dev-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: .next-e2e-mock/dev/cache
-          key: next-dev-e2e-mock-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            next-dev-e2e-mock-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
-
       # `--shard` corta bloques contiguos y los specs pesados caían juntos (un shard tardaba
-      # el doble que otro); scripts/ci/e2e-shard.cjs reparte los tests en round-robin.
+      # el doble que otro). scripts/ci/e2e-shard.cjs reparte los tests por duración medida
+      # (scripts/ci/e2e-durations.json, #981): con 8 shards el más lento termina antes que
+      # con los 10 de antes en round-robin, y la corrida pide 2 runners menos. Cada shard
+      # paga ~1 min fijo (setup, `next dev` y el warm-up), así que más shards no rinden.
       - name: Playwright smoke and accessibility suite
         run: |
           grep=$(node scripts/ci/e2e-shard.cjs --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }})
           pnpm exec playwright test --project=chromium --grep "$grep"
-
-      - name: Save Turbopack dev cache
-        if: ${{ !cancelled() && matrix.shard == 1 && steps.next-dev-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v6
-        with:
-          path: .next-e2e-mock/dev/cache
-          key: ${{ steps.next-dev-cache.outputs.cache-primary-key }}
 
       - name: Upload Playwright report
         if: ${{ failure() }}
@@ -334,25 +317,8 @@ jobs:
       - name: Setup Playwright Chromium
         uses: ./.github/actions/setup-playwright
 
-      # Misma caché de Turbopack que en e2e-shard, para el servidor real-m1 (#981).
-      - name: Restore Turbopack dev cache
-        id: next-dev-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: .next-e2e-real-m1/dev/cache
-          key: next-dev-e2e-real-m1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            next-dev-e2e-real-m1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
-
       - name: Playwright real-m1 login suite
         run: pnpm exec playwright test --project=real-m1
-
-      - name: Save Turbopack dev cache
-        if: ${{ !cancelled() && steps.next-dev-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v6
-        with:
-          path: .next-e2e-real-m1/dev/cache
-          key: ${{ steps.next-dev-cache.outputs.cache-primary-key }}
 
       - name: Upload Playwright report
         if: ${{ failure() }}
