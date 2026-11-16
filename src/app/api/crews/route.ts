@@ -1,4 +1,4 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse } from "@/lib/bff-route";
+import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -7,7 +7,6 @@ import { createCrewInputSchema, type CrewQuery, crewSchema, crewSpecialtySchema,
 import { m1IdentityAdapter } from "@/lib/m1-identity";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
 
 
@@ -90,9 +89,7 @@ export async function GET(request: Request) {
     const scopedQuery = scenario.actor.kind === "FIELD" ? { ...query, crewId: scenario.actor.crewId } : query;
     return NextResponse.json(paginateCrewFixtures(filterCrewFixtures(scopedQuery), query.page, query.pageSize));
   } catch (error) {
-    if (error instanceof InvalidSessionError) { recordTelemetryEvent({ name: "auth_session_expired", status: 401 }); return errorResponse(401, "La sesión no está activa.", path); }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudieron cargar las cuadrillas.");
+    return handleRouteError(error, path, "No se pudieron cargar las cuadrillas.");
   }
 }
 
@@ -100,10 +97,8 @@ export async function POST(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = requireOfficeCapability(request);
-    let body: unknown;
-    try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-    const parsed = createCrewInputSchema.safeParse(body);
-    if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
+    const parsed = await parseJsonBody(request, createCrewInputSchema, path);
+    if (parsed instanceof Response) return parsed;
     if (backendMode(session)) return forwardResponse(await fetchBackend(request, "/crews", "crew:manage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
     const [users, organizations] = await Promise.all([m1IdentityAdapter.listUsers(), m1IdentityAdapter.listOrganizations()]);
     const crew = crewSchema.parse({ leaderName: users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null, organizationName: organizations.find((organization) => organization.id === parsed.data.organizationId)?.displayName ?? null, members: [{ userId: parsed.data.leaderUserId, displayName: users.find((user) => user.id === parsed.data.leaderUserId)?.displayName ?? null }], id: `crew-${Date.now()}`, ...parsed.data, homeZoneId: parsed.data.homeZoneId ?? null, effectiveZoneId: parsed.data.homeZoneId ?? null, memberUserIds: [parsed.data.leaderUserId], active: true });

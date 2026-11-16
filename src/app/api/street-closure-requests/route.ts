@@ -1,4 +1,4 @@
-import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, requireCrewScope, FORBIDDEN_CODES } from "@/lib/bff-route";
+import { backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, requireCrewScope, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { withArgentinaOffset } from "@/lib/argentina-date";
@@ -16,7 +16,6 @@ import {
 } from "@/lib/street-closure-requests";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, getRequiredSession, InvalidSessionError } from "@/lib/session";
-import { recordTelemetryEvent } from "@/lib/telemetry";
 import { serviceFixtures } from "@/lib/services-fixtures";
 import { getTreeInterventionFixture } from "@/lib/tree-intervention-fixtures";
 import { pageParam, pageSizeParam } from "@/lib/input-limits";
@@ -101,16 +100,8 @@ export async function POST(request: Request) {
     if (!scenario.capabilities.includes("streetClosureRequest:create")) {
       return errorResponse(403, "Su rol no permite crear solicitudes de corte de calle.", path, FORBIDDEN_CODES.roleRequired);
     }
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path);
-    }
-    const parsed = createStreetClosureRequestInputSchema.safeParse(body);
-    if (!parsed.success) {
-      return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-    }
+    const parsed = await parseJsonBody(request, createStreetClosureRequestInputSchema, path);
+    if (parsed instanceof Response) return parsed;
 
     if (session && backendMode(session)) {
       const backendResponse = await fetchBackend(request, "/street-closure-requests", undefined, {
@@ -144,11 +135,6 @@ export async function POST(request: Request) {
     addStreetClosureRequestFixture(created);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
-    if (error instanceof InvalidSessionError) {
-      recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
-      return errorResponse(401, "La sesión no está activa.", path);
-    }
-    if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);
-    return mapSessionError(error, path, "No se pudo crear la solicitud de corte de calle.");
+    return handleRouteError(error, path, "No se pudo crear la solicitud de corte de calle.");
   }
 }
