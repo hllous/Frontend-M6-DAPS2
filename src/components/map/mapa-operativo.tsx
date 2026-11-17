@@ -614,7 +614,7 @@ export function MapaOperativo({ scenario }: { scenario: OperationalScenario }) {
           </Alert>
         ) : null}
 
-        <TabsContent value={view} id={`map-view-${view}`} className={styles.tabContent}>
+        <TabsContent value={view} className={styles.tabContent}>
           {viewError ? (
             <Alert variant="destructive">
               <AlertTriangle aria-hidden />

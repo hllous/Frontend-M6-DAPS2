@@ -13,11 +13,19 @@ export async function loginViaUi(page: Page, scenarioLabel: string) {
   await page.waitForURL("**/app");
 }
 
-/** Seeds a session cookie through the real BFF route without driving the form UI. */
+/**
+ * Seeds a session cookie through the real BFF route without driving the form UI.
+ *
+ * `maxRetries` is Playwright's network-level retry, not a test retry: the request
+ * context pools keep-alive sockets and Node closes idle ones after 5 s, so a
+ * second login in a long test can write to a socket the server just closed and
+ * fail with ECONNRESET before the server saw it (#946). The login is idempotent.
+ */
 export async function loginViaApi(page: Page, scenarioId: ScenarioId) {
   const response = await page.request.post("/api/session/login", {
     data: { scenarioId },
     headers: SESSION_MUTATION_HEADERS,
+    maxRetries: 3,
   });
   if (!response.ok()) {
     throw new Error(`Seeding a session for ${scenarioId} failed with status ${response.status()}`);

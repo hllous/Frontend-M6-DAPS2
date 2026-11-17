@@ -1,4 +1,5 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
+import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
+import { authorize, backendMode, catalogBackendQuery, catalogListQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -28,12 +29,13 @@ export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const query = parseVehicleQuery(new URL(request.url));
+    const query = catalogListQuery("vehicles", request, parseVehicleQuery);
+    if (query instanceof Response) return query;
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/vehicles${backendQuery(query, ["active", "vehicleType", "page", "pageSize"])}`);
+      const response = await fetchBackend(request, `/vehicles${catalogBackendQuery(query, ["active", "vehicleType", "page", "pageSize"])}`);
       return forwardResponse(response);
     }
-    return NextResponse.json(paginateVehicleFixtures(filterVehicleFixtures(query), query.page, query.pageSize));
+    return NextResponse.json(paginateVehicleFixtures(sortCatalogFixtures(filterVehicleFixtures(query), query, "plate", { vehicleType: vehicleTypeSchema.options }), query.page, query.pageSize));
   } catch (error) {
     return handleRouteError(error, path, "No se pudieron cargar los vehículos.");
   }

@@ -1,0 +1,76 @@
+name: Mutation testing
+
+# Sin trigger por push ni PR: con `break` dejaría develop o un PR en rojo por un umbral que se
+# mide aparte. Manual y semanal; los reportes HTML quedan como artifacts.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  # La corrida completa (~17 000 mutantes) no entra en un solo job de 6 h: se reparte por
+  # archivos en shards (scripts/mutation-shard.mjs) y el job `score` exige el umbral global.
+  mutation:
+    name: mutation shard ${{ matrix.shard }}/16
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      # Modo incremental: Stryker solo re-prueba los mutantes de lo que cambió desde la
+      # última corrida. Los caches son inmutables: se guarda uno nuevo por corrida y se
+      # restaura el más reciente del mismo shard por prefijo.
+      - name: Restaurar el incremental de Stryker
+        uses: actions/cache/restore@v4
+        with:
+          path: reports/mutation/incremental.json
+          key: stryker-incremental-${{ matrix.shard }}-${{ hashFiles('stryker.config.json', 'vitest.mutation.config.ts') }}-${{ github.run_id }}
+          restore-keys: |
+            stryker-incremental-${{ matrix.shard }}-${{ hashFiles('stryker.config.json', 'vitest.mutation.config.ts') }}-
+            stryker-incremental-${{ matrix.shard }}-
+
+      - run: node scripts/mutation-shard.mjs ${{ matrix.shard }} 16
+
+      - name: Guardar el incremental de Stryker
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: reports/mutation/incremental.json
+          key: stryker-incremental-${{ matrix.shard }}-${{ hashFiles('stryker.config.json', 'vitest.mutation.config.ts') }}-${{ github.run_id }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report-${{ matrix.shard }}
+          path: reports/mutation
+
+  score:
+    name: mutation score
+    needs: mutation
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mutation-report-*
+          path: shards
+      - name: Mutation score global
+        run: node scripts/mutation-merge.mjs shards/mutation-report-0 shards/mutation-report-1 shards/mutation-report-2 shards/mutation-report-3 shards/mutation-report-4 shards/mutation-report-5 shards/mutation-report-6 shards/mutation-report-7 shards/mutation-report-8 shards/mutation-report-9 shards/mutation-report-10 shards/mutation-report-11 shards/mutation-report-12 shards/mutation-report-13 shards/mutation-report-14 shards/mutation-report-15
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-summary
+          path: mutation-summary.md

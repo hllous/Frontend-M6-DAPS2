@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const { buildGrep, collectUnits, selectShard } = require("./e2e-shard.cjs");
+const { buildGrep, collectUnits, readDurations, selectShard, unitWeights } = require("./e2e-shard.cjs");
 
 const report = {
   suites: [
@@ -108,4 +108,49 @@ test("the grep pattern matches exactly the selected titles, with or without trai
 
 test("an empty selection builds a pattern that matches nothing", () => {
   assert.equal(new RegExp(buildGrep([])).test("chromium a.spec.ts opens"), false);
+});
+
+test("weighted units go heaviest first to the least loaded shard", () => {
+  const units = [["slow"], ["a"], ["b"], ["c"], ["d"]];
+  const weights = [10, 3, 3, 2, 2];
+
+  assert.deepEqual(selectShard(units, 1, 2, weights), ["slow"]);
+  assert.deepEqual(selectShard(units, 2, 2, weights), ["a", "b", "c", "d"]);
+});
+
+test("with weights, every title still lands in exactly one shard", () => {
+  const units = Array.from({ length: 41 }, (_, index) => [`title ${index}`]);
+  const weights = units.map((_, index) => (index * 7) % 11);
+  const shards = [1, 2, 3, 4, 5, 6, 7, 8].map((current) => selectShard(units, current, 8, weights));
+
+  assert.deepEqual([...shards.flat()].sort(), units.flat().sort());
+});
+
+test("a unit weighs the sum of its tests and an unknown test weighs the median", () => {
+  const durations = { a: 1, b: 2, c: 9 };
+
+  assert.deepEqual(unitWeights([["a", "c"], ["new"], ["b"]], durations), [10, 2, 2]);
+  assert.deepEqual(unitWeights([["x"], ["y", "z"]], {}), [1, 2]);
+});
+
+test("the committed durations file parses to positive numbers", () => {
+  const durations = readDurations();
+
+  assert.ok(Object.keys(durations).length > 0);
+  assert.ok(Object.values(durations).every((value) => Number.isFinite(value) && value > 0));
+});
+
+test("durations are parsed from list-reporter lines with the same full title the shards use", () => {
+  const { parseDurations } = require("./update-e2e-durations.cjs");
+  const log = [
+    "e2e shard 1/8\tPlaywright\t2026-11-16T17:07:27.0689658Z   ✓   1 [chromium] › e2e/a.spec.ts:6:5 › Catalog › lists rows (5.7s)",
+    "2026-11-16T17:07:28.0Z   ✓   2 [chromium] › e2e/a.spec.ts:9:5 › Catalog › lists rows (300ms)",
+    "2026-11-16T17:07:29.0Z   ✓   3 [chromium] › e2e/b.spec.ts:1:1 › closes (20ms)",
+    "2026-11-16T17:07:30.0Z Running 3 tests using 1 worker",
+  ].join("\n");
+
+  assert.deepEqual(parseDurations([log]), {
+    "chromium a.spec.ts Catalog lists rows": 3,
+    "chromium b.spec.ts closes": 0.1,
+  });
 });

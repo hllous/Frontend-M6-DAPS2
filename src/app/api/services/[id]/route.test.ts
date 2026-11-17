@@ -24,7 +24,7 @@ function serviceRequest(cookie: string) {
 
 describe("GET /api/services/:id backend availability", () => {
   it("returns 503 when fetch rejects with a network error", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" });
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
 
     const response = await serviceRequest(cookie);
@@ -34,13 +34,8 @@ describe("GET /api/services/:id backend availability", () => {
   });
 
   it("returns 503 when the backend does not respond before the timeout", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" });
     vi.useFakeTimers();
-    vi.spyOn(AbortSignal, "timeout").mockImplementation((timeoutMs) => {
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), timeoutMs);
-      return controller.signal;
-    });
     vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
       const signal = init?.signal;
       if (!signal) return Promise.reject(new TypeError("missing timeout signal"));
@@ -50,7 +45,7 @@ describe("GET /api/services/:id backend availability", () => {
     });
 
     const responsePromise = serviceRequest(cookie);
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(5_000);
     const response = await responsePromise;
 
     expect(response.status).toBe(503);
@@ -72,7 +67,7 @@ describe("Service detail mock visibility", () => {
     if (status === 200) expect((await response.json()).crewId).toBe("crew-b");
   });
   it("preserves a backend detail 404", async () => {
-    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature", backendOrigin: "https://backend.internal" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature", backendOrigin: "https://backend.internal" });
     const error = { statusCode: 404, message: "Servicio no encontrado." };
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(error, { status: 404 }));
     const response = await serviceRequest(cookie);

@@ -95,6 +95,9 @@ const INITIAL_CONTAINER_FIXTURES: Container[] = [
   },
 ];
 
+// Versión inicial para la concurrencia optimista en modo mock (`src/lib/bff-mock-versions.ts`).
+for (const item of INITIAL_CONTAINER_FIXTURES) item.updatedAt ??= "2026-09-01T00:00:00.000Z";
+
 export let containerFixtures: Container[] = INITIAL_CONTAINER_FIXTURES.map((item) => ({ ...item }));
 export let containerAttachmentFixtures: Record<string, Attachment[]> = {};
 

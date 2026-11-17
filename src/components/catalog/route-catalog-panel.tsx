@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { useCatalogSort, withCatalogSorting } from "@/components/catalog/use-catalog-sort";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -105,6 +106,8 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
 
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [requestVersion, setRequestVersion] = useState(0);
+  // Sin paginador: cambiar el orden no mueve de página.
+  const { sortQuery, tableOptions } = useCatalogSort("routes", () => undefined);
 
   // Available zones for filtering
   const [availableZones, setAvailableZones] = useState<Zone[]>([]);
@@ -192,6 +195,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
           search: search.trim() || undefined,
           active: activeParam,
           zoneId: zoneIdParam,
+          ...sortQuery,
         });
         if (isCurrent) {
           setState({ status: "ready", items: page.routes });
@@ -218,7 +222,7 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     return () => {
       isCurrent = false;
     };
-  }, [search, activeFilter, zoneFilter, requestVersion, selectedRouteId]);
+  }, [search, activeFilter, zoneFilter, requestVersion, selectedRouteId, sortQuery]);
 
   async function handleCreateSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -501,11 +505,10 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     setStalenessWarningReason(null);
   }
 
-  const columns: DataTableColumn<Route>[] = [
+  const columns: DataTableColumn<Route>[] = withCatalogSorting("routes", [
     {
       id: "code",
       header: "Código",
-      enableSorting: false,
       meta: {
         headClassName:
           "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
@@ -520,7 +523,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     {
       id: "name",
       header: "Nombre",
-      enableSorting: false,
       meta: {
         headClassName:
           "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
@@ -535,7 +537,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     {
       id: "stops",
       header: "Paradas",
-      enableSorting: false,
       meta: {
         headClassName:
           "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
@@ -563,7 +564,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     {
       id: "status",
       header: "Estado",
-      enableSorting: false,
       meta: {
         headClassName:
           "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
@@ -583,7 +583,6 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
     {
       id: "actions",
       header: "Acciones",
-      enableSorting: false,
       meta: {
         headClassName:
           "h-auto whitespace-normal text-inherit font-bold px-4 py-3 text-right",
@@ -650,12 +649,13 @@ export function RouteCatalogPanel({ scenario }: { scenario: OperationalScenario 
         );
       },
     },
-  ];
+  ]);
 
   const table = useDataTable({
     data: state.status === "ready" ? state.items : NO_ROUTES,
     columns,
     getRowId: (item) => item.id,
+    ...tableOptions,
   });
 
   return (

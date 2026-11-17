@@ -5,6 +5,7 @@ import { BackendContractError, parseBackendError, readJsonBody as readBackendJso
 import { recordTelemetryEvent } from "./telemetry";
 import { MAX_DECIMAL_10_2, boundedDecimalInput } from "@/lib/input-limits";
 import { tolerantRecords } from "./tolerant-records";
+import { appendSortParams, type CatalogSortQuery } from "./catalog-sort";
 
 export const vehicleTypeSchema = z.enum([
   "COMPACTOR_TRUCK",
@@ -25,7 +26,7 @@ const vehicleSchema = z.object({
 });
 export type Vehicle = z.infer<typeof vehicleSchema>;
 
-export type VehicleQuery = {
+export type VehicleQuery = CatalogSortQuery<"vehicles"> & {
   active?: boolean;
   vehicleType?: VehicleType;
   page?: number;
@@ -85,6 +86,7 @@ function buildVehiclesQueryString(query: VehicleQuery): string {
   if (query.vehicleType) params.set("vehicleType", query.vehicleType);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  appendSortParams(params, query);
   const queryString = params.toString();
   return queryString ? `?${queryString}` : "";
 }

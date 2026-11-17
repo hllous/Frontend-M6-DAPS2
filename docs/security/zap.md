@@ -17,6 +17,8 @@ La instancia del job activo arranca con `NODE_ENV=production`, donde la app solo
 
 Corrida archivada: [run 43763194531](https://github.com/hllous/Frontend-M6-DAPS2/actions/runs/43763194531), 15/11/2026, rama `infra/925-zap`. Reportes en `docs/security/zap-2026-11-15/` (`baseline.html|json`, `active.html|json`).
 
+> **Actualización 16/11/2026:** los dos gaps Medium de abajo (CSP y anti-clickjacking) se cerraron en #956: `next.config.mjs` envía `X-Frame-Options: DENY` y `src/proxy.ts` agrega la CSP con nonce. La tabla conserva el estado de la corrida archivada; la evidencia vigente está en [eje-d-evidencia.md](eje-d-evidencia.md).
+
 ## Resultado
 
 | Job | High | Medium | Low | Informational |

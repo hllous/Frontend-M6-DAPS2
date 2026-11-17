@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { useCatalogSort, withCatalogSorting } from "@/components/catalog/use-catalog-sort";
 import { LoadingRegion } from "@/components/ui/loading-region";
 import { TableRowsSkeleton } from "@/components/ui/loading-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -348,6 +349,7 @@ export function ContainerCatalogPanel({
     };
   }, [detailContainer]);
 
+  const { sortQuery, tableOptions } = useCatalogSort("containers", () => setParams({}));
   const query = useMemo<ContainerQuery>(
     () => ({
       status: statusFilter === "all" ? undefined : statusFilter,
@@ -356,8 +358,9 @@ export function ContainerCatalogPanel({
       search: search.trim() || undefined,
       page,
       pageSize: PAGE_SIZE,
+      ...sortQuery,
     }),
-    [statusFilter, typeFilter, zoneFilter, search, page],
+    [statusFilter, typeFilter, zoneFilter, search, page, sortQuery],
   );
 
   useEffect(() => {
@@ -537,20 +540,20 @@ export function ContainerCatalogPanel({
     ? findInFlightServiceForContainer(detailContainer, services)
     : undefined;
 
-  const containerColumns: DataTableColumn<Container>[] = [
-    { id: "code", header: "Código", accessorFn: (c) => c.code, enableSorting: false, meta: { rowHeader: true, headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => { const container = row.original; return (
+  const containerColumns: DataTableColumn<Container>[] = withCatalogSorting("containers", [
+    { id: "code", header: "Código", accessorFn: (c) => c.code, meta: { rowHeader: true, headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => { const container = row.original; return (
       <Button id={`container-detail-${container.id}`} type="button" variant="ghost" size="sm" aria-label={`Ver detalle de ${container.code}`} onClick={() => openDetail(container)} className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none">
         {container.code}
         <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
       </Button>); } },
-    { id: "type", header: "Tipo", accessorFn: (c) => c.containerType, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => CONTAINER_TYPE_LABELS[row.original.containerType] },
-    { id: "zone", header: "Zona", accessorFn: (c) => c.zoneId, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => zoneCatalog.lookup(row.original.zoneId) ?? <Skeleton aria-hidden="true" className="inline-block h-4 w-24 align-middle" /> },
-    { id: "address", header: "Dirección", accessorFn: (c) => c.address, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => row.original.address ?? "—" },
-    { id: "capacity", header: "Capacidad", accessorFn: (c) => c.capacityLiters, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => `${row.original.capacityLiters.toLocaleString("es-AR")} L` },
-    { id: "status", header: "Estado", accessorFn: (c) => c.status, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => <StatusBadge status={row.original.status} /> },
-    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, enableSorting: false, meta: { headClassName: CONT_HEAD, cellClassName: `${styles.rowChevron} ${CONT_CELL}` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
-  ];
-  const containerTable = useDataTable({ data: state.status === "ready" ? state.containers : NO_CONTAINERS, columns: containerColumns, getRowId: (c) => c.id });
+    { id: "type", header: "Tipo", accessorFn: (c) => c.containerType, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => CONTAINER_TYPE_LABELS[row.original.containerType] },
+    { id: "zone", header: "Zona", accessorFn: (c) => c.zoneId, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => zoneCatalog.lookup(row.original.zoneId) ?? <Skeleton aria-hidden="true" className="inline-block h-4 w-24 align-middle" /> },
+    { id: "address", header: "Dirección", accessorFn: (c) => c.address, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => row.original.address ?? "—" },
+    { id: "capacity", header: "Capacidad", accessorFn: (c) => c.capacityLiters, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => `${row.original.capacityLiters.toLocaleString("es-AR")} L` },
+    { id: "status", header: "Estado", accessorFn: (c) => c.status, meta: { headClassName: CONT_HEAD, cellClassName: CONT_CELL }, cell: ({ row }) => <StatusBadge status={row.original.status} /> },
+    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, meta: { headClassName: CONT_HEAD, cellClassName: `${styles.rowChevron} ${CONT_CELL}` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
+  ]);
+  const containerTable = useDataTable({ data: state.status === "ready" ? state.containers : NO_CONTAINERS, columns: containerColumns, getRowId: (c) => c.id, ...tableOptions });
 
   return (
     <section aria-labelledby="containers-title" className="flex flex-col gap-5">

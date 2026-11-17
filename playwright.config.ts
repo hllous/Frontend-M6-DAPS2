@@ -18,7 +18,9 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 1 : 0,
+  // Sin reintentos: un reintento convertía un e2e inestable en un verde engañoso. Si uno falla,
+  // se corrige la causa (#946); la cátedra exige el mismo resultado en tres corridas.
+  retries: 0,
   workers: isCI ? 1 : undefined,
   reporter: isCI ? [["github"], ["list"], ["html", { open: "never" }]] : "list",
   use: {
@@ -30,12 +32,12 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: "**/real-m1-login.spec.ts",
+      testIgnore: ["**/real-m1-login.spec.ts", "**/login-rate-limit.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "real-m1",
-      testMatch: "**/real-m1-login.spec.ts",
+      testMatch: ["**/real-m1-login.spec.ts", "**/login-rate-limit.spec.ts"],
       use: { ...devices["Desktop Chrome"], baseURL: realM1BaseURL },
     },
   ],

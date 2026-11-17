@@ -114,7 +114,7 @@ describe("repair request BFF detail and recovery routes", () => {
 
   it("forwards an authenticated backend repair request detail with its id and GET method", async () => {
     const id = "RR-encoded_42.3~";
-    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const cookie = await loginAs("office-duty-queue", {
       mode: "real-m1",
       accessToken: devJwt,
@@ -138,7 +138,7 @@ describe("repair request BFF detail and recovery routes", () => {
     ["close", close],
   ] as const)("forwards the backend repair request %s action using POST", async (action, handler) => {
     const id = "RR-encoded_42.3~";
-    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+    const devJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
     const cookie = await loginAs("office-duty-queue", {
       mode: "real-m1",
       accessToken: devJwt,

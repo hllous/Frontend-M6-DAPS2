@@ -1,6 +1,10 @@
-// Reparte los tests de Playwright entre shards de CI en round-robin por test en lugar
-// de `--shard`, que corta bloques contiguos: los specs pesados (shell-page-scroll,
-// catalog-page-overflow, ...) caían juntos y un shard tardaba el doble que otro.
+// Reparte los tests de Playwright entre shards de CI en lugar de `--shard`, que corta
+// bloques contiguos: los specs pesados (shell-page-scroll, catalog-page-overflow, ...)
+// caían juntos y un shard tardaba el doble que otro. Cada unidad pesa su duración medida
+// en CI (e2e-durations.json, por título completo; un test nuevo pesa la mediana) y se
+// asigna, de la más pesada a la más liviana, al shard con menos carga (#981). Con pesos
+// desconocidos o iguales queda como round-robin. Las duraciones viejas solo desbalancean:
+// ningún test se pierde ni se repite. Para actualizarlas, ver docs/agents/e2e-local-debugging.md.
 // Imprime un patrón para `--grep` con el título completo de cada test del shard.
 
 const { spawnSync } = require("node:child_process");
@@ -48,12 +52,47 @@ function collectUnits(report, project, serialFiles = new Set()) {
   return [...units.values()];
 }
 
-function selectShard(units, current, total) {
+// Peso de cada unidad: la suma de las duraciones de sus tests; un test sin dato pesa la
+// mediana de los conocidos (o 1 si no hay ninguno).
+function unitWeights(units, durations = {}) {
+  const known = Object.values(durations).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+  const fallback = known.length > 0 ? known[Math.floor(known.length / 2)] : 1;
+  return units.map((titles) =>
+    titles.reduce((sum, title) => {
+      const value = durations[title];
+      return sum + (Number.isFinite(value) && value > 0 ? value : fallback);
+    }, 0),
+  );
+}
+
+// Longest processing time first: determinista (desempata por orden del reporte y por
+// número de shard), así cada shard calcula el mismo reparto por su cuenta.
+function selectShard(units, current, total, weights = units.map(() => 1)) {
   if (!Number.isInteger(current) || !Number.isInteger(total) || total < 1 || current < 1 || current > total) {
     throw new RangeError(`Invalid shard ${current}/${total}`);
   }
 
-  return units.filter((_, index) => index % total === current - 1).flat();
+  const order = units.map((_, index) => index).sort((a, b) => weights[b] - weights[a] || a - b);
+  const loads = new Array(total).fill(0);
+  const owner = new Array(units.length);
+  for (const index of order) {
+    let target = 0;
+    for (let shard = 1; shard < total; shard += 1) {
+      if (loads[shard] < loads[target]) target = shard;
+    }
+    owner[index] = target;
+    loads[target] += weights[index];
+  }
+
+  return units.filter((_, index) => owner[index] === current - 1).flat();
+}
+
+function readDurations(file = path.join(__dirname, "e2e-durations.json")) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return {};
+  }
 }
 
 function escapeRegExp(text) {
@@ -92,11 +131,12 @@ function main(argv) {
   const report = listReport(project);
   const testDir = report.config.projects.find((entry) => entry.name === project)?.testDir ?? report.config.rootDir;
 
-  process.stdout.write(buildGrep(selectShard(collectUnits(report, project, findSerialFiles(testDir)), current, total)));
+  const units = collectUnits(report, project, findSerialFiles(testDir));
+  process.stdout.write(buildGrep(selectShard(units, current, total, unitWeights(units, readDurations()))));
 }
 
 if (require.main === module) {
   main(process.argv.slice(2));
 }
 
-module.exports = { buildGrep, collectUnits, findSerialFiles, selectShard };
+module.exports = { buildGrep, collectUnits, findSerialFiles, readDurations, selectShard, unitWeights };

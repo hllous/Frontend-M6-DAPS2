@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getContainerFixture, startRepairFixture } from "@/lib/containers-fixtures";
 import { getRequiredSession } from "@/lib/session";
+import { versionedContainer } from "@/lib/bff-mock-versions";
 
 
 
@@ -13,7 +14,7 @@ async function targetId(context: { params: Promise<{ id: string }> }) {
   return (await context.params).id;
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -48,3 +49,5 @@ export async function POST(
     return handleRouteError(error, path, "No se pudo iniciar la reparación del contenedor.");
   }
 }
+
+export const POST = versionedContainer(handlePOST);

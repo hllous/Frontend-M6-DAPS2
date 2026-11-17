@@ -7,6 +7,7 @@ import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { useCatalogSort, withCatalogSorting } from "@/components/catalog/use-catalog-sort";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -138,13 +139,15 @@ export function GreenSpacesPanel({
     return () => media.removeEventListener("change", updateSide);
   }, []);
 
+  const { sortQuery, tableOptions } = useCatalogSort("green-spaces", () => setPage(1));
   const query = useMemo<GreenSpaceQuery>(
     () => ({
       active: activeFilter === "all" ? undefined : activeFilter === "true",
       spaceType: typeFilter === "all" ? undefined : typeFilter,
       zoneId: zoneFilter === "all" ? undefined : zoneFilter,
+      ...sortQuery,
     }),
-    [activeFilter, typeFilter, zoneFilter],
+    [activeFilter, typeFilter, zoneFilter, sortQuery],
   );
 
   useEffect(() => {
@@ -285,19 +288,19 @@ export function GreenSpacesPanel({
     }
   }
 
-  const spaceColumns: DataTableColumn<GreenSpace>[] = [
-    { id: "name", header: "Nombre", accessorFn: (g) => g.name, enableSorting: false, meta: { rowHeader: true, headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => { const greenSpace = row.original; return (
+  const spaceColumns: DataTableColumn<GreenSpace>[] = withCatalogSorting("green-spaces", [
+    { id: "name", header: "Nombre", accessorFn: (g) => g.name, meta: { rowHeader: true, headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => { const greenSpace = row.original; return (
       <Button type="button" variant="ghost" size="sm" aria-label={`Ver detalle de ${greenSpace.name}`} onClick={() => openDetail(greenSpace)} className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none">
         {greenSpace.name}
         <ChevronRight data-icon="inline-end" aria-hidden className="hidden max-[760px]:inline" />
       </Button>); } },
-    { id: "type", header: "Tipo", accessorFn: (g) => g.spaceType, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => spaceTypeLabels[row.original.spaceType] },
-    { id: "area", header: "Superficie", accessorFn: (g) => g.areaM2, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => row.original.areaM2 === null ? "—" : `${row.original.areaM2.toLocaleString("es-AR")} m²` },
-    { id: "zone", header: "Zona", accessorFn: (g) => g.zoneId, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
-    { id: "status", header: "Estado", accessorFn: (g) => g.active, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => { const greenSpace = row.original; return <span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span>; } },
-    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, enableSorting: false, meta: { headClassName: SPACE_HEAD, cellClassName: `${styles.rowChevron} ${SPACE_CELL} px-4 py-3` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
-  ];
-  const spaceTable = useDataTable({ data: state.status === "ready" ? state.greenSpaces : NO_SPACES, columns: spaceColumns, getRowId: (g) => g.id });
+    { id: "type", header: "Tipo", accessorFn: (g) => g.spaceType, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => spaceTypeLabels[row.original.spaceType] },
+    { id: "area", header: "Superficie", accessorFn: (g) => g.areaM2, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => row.original.areaM2 === null ? "—" : `${row.original.areaM2.toLocaleString("es-AR")} m²` },
+    { id: "zone", header: "Zona", accessorFn: (g) => g.zoneId, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
+    { id: "status", header: "Estado", accessorFn: (g) => g.active, meta: { headClassName: SPACE_HEAD, cellClassName: SPACE_CELL }, cell: ({ row }) => { const greenSpace = row.original; return <span className="inline-flex items-center gap-1">{greenSpace.active ? <Check aria-hidden className="size-4 text-[var(--color-success)]" /> : <X aria-hidden className="size-4 text-muted-foreground" />}{greenSpace.active ? "Activo" : "Inactivo"}</span>; } },
+    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, meta: { headClassName: SPACE_HEAD, cellClassName: `${styles.rowChevron} ${SPACE_CELL} px-4 py-3` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
+  ]);
+  const spaceTable = useDataTable({ data: state.status === "ready" ? state.greenSpaces : NO_SPACES, columns: spaceColumns, getRowId: (g) => g.id, ...tableOptions });
 
   return (
     <section

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { authenticatedFetch, NetworkFailureError, ROLES_STALE_EVENT } from "./authenticated-fetch";

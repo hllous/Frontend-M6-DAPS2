@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 
 import { resetContainerFixtures } from "@/lib/containers-fixtures";
@@ -9,6 +9,7 @@ import { resetEnvironmentalReportFixtures } from "@/lib/environmental-report-fix
 import { resetGreenPointFixtures } from "@/lib/green-point-fixtures";
 import { resetGreenSpaceFixtures } from "@/lib/green-space-fixtures";
 import { resetIntegrationMonitorFixtures } from "@/mocks/integration-monitor-fixtures";
+import { resetRecordVersions } from "@/lib/record-versions";
 import { resetRepairRequestFixtures } from "@/lib/repair-request-fixtures";
 import { resetRouteFixtures } from "@/lib/routes-fixtures";
 import { resetServiceFrequencyFixtures } from "@/lib/service-frequency-fixtures";
@@ -20,6 +21,11 @@ import { resetTreeSurveyFixtures } from "@/lib/tree-survey-fixtures";
 import { resetTreeFixtures } from "@/lib/tree-fixtures";
 import { resetVehicleFixtures } from "@/lib/vehicles-fixtures";
 import { resetZoneFixtures } from "@/lib/zones-fixtures";
+
+// `findBy*` y `waitFor` esperan 1 s por defecto. Un popup de Radix/Base UI o una respuesta de
+// MSW pueden tardar más con la máquina cargada: es un tope, no una pausa (retornan en cuanto
+// el elemento aparece), así que subirlo no vuelve más lentos a los tests que pasan (#946).
+configure({ asyncUtilTimeout: 10_000 });
 
 function navigate(href: string, replace = false) {
   window.history[replace ? "replaceState" : "pushState"](null, "", href);
@@ -122,6 +128,8 @@ beforeEach(() => {
   resetTreeFixtures();
   resetVehicleFixtures();
   resetZoneFixtures();
+  // Las versiones leídas (ETag) son de la pestaña: con los fixtures reiniciados, se olvidan como tras recargar.
+  resetRecordVersions();
 });
 
 // #397 field-draft owner for component tests

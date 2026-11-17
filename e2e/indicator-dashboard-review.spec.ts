@@ -53,9 +53,12 @@ test.describe("Tableros: ajustes de la revisión del PO (#887)", () => {
     await loginViaApi(page, "office-duty-queue");
     await page.goto(COBERTURA);
     const trigger = page.getByRole("table", { name: /Cobertura por zona/ }).getByRole("button", { name: /Porcentajes de Norte/ });
-    await page.waitForTimeout(1500);
+    await expect(trigger).toBeVisible();
+    // Las filas se vuelven a montar cuando llegan los datos de cada familia: se espera a que
+    // ninguna región siga ocupada en vez de dormir un tiempo fijo (el trigger se desprendía
+    // del DOM justo al enfocarlo). `focus()` ya espera que el elemento esté adjunto.
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
     await page.mouse.move(2, 2);
-    await trigger.scrollIntoViewIfNeeded();
     await trigger.focus();
     const popup = page.getByRole("dialog", { name: /Norte/ });
     await expect(popup).toBeVisible();

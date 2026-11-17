@@ -1,4 +1,5 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
+import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
+import { authorize, backendMode, catalogBackendQuery, catalogListQuery, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -20,12 +21,13 @@ export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const query = parseQuery(new URL(request.url));
+    const query = catalogListQuery("green-points", request, parseQuery);
+    if (query instanceof Response) return query;
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/green-points${backendQuery(query, ["active", "zoneId", "wasteType", "search", "page", "pageSize"])}`);
+      const response = await fetchBackend(request, `/green-points${catalogBackendQuery(query, ["active", "zoneId", "wasteType", "search", "page", "pageSize"])}`);
       return forwardResponse(response);
     }
-    return NextResponse.json(paginateGreenPointFixtures(filterGreenPointFixtures(query), query.page, query.pageSize));
+    return NextResponse.json(paginateGreenPointFixtures(sortCatalogFixtures(filterGreenPointFixtures(query), query, "code", {}), query.page, query.pageSize));
   } catch (error) {
     if (error instanceof InvalidSessionError) return errorResponse(401, "La sesión no está activa.", path);
     if (error instanceof AuthUnavailableError) return errorResponse(503, error.message, path);

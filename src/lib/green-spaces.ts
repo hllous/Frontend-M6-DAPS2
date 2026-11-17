@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { appendSortParams, type CatalogSortQuery } from "./catalog-sort";
 import { withResponseCoordinates } from "./response-coordinates";
 import { MAX_DECIMAL_10_2, boundedDecimalInput, latitudeInput, longitudeInput } from "@/lib/input-limits";
 import { tolerantRecords } from "./tolerant-records";
@@ -20,7 +21,7 @@ export const greenSpaceSchema = withResponseCoordinates({
 });
 export type GreenSpace = z.infer<typeof greenSpaceSchema>;
 
-export type GreenSpaceQuery = {
+export type GreenSpaceQuery = CatalogSortQuery<"green-spaces"> & {
   active?: boolean;
   spaceType?: GreenSpaceType;
   zoneId?: string;
@@ -93,6 +94,7 @@ function buildQueryString(query: GreenSpaceQuery): string {
   if (query.zoneId) params.set("zoneId", query.zoneId);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  appendSortParams(params, query);
   const queryString = params.toString();
   return queryString ? `?${queryString}` : "";
 }

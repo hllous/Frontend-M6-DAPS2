@@ -1,13 +1,15 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
+import { loginRateLimiter } from "@/lib/login-rate-limit";
 import { handlers } from "@/mocks/handlers";
 import { POST as login } from "./route";
 
 const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeEach(() => loginRateLimiter.reset());
 afterEach(() => {
   server.resetHandlers();
   vi.unstubAllEnvs();
@@ -248,5 +250,24 @@ describe("POST /api/session/login", () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).session.identity.userId).toBe("42");
+  });
+
+  it("cuts a login that M1 never answers and tells the user, with no session cookie (CA-HU30-4)", async () => {
+    vi.stubEnv("M6_AUTH_MODE", "real-m1");
+    vi.stubEnv("M1_BASE_URL", "https://m1.test/api/v1/");
+    vi.stubEnv("M6_BACKEND_ORIGIN", "https://backend.test");
+    // Same timer the route uses, shortened: the real limit is LOGIN_TIMEOUT_MS (90 s).
+    const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => realTimeout(ms >= 90_000 ? 50 : ms));
+    server.use(
+      http.get("https://backend.test/health", () => HttpResponse.json({ status: "ok" })),
+      http.post("https://m1.test/api/v1/auth/usuario/login", () => new Promise<never>(() => undefined)),
+    );
+
+    const response = await login(request({ email: "persona@example.test", password: "secret" }));
+
+    expect(response.status).toBe(504);
+    expect((await response.json()).message).toMatch(/no respondió/);
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 });

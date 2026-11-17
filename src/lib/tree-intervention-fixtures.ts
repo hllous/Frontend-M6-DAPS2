@@ -19,6 +19,9 @@ const INITIAL_TREE_INTERVENTIONS: TreeIntervention[] = [
   intervention({ id: "intervention-3", interventionType: "REMOVAL", treeIds: ["tree-4"], address: "Paseo de la Costa 220", requiresStreetClosure: false, priority: "CRITICAL", status: "REQUESTED", serviceId: null, justification: "El ejemplar presenta inestabilidad crítica.", authorizedByUserId: null, authorizedAt: null }),
 ];
 
+// Versión inicial para la concurrencia optimista en modo mock (`src/lib/bff-mock-versions.ts`).
+for (const item of INITIAL_TREE_INTERVENTIONS) item.updatedAt ??= "2026-09-01T00:00:00.000Z";
+
 export const treeInterventionFixtures: TreeIntervention[] = structuredClone(INITIAL_TREE_INTERVENTIONS);
 
 export function resetTreeInterventionFixtures() {

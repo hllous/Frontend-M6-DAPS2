@@ -543,7 +543,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     {
       id: "name",
       header: "Nombre",
-      enableSorting: false,
+      accessorFn: (zone) => zone.name,
+      sortFn: "text",
       meta: {
         headClassName:
           "h-auto whitespace-normal text-inherit font-bold px-4 py-3",
@@ -558,7 +559,8 @@ export function ZoneCatalogPanel({ scenario }: { scenario: OperationalScenario }
     {
       id: "commune",
       header: "Comuna",
-      enableSorting: false,
+      accessorFn: (zone) => zone.commune?.name ?? "",
+      sortFn: "text",
       meta: {
         headClassName:
           "h-auto whitespace-normal text-inherit font-bold px-4 py-3",

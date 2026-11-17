@@ -24,6 +24,8 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 - [operations/external-contracts.md](operations/external-contracts.md): contratos externos, evidencia y estado de GA.
 - [agents/quality-security-ci.md](agents/quality-security-ci.md): SonarCloud, Trivy y ZAP en el CI, cómo leer sus resultados y dónde mirar la calidad del Backend.
 - [security/zap.md](security/zap.md): escaneo dinámico con OWASP ZAP (workflow `dast.yml`), resultados y limitaciones.
+- [security/eje-d-evidencia.md](security/eje-d-evidencia.md): tabla criterio, estado y evidencia del Eje D (seguridad) del Frontend.
+- [security/login-rate-limit.md](security/login-rate-limit.md): límite de intentos de ingreso fallidos (429), IP confiable y limitación en serverless.
 
 ## Dónde agregar documentación
 

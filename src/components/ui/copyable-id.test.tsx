@@ -23,7 +23,7 @@ describe("CopyableId", () => {
     expect(writeText).toHaveBeenCalledWith("abc-123");
     expect(screen.getByRole("status")).toHaveTextContent("Copiado");
 
-    await waitFor(() => expect(screen.getByRole("status")).toBeEmptyDOMElement(), { timeout: 3500 });
+    await waitFor(() => expect(screen.getByRole("status")).toBeEmptyDOMElement());
   });
 
   it("announces the failure instead of swallowing it when the clipboard rejects or is missing", async () => {

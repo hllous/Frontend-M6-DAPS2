@@ -1,3 +1,4 @@
+import { rememberRecordVersions, withRecordVersion } from "./record-versions";
 import { broadcastLogout } from "./session-client";
 import { recordTelemetryEvent } from "./telemetry";
 
@@ -25,11 +26,14 @@ export class NetworkFailureError extends Error {
 
 export async function authenticatedFetch(input: string, init?: RequestInit): Promise<Response> {
   let response: Response;
+  // Concurrencia optimista: la escritura lleva como `If-Match` la versión que esta pestaña leyó del registro.
+  const versionedInit = withRecordVersion(input, init);
   try {
-    response = await fetch(input, { cache: "no-store", ...init });
+    response = await fetch(input, { cache: "no-store", ...versionedInit });
   } catch (cause) {
     throw new NetworkFailureError({ cause });
   }
+  await rememberRecordVersions(input, versionedInit, response);
 
   if (response.status === 401) {
     recordTelemetryEvent({ name: "auth_session_expired", status: 401 });
