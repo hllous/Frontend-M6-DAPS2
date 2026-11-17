@@ -124,7 +124,7 @@ jobs:
         run: pnpm lint
 
       - name: CI script tests
-        run: node --test scripts/ci/docs-only.node-test.mjs scripts/ci/e2e-shard.node-test.mjs
+        run: node --test scripts/ci/docs-only.node-test.mjs scripts/ci/e2e-shard.node-test.mjs scripts/mutation-merge.node-test.mjs
 
   # Vitest abre un worker aislado por archivo (255 archivos): repartirlo en shards es
   # lo que acorta el camino crítico. `isolate: false` no es opción: contamina estado
