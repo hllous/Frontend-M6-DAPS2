@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, CircleOff, Eye, MapPinned, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { useCatalogSort, withCatalogSorting } from "@/components/catalog/use-catalog-sort";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -157,13 +158,15 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
   const [interventionTreeIds, setInterventionTreeIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const { sortQuery, tableOptions } = useCatalogSort("trees", () => setParams({}));
   const query = useMemo<TreeQuery>(() => ({
     active: activeFilter === "all" ? undefined : activeFilter === "true",
     zoneId: zoneFilter === "all" ? undefined : zoneFilter,
     search: search.trim() || undefined,
     page,
     pageSize: PAGE_SIZE,
-  }), [activeFilter, search, zoneFilter, page]);
+    ...sortQuery,
+  }), [activeFilter, search, zoneFilter, page, sortQuery]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -289,16 +292,16 @@ export function TreeCatalogPanel({ scenario }: { scenario: OperationalScenario }
     }
   };
 
-  const treeColumns: DataTableColumn<Tree>[] = [
-    { id: "surveyCode", header: "Código de relevamiento", accessorFn: (tree) => tree.surveyCode, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 font-mono text-xs" }, cell: ({ row }) => row.original.surveyCode },
-    { id: "species", header: "Especie", accessorFn: (tree) => tree.species, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 font-medium" }, cell: ({ row }) => row.original.species ?? "—" },
-    { id: "zone", header: "Zona", accessorFn: (tree) => tree.zoneId, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
-    { id: "address", header: "Ubicación", accessorFn: (tree) => tree.address, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "max-w-[230px] whitespace-normal px-4 py-3" }, cell: ({ row }) => row.original.address ?? "Sin dirección registrada" },
-    { id: "measures", header: "Medidas", accessorFn: (tree) => tree.heightM, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 tabular-nums" }, cell: ({ row }) => <>{formatMeasurement(row.original.heightM, "m")} · {formatMeasurement(row.original.diameterCm, "cm")}</> },
-    { id: "status", header: "Estado", accessorFn: (tree) => tree.active, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => { const tree = row.original; return <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold ${tree.active ? "bg-[var(--color-success-fill)] text-[var(--color-success)]" : "bg-muted text-muted-foreground"}`}>{tree.active ? <Check className="size-4" aria-hidden /> : <CircleOff className="size-4" aria-hidden />}{tree.active ? "Activo" : "Inactivo"}</span>; } },
-    { id: "actions", header: () => <span className="sr-only">Acciones</span>, enableSorting: false, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => { const tree = row.original; return <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => openDetail(tree)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => openEdit(tree)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{tree.active ? <Button type="button" size="sm" variant="destructive" aria-haspopup="dialog" onClick={() => setDeactivateTarget(tree)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</> : null}</div>; } },
-  ];
-  const treeTable = useDataTable({ data: state.status === "ready" ? state.items : NO_TREES, columns: treeColumns, getRowId: (tree) => tree.id });
+  const treeColumns: DataTableColumn<Tree>[] = withCatalogSorting("trees", [
+    { id: "surveyCode", header: "Código de relevamiento", accessorFn: (tree) => tree.surveyCode, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 font-mono text-xs" }, cell: ({ row }) => row.original.surveyCode },
+    { id: "species", header: "Especie", accessorFn: (tree) => tree.species, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 font-medium" }, cell: ({ row }) => row.original.species ?? "—" },
+    { id: "zone", header: "Zona", accessorFn: (tree) => tree.zoneId, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
+    { id: "address", header: "Ubicación", accessorFn: (tree) => tree.address, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "max-w-[230px] whitespace-normal px-4 py-3" }, cell: ({ row }) => row.original.address ?? "Sin dirección registrada" },
+    { id: "measures", header: "Medidas", accessorFn: (tree) => tree.heightM, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3 tabular-nums" }, cell: ({ row }) => <>{formatMeasurement(row.original.heightM, "m")} · {formatMeasurement(row.original.diameterCm, "cm")}</> },
+    { id: "status", header: "Estado", accessorFn: (tree) => tree.active, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => { const tree = row.original; return <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold ${tree.active ? "bg-[var(--color-success-fill)] text-[var(--color-success)]" : "bg-muted text-muted-foreground"}`}>{tree.active ? <Check className="size-4" aria-hidden /> : <CircleOff className="size-4" aria-hidden />}{tree.active ? "Activo" : "Inactivo"}</span>; } },
+    { id: "actions", header: () => <span className="sr-only">Acciones</span>, meta: { headClassName: "h-auto whitespace-normal px-4 py-3 font-bold text-inherit", cellClassName: "whitespace-normal px-4 py-3" }, cell: ({ row }) => { const tree = row.original; return <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => openDetail(tree)}><Eye data-icon="inline-start" aria-hidden />Ver detalle</Button>{canManage ? <><Button type="button" size="sm" variant="outline" onClick={() => openEdit(tree)}><Pencil data-icon="inline-start" aria-hidden />Editar</Button>{tree.active ? <Button type="button" size="sm" variant="destructive" aria-haspopup="dialog" onClick={() => setDeactivateTarget(tree)}><Trash2 data-icon="inline-start" aria-hidden />Dar de baja</Button> : null}</> : null}</div>; } },
+  ]);
+  const treeTable = useDataTable({ data: state.status === "ready" ? state.items : NO_TREES, columns: treeColumns, getRowId: (tree) => tree.id, ...tableOptions });
 
   return (
     <section aria-labelledby="trees-title" className="flex flex-col gap-6">

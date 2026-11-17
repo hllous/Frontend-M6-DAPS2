@@ -1,4 +1,5 @@
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
+import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
+import { authorize, backendMode, catalogBackendQuery, catalogListQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -37,14 +38,15 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const query = parseRouteQuery(new URL(request.url));
+    const query = catalogListQuery("routes", request, parseRouteQuery);
+    if (query instanceof Response) return query;
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/routes${backendQuery(query, ["active", "zoneId", "search", "page", "pageSize"])}`);
+      const backendResponse = await fetchBackend(request, `/routes${catalogBackendQuery(query, ["active", "zoneId", "search", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 
-    return NextResponse.json(paginateRouteFixtures(filterRouteFixtures(query), query.page, query.pageSize));
+    return NextResponse.json(paginateRouteFixtures(sortCatalogFixtures(filterRouteFixtures(query), query, "code", {}), query.page, query.pageSize));
   } catch (error) {
     return handleRouteError(error, path, "No se pudieron cargar los recorridos.");
   }

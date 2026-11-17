@@ -1,4 +1,5 @@
-import { backendMode, backendQuery, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
+import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
+import { backendMode, catalogBackendQuery, catalogListQuery, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -45,15 +46,16 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const query = parseContainerQuery(new URL(request.url));
+    const query = catalogListQuery("containers", request, parseContainerQuery);
+    if (query instanceof Response) return query;
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers${backendQuery(query, ["status", "containerType", "zoneId", "search", "page", "pageSize"])}`);
+      const backendResponse = await fetchBackend(request, `/containers${catalogBackendQuery(query, ["status", "containerType", "zoneId", "search", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 
     return NextResponse.json(
-      paginateContainerFixtures(filterContainerFixtures(query), query.page, query.pageSize),
+      paginateContainerFixtures(sortCatalogFixtures(filterContainerFixtures(query), query, "code", { containerType: containerTypeSchema.options, status: containerStatusSchema.options }), query.page, query.pageSize),
     );
   } catch (error) {
     return handleRouteError(error, path, "No se pudieron cargar los contenedores.");

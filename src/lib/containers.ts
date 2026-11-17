@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { attachmentSchema, type Attachment, type Service, type ServiceStatus } from "./services";
 import { recordTelemetryEvent } from "./telemetry";
+import { appendSortParams, type CatalogSortQuery } from "./catalog-sort";
 import { withResponseCoordinates } from "./response-coordinates";
 import { MAX_INT32, latitudeInput, longitudeInput } from "@/lib/input-limits";
 import { tolerantRecords } from "./tolerant-records";
@@ -52,7 +53,7 @@ export const containerSchema = withResponseCoordinates({
 });
 export type Container = z.infer<typeof containerSchema>;
 
-export type ContainerQuery = {
+export type ContainerQuery = CatalogSortQuery<"containers"> & {
   status?: ContainerStatus;
   containerType?: ContainerType;
   zoneId?: string;
@@ -213,6 +214,7 @@ function buildQueryString(query: ContainerQuery): string {
   if (query.search) params.set("search", query.search);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  appendSortParams(params, query);
   const queryString = params.toString();
   return queryString ? `?${queryString}` : "";
 }
