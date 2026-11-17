@@ -1,6 +1,5 @@
-import { parseCatalogSort } from "@/lib/catalog-sort";
 import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
-import { backendMode, backendQuery, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
+import { backendMode, catalogBackendQuery, catalogListQuery, errorResponse, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -47,13 +46,11 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const url = new URL(request.url);
-    const sort = parseCatalogSort("containers", url.searchParams);
-    if (!sort.ok) return errorResponse(400, sort.message, path);
-    const query = { ...parseContainerQuery(url), ...sort.value };
+    const query = catalogListQuery("containers", request, parseContainerQuery);
+    if (query instanceof Response) return query;
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/containers${backendQuery(query, ["status", "containerType", "zoneId", "search", "page", "pageSize", "sort", "order"])}`);
+      const backendResponse = await fetchBackend(request, `/containers${catalogBackendQuery(query, ["status", "containerType", "zoneId", "search", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 

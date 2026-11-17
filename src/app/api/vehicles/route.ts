@@ -1,6 +1,5 @@
-import { parseCatalogSort } from "@/lib/catalog-sort";
 import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
+import { authorize, backendMode, catalogBackendQuery, catalogListQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -30,12 +29,10 @@ export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const url = new URL(request.url);
-    const sort = parseCatalogSort("vehicles", url.searchParams);
-    if (!sort.ok) return errorResponse(400, sort.message, path);
-    const query = { ...parseVehicleQuery(url), ...sort.value };
+    const query = catalogListQuery("vehicles", request, parseVehicleQuery);
+    if (query instanceof Response) return query;
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/vehicles${backendQuery(query, ["active", "vehicleType", "page", "pageSize", "sort", "order"])}`);
+      const response = await fetchBackend(request, `/vehicles${catalogBackendQuery(query, ["active", "vehicleType", "page", "pageSize"])}`);
       return forwardResponse(response);
     }
     return NextResponse.json(paginateVehicleFixtures(sortCatalogFixtures(filterVehicleFixtures(query), query, "plate", { vehicleType: vehicleTypeSchema.options }), query.page, query.pageSize));

@@ -1,6 +1,5 @@
-import { parseCatalogSort } from "@/lib/catalog-sort";
 import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
+import { authorize, backendMode, catalogBackendQuery, catalogListQuery, errorResponse, mapSessionError, forwardResponse, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
@@ -57,13 +56,11 @@ export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const url = new URL(request.url);
-    const sort = parseCatalogSort("crews", url.searchParams);
-    if (!sort.ok) return errorResponse(400, sort.message, path);
-    const query = { ...parseQuery(url), ...sort.value };
+    const query = catalogListQuery("crews", request, parseQuery);
+    if (query instanceof Response) return query;
     const scenario = getScenario(session);
     if (backendMode(session)) {
-      if (scenario.actor.kind !== "FIELD") return forwardResponse(await fetchBackend(request, `/crews${backendQuery(query, ["active", "crewType", "defaultShift", "zoneId", "specialty", "page", "pageSize", "sort", "order"])}`));
+      if (scenario.actor.kind !== "FIELD") return forwardResponse(await fetchBackend(request, `/crews${catalogBackendQuery(query, ["active", "crewType", "defaultShift", "zoneId", "specialty", "page", "pageSize"])}`));
 
       const crewId = session.crew?.id;
       if (!crewId) return errorResponse(403, "La sesión no tiene una cuadrilla asignada.", path);

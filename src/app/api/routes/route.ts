@@ -1,6 +1,5 @@
-import { parseCatalogSort } from "@/lib/catalog-sort";
 import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
+import { authorize, backendMode, catalogBackendQuery, catalogListQuery, errorResponse, mapSessionError, forwardResponse, FORBIDDEN_CODES, handleRouteError, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -39,13 +38,11 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const url = new URL(request.url);
-    const sort = parseCatalogSort("routes", url.searchParams);
-    if (!sort.ok) return errorResponse(400, sort.message, path);
-    const query = { ...parseRouteQuery(url), ...sort.value };
+    const query = catalogListQuery("routes", request, parseRouteQuery);
+    if (query instanceof Response) return query;
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/routes${backendQuery(query, ["active", "zoneId", "search", "page", "pageSize", "sort", "order"])}`);
+      const backendResponse = await fetchBackend(request, `/routes${catalogBackendQuery(query, ["active", "zoneId", "search", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 

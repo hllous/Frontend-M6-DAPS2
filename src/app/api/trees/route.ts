@@ -1,6 +1,5 @@
-import { parseCatalogSort } from "@/lib/catalog-sort";
 import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
-import { authorize, backendMode, backendQuery, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
+import { authorize, backendMode, catalogBackendQuery, catalogListQuery, errorResponse, mapSessionError, forwardResponse, parseJsonBody } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -26,12 +25,10 @@ export async function GET(request: Request) {
   const path = new URL(request.url).pathname;
   try {
     const session = getRequiredSession(request);
-    const url = new URL(request.url);
-    const sort = parseCatalogSort("trees", url.searchParams);
-    if (!sort.ok) return errorResponse(400, sort.message, path);
-    const query = { ...parseQuery(url), ...sort.value };
+    const query = catalogListQuery("trees", request, parseQuery);
+    if (query instanceof Response) return query;
     if (backendMode(session)) {
-      const response = await fetchBackend(request, `/trees${backendQuery(query, ["active", "zoneId", "search", "page", "pageSize", "sort", "order"])}`);
+      const response = await fetchBackend(request, `/trees${catalogBackendQuery(query, ["active", "zoneId", "search", "page", "pageSize"])}`);
       return forwardResponse(response);
     }
     return NextResponse.json(paginateTreeFixtures(sortCatalogFixtures(filterTreeFixtures(query), query, "surveyCode", {}), query.page, query.pageSize));

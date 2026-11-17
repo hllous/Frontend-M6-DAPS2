@@ -1,6 +1,5 @@
-import { parseCatalogSort } from "@/lib/catalog-sort";
 import { sortCatalogFixtures } from "@/lib/catalog-sort-fixtures";
-import { backendMode, backendQuery, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
+import { backendMode, catalogBackendQuery, catalogListQuery, errorResponse, forwardResponse, handleRouteError } from "@/lib/bff-route";
 import { NextResponse } from "next/server";
 
 import { fetchBackend } from "@/lib/bff-backend";
@@ -45,13 +44,11 @@ export async function GET(request: Request) {
 
   try {
     const session = getRequiredSession(request);
-    const url = new URL(request.url);
-    const sort = parseCatalogSort("green-spaces", url.searchParams);
-    if (!sort.ok) return errorResponse(400, sort.message, path);
-    const query = { ...parseGreenSpaceQuery(url), ...sort.value };
+    const query = catalogListQuery("green-spaces", request, parseGreenSpaceQuery);
+    if (query instanceof Response) return query;
 
     if (backendMode(session)) {
-      const backendResponse = await fetchBackend(request, `/green-spaces${backendQuery(query, ["active", "spaceType", "zoneId", "page", "pageSize", "sort", "order"])}`);
+      const backendResponse = await fetchBackend(request, `/green-spaces${catalogBackendQuery(query, ["active", "spaceType", "zoneId", "page", "pageSize"])}`);
             return forwardResponse(backendResponse);
     }
 

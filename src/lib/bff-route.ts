@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { type CatalogResource, type CatalogSortQuery, parseCatalogSort } from "./catalog-sort";
 import { fetchBackend, isJsonMediaType, pathId } from "./bff-backend";
 import { getScenario, type Capability, type OperationalScenario } from "./scenarios";
 
@@ -127,6 +128,21 @@ export function backendQuery<T extends object>(query: T, allowedKeys: readonly s
 
   const value = params.toString();
   return value ? `?${value}` : "";
+}
+
+/**
+ * Query de un listado de catálogo: los filtros propios del recurso más `sort`/`order`.
+ * Un orden inválido devuelve la respuesta 400 lista para retornar (como el Backend); va antes de leer el Backend o el mock.
+ */
+export function catalogListQuery<R extends CatalogResource, Q extends object>(resource: R, request: Request, parse: (url: URL) => Q): (Q & CatalogSortQuery<R>) | NextResponse {
+  const url = new URL(request.url);
+  const sort = parseCatalogSort(resource, url.searchParams);
+  return sort.ok ? { ...parse(url), ...sort.value } : errorResponse(400, sort.message, url.pathname);
+}
+
+/** `backendQuery` de un listado de catálogo: reenvía además `sort` y `order`. */
+export function catalogBackendQuery<T extends object>(query: T, filterKeys: readonly string[]): string {
+  return backendQuery(query, [...filterKeys, "sort", "order"]);
 }
 
 // Scope checks need the ownership fields, not the view adapter's enriched Service.
