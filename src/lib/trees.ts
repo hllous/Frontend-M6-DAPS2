@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { appendSortParams, type CatalogSortQuery } from "./catalog-sort";
 import { withResponseCoordinates } from "./response-coordinates";
 import {
   riskLevelSchema,
@@ -74,7 +75,7 @@ export const treeUpdateInputSchema = z.object({
 }).strict();
 export type TreeUpdateInput = z.infer<typeof treeUpdateInputSchema>;
 
-export type TreeQuery = {
+export type TreeQuery = CatalogSortQuery<"trees"> & {
   active?: boolean;
   zoneId?: string;
   search?: string;
@@ -127,6 +128,7 @@ function queryString(query: TreeQuery): string {
   if (query.search) params.set("search", query.search);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  appendSortParams(params, query);
   const value = params.toString();
   return value ? `?${value}` : "";
 }

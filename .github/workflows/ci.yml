@@ -41,6 +41,7 @@ jobs:
   changes:
     name: changes
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -84,6 +85,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -110,6 +112,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -131,6 +134,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -144,10 +148,14 @@ jobs:
 
       # Cobertura v8 sin umbrales (#923): cada shard deja un blob con resultados y datos de
       # cobertura; el job unit-coverage los combina. No cambia qué tests corren ni sus
-      # aserciones. La instrumentación v8 vuelve más lentos los tests con jsdom y varios
-      # superaban el timeout de 5 s: se sube solo acá, con la bandera, no en la config.
+      # aserciones. El timeout de 30 s por test vive en vitest.config.ts (#946), igual que
+      # en local: la instrumentación v8 y los runners cargados vuelven lentos los tests con jsdom.
       - name: Unit and component tests
-        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob --testTimeout=30000
+        env:
+          # Cada shard mide solo una cuarta parte del código: los umbrales de cobertura
+          # se exigen una sola vez, sobre el reporte combinado (job unit-coverage, #975).
+          COVERAGE_THRESHOLDS: "off"
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --reporter=default --reporter=blob
 
       - name: Upload Vitest blob report
         uses: actions/upload-artifact@v7
@@ -157,15 +165,17 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
-  # Combina los blobs de los 4 shards en un solo lcov. Vive fuera del job agregador `test`
-  # y de la branch protection: solo mide, no decide si el PR se puede mergear. Solo alimenta
-  # a Sonar, y el plan Free de SonarCloud analiza PRs y la rama principal (main): se saltea
-  # en pushes a develop/test.
+  # Combina los blobs de los 4 shards en un solo lcov y exige los umbrales de cobertura de
+  # vitest.config.ts (#975). Entra en `needs` del job agregador `test`, así que un PR que baja
+  # la cobertura no se puede mergear. También alimenta a Sonar, y el plan Free de SonarCloud
+  # analiza PRs y la rama principal (main): se saltea en pushes a develop/test, y el agregador
+  # lo acepta salteado solo en ese caso.
   unit-coverage:
     name: unit coverage
     needs: [changes, unit-shard]
     if: ${{ !cancelled() && needs.unit-shard.result == 'success' && (github.event_name != 'push' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -180,7 +190,8 @@ jobs:
           merge-multiple: true
           path: .vitest/blob
 
-      - name: Merge reports and build lcov
+      # Falla si la cobertura combinada baja de coverage.thresholds (vitest.config.ts, #975).
+      - name: Merge reports, build lcov and enforce coverage thresholds
         run: pnpm exec vitest run --merge-reports --coverage
 
       - name: Upload coverage
@@ -190,15 +201,16 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # Análisis de SonarCloud con la cobertura combinada. El gate no bloquea todavía
-  # (sonar.qualitygate.wait=false) y el job no es un check requerido. Sin SONAR_TOKEN
-  # (PRs desde forks) los pasos se saltean y el job termina en verde. Proyecto y
-  # exclusiones en sonar-project.properties.
+  # Análisis de SonarCloud con la cobertura combinada. El gate es bloqueante
+  # (sonar.qualitygate.wait=true, #926): el scanner espera el resultado y el job falla si el
+  # Quality Gate da rojo. Sin SONAR_TOKEN (PRs desde forks) los pasos se saltean y el job
+  # termina en verde. Proyecto y exclusiones en sonar-project.properties.
   sonar:
     name: sonar
     needs: unit-coverage
     if: ${{ !cancelled() && needs.unit-coverage.result == 'success' }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
@@ -224,27 +236,38 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
         with:
           args: >
-            -Dsonar.qualitygate.wait=false
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
             ${{ inputs.sonar_branch_name && format('-Dsonar.branch.name={0}', inputs.sonar_branch_name) || '' }}
 
   test:
     name: test
     runs-on: ubuntu-24.04
-    needs: [changes, lint, unit-shard]
+    timeout-minutes: 5
+    needs: [changes, lint, unit-shard, unit-coverage]
     if: ${{ !cancelled() }}
     steps:
-      - name: Require lint and every unit shard to succeed
+      - name: Require lint, every unit shard and the coverage thresholds to succeed
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           LINT_RESULT: ${{ needs.lint.result }}
           SHARDS_RESULT: ${{ needs.unit-shard.result }}
+          COVERAGE_RESULT: ${{ needs.unit-coverage.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
         run: |
           if [ "$CHANGES_RESULT" = "success" ] && [ "$DOCS_ONLY" = "true" ]; then
             exit 0
           fi
           test "$LINT_RESULT" = "success"
           test "$SHARDS_RESULT" = "success"
+          # unit-coverage solo se saltea en pushes a develop/test (ver su `if`): ahí no hay umbral que exigir.
+          if [ "$EVENT_NAME" = "push" ] && [ "$REF" != "refs/heads/main" ]; then
+            test "$COVERAGE_RESULT" = "success" || test "$COVERAGE_RESULT" = "skipped"
+          else
+            test "$COVERAGE_RESULT" = "success"
+          fi
 
   # Smoke journeys, failure journeys, and axe/WCAG checks run against deterministic
   # mock scenarios and fixture data only — no production or Tier 2 data ever enters
@@ -256,6 +279,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       E2E_TARGET: mock
     strategy:
@@ -273,7 +297,10 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       # `--shard` corta bloques contiguos y los specs pesados caían juntos (un shard tardaba
-      # el doble que otro); scripts/ci/e2e-shard.cjs reparte los tests en round-robin.
+      # el doble que otro). scripts/ci/e2e-shard.cjs reparte los tests por duración medida
+      # (scripts/ci/e2e-durations.json, #981). Cada shard paga ~1 min fijo (setup, `next dev`
+      # y el warm-up) y el mismo bloque de tests varía ±25 % entre runners: con 8 shards el
+      # más lento tardaba más que con 10, así que se quedan 10.
       - name: Playwright smoke and accessibility suite
         run: |
           grep=$(node scripts/ci/e2e-shard.cjs --project=chromium --shard=${{ matrix.shard }}/${{ strategy.job-total }})
@@ -292,6 +319,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       E2E_TARGET: real-m1
     steps:
@@ -318,6 +346,7 @@ jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     needs: [changes, e2e-shard, e2e-real-m1]
     if: ${{ !cancelled() }}
     steps:
@@ -339,6 +368,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -349,9 +379,111 @@ jobs:
       - name: Dependency vulnerability scan
         run: pnpm audit --prod --audit-level=high
 
+  # Secretos en todo el historial (#964), igual que el backend. Sin filtro de
+  # paths: un secreto puede entrar en cualquier archivo, también en docs.
+  # Reglas y excepciones (por valor exacto) en .gitleaks.toml.
+  secrets:
+    name: secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (historial completo)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1             git /repo --redact --verbose --no-banner --log-opts="--all"
+
+  # secrets-default: lo mismo que `secrets` pero como lo corre la cátedra:
+  # gitleaks con la configuración POR DEFECTO (se borra .gitleaks.toml y se respeta
+  # .gitleaksignore, que es lo que ve la cátedra; el historial no se toca) y trufflehog,
+  # sobre todas las ramas y tags. Muestra qué ve una herramienta
+  # sin nuestras excepciones (frena si gitleaks por defecto encuentra algo en el historial, o si
+  # trufflehog verifica una credencial viva). Los reportes se publican como artifact con los
+  # valores redactados (en trufflehog se eliminan Raw/RawV2).
+  secrets-default:
+    name: secrets-default
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (historial completo, todas las ramas y tags)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Carpeta de reportes
+        run: echo "REPORTS=$RUNNER_TEMP/secrets-reports" >> "$GITHUB_ENV"
+
+      - name: Gitleaks con configuración por defecto
+        continue-on-error: true
+        run: |
+          rm -f .gitleaks.toml
+          mkdir -p "$REPORTS"
+          docker run --rm -v "$PWD:/repo" -v "$REPORTS:/reports" zricethezav/gitleaks:v8.30.1 \
+            git /repo --redact --no-banner --log-opts="--all" \
+            --report-format json --report-path /reports/gitleaks-default.json || true # se evalúa en el último paso
+          # Estado actual de los archivos (no el historial).
+          docker run --rm -v "$PWD:/repo" -v "$REPORTS:/reports" zricethezav/gitleaks:v8.30.1 \
+            dir /repo --redact --no-banner \
+            --report-format json --report-path /reports/gitleaks-default-worktree.json
+
+      - name: Trufflehog (acción oficial, historial de la rama)
+        continue-on-error: true
+        uses: trufflesecurity/trufflehog@3bd2b5887eb0efb8fa18bfd1d296032924e4ffdc # v3.99.9
+        with:
+          head: HEAD
+          version: 3.99.9
+          extra_args: --results=verified,unknown,unverified,filtered_unverified
+
+      - name: Trufflehog JSON sobre todas las ramas y tags
+        continue-on-error: true
+        run: |
+          mkdir -p "$REPORTS"
+          docker run --rm -v "$PWD:/tmp" -w /tmp ghcr.io/trufflesecurity/trufflehog:3.99.9 \
+            git file:///tmp/ --json --no-update \
+            --results=verified,unknown,unverified,filtered_unverified \
+            > "$REPORTS/trufflehog-raw.jsonl"
+          jq -c 'del(.Raw, .RawV2)' "$REPORTS/trufflehog-raw.jsonl" \
+            > "$REPORTS/trufflehog-default.jsonl"
+          rm "$REPORTS/trufflehog-raw.jsonl"
+          # Estado actual de los archivos (no el historial).
+          printf '/\\.git/\n' > "$RUNNER_TEMP/th-exclude.txt"
+          docker run --rm -v "$PWD:/tmp" -v "$RUNNER_TEMP/th-exclude.txt:/th-exclude.txt" -w /tmp \
+            ghcr.io/trufflesecurity/trufflehog:3.99.9 \
+            filesystem /tmp --json --no-update --exclude-paths=/th-exclude.txt \
+            --results=verified,unknown,unverified,filtered_unverified \
+            | jq -c 'del(.Raw, .RawV2)' > "$REPORTS/trufflehog-default-worktree.jsonl"
+
+      # Frenantes del job: algún hallazgo de gitleaks por defecto en el historial
+      # (los valores de juguete ya conocidos están en .gitleaksignore) o una
+      # credencial VERIFICADA como viva por trufflehog. Trufflehog sin verificar y
+      # el estado actual de los archivos son informativos.
+      - name: Fallar ante hallazgos de gitleaks o verificados de trufflehog
+        run: |
+          g=$(jq 'length' "$REPORTS/gitleaks-default.json")
+          v=$(jq -s '[.[] | select(.Verified == true)] | length' "$REPORTS/trufflehog-default.jsonl" "$REPORTS/trufflehog-default-worktree.jsonl")
+          echo "gitleaks (historial, sin .gitleaks.toml): $g hallazgos; trufflehog verificados: $v"
+          test "$g" -eq 0 && test "$v" -eq 0
+
+      - name: Publicar reportes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: secrets-default-reports
+          path: ${{ runner.temp }}/secrets-reports/
+          if-no-files-found: warn
+          retention-days: 14
+
   docs:
     name: docs
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:

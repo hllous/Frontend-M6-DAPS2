@@ -31,7 +31,7 @@ describe("ServiceTypesPanel", () => {
     expect(loading.querySelectorAll("tbody tr:first-child td")).toHaveLength(7);
     expect(loading.querySelectorAll("tbody tr:first-child td:last-child [data-slot=skeleton]")).toHaveLength(1);
     const widths = Array.from(loading.querySelectorAll("col"), (column) => column.className);
-    await screen.findByRole("row", { name: /WASTE-ROUTE/ }, { timeout: 3000 });
+    await screen.findByRole("row", { name: /WASTE-ROUTE/ });
     expect(screen.queryByRole("region", { name: "Listado de tipos de servicio" })).not.toBeInTheDocument();
     expect(Array.from(container.querySelectorAll("col"), (column) => column.className)).toEqual(widths);
     expect(container.querySelectorAll("thead th")).toHaveLength(7);

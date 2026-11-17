@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { type CatalogResource, type CatalogSortQuery, parseCatalogSort } from "./catalog-sort";
 import { fetchBackend, isJsonMediaType, pathId } from "./bff-backend";
 import { getScenario, type Capability, type OperationalScenario } from "./scenarios";
 
@@ -30,6 +31,7 @@ const ERROR_LABELS: Record<number, string> = {
   404: "Not Found",
   405: "Method Not Allowed",
   409: "Conflict",
+  412: "Precondition Failed",
   413: "Payload Too Large",
   415: "Unsupported Media Type",
   422: "Unprocessable Entity",
@@ -126,6 +128,21 @@ export function backendQuery<T extends object>(query: T, allowedKeys: readonly s
 
   const value = params.toString();
   return value ? `?${value}` : "";
+}
+
+/**
+ * Query de un listado de catálogo: los filtros propios del recurso más `sort`/`order`.
+ * Un orden inválido devuelve la respuesta 400 lista para retornar (como el Backend); va antes de leer el Backend o el mock.
+ */
+export function catalogListQuery<R extends CatalogResource, Q extends object>(resource: R, request: Request, parse: (url: URL) => Q): (Q & CatalogSortQuery<R>) | NextResponse {
+  const url = new URL(request.url);
+  const sort = parseCatalogSort(resource, url.searchParams);
+  return sort.ok ? { ...parse(url), ...sort.value } : errorResponse(400, sort.message, url.pathname);
+}
+
+/** `backendQuery` de un listado de catálogo: reenvía además `sort` y `order`. */
+export function catalogBackendQuery<T extends object>(query: T, filterKeys: readonly string[]): string {
+  return backendQuery(query, [...filterKeys, "sort", "order"]);
 }
 
 // Scope checks need the ownership fields, not the view adapter's enriched Service.
@@ -275,6 +292,9 @@ export function forwardResponse(response: Response, path = bffPathForResponse(re
       "X-Content-Type-Options": "nosniff",
     },
   });
+  // Concurrencia optimista (ADR-012 del backend): el navegador guarda el ETag y lo devuelve como `If-Match`.
+  const etag = response.headers.get("etag");
+  if (etag) forwarded.headers.set("ETag", etag);
   // Si el pedido renovó los tokens contra M1, la cookie se resella con el material nuevo (no solo se extiende).
   const renewed = renewedSessionForResponse(response);
   if (renewed) forwarded.cookies.set({

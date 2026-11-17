@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -131,6 +132,28 @@ describe("environmental reports adapter", () => {
     await expect(environmentalReportsAdapter.forward("ER-1001", { reason: "   " })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
     await expect(environmentalReportsAdapter.dismiss("ER-1001", { reason: "x".repeat(501) })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
     expect(bodies).toHaveLength(2);
+  });
+
+  it("sends the optional close reason trimmed, and nothing when it is missing or blank", async () => {
+    const calls: { type: string | null; text: string }[] = [];
+    server.use(http.post("*/api/environmental-reports/ER-1001/close", async ({ request }) => {
+      calls.push({ type: request.headers.get("content-type"), text: await request.text() });
+      return HttpResponse.json({ ...(await environmentalReportsAdapter.get("ER-1001")), status: "CLOSED" });
+    }));
+    await environmentalReportsAdapter.close("ER-1001");
+    await environmentalReportsAdapter.close("ER-1001", {});
+    await environmentalReportsAdapter.close("ER-1001", { reason: "   " });
+    await environmentalReportsAdapter.close("ER-1001", { reason: "  Regularizado  " });
+    await environmentalReportsAdapter.close("ER-1001", { reason: "x".repeat(500) });
+    expect(calls).toEqual([
+      { type: null, text: "" },
+      { type: null, text: "" },
+      { type: null, text: "" },
+      { type: "application/json", text: JSON.stringify({ reason: "Regularizado" }) },
+      { type: "application/json", text: JSON.stringify({ reason: "x".repeat(500) }) },
+    ]);
+    await expect(environmentalReportsAdapter.close("ER-1001", { reason: "x".repeat(501) })).rejects.toBeInstanceOf(EnvironmentalReportContractError);
+    expect(calls).toHaveLength(5);
   });
 
   it("requests information with trimmed JSON, drops blank optionals and rejects invalid input before the request", async () => {

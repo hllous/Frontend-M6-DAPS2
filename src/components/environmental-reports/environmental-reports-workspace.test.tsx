@@ -642,7 +642,7 @@ describe("EnvironmentalReportsWorkspace", () => {
     expect(payloads).toEqual([expect.objectContaining({ address: "Calle Nueva 100", lat: -34.5446871, lng: -58.4386826 })]);
   });
 
-  it("lets Office schedule and assign an inspection from a report under review", { timeout: 15000 }, async () => {
+  it("lets Office schedule and assign an inspection from a report under review", async () => {
     compatibleInspectionCrew();
     const user = userEvent.setup();
     const create = vi.spyOn(servicesAdapter, "create");
@@ -1080,7 +1080,7 @@ describe("internal jargon guard", () => {
 });
 
 
-it("prioriza la cuadrilla de la zona de inspección y advierte una especialidad distinta", { timeout: 15000 }, async () => {
+it("prioriza la cuadrilla de la zona de inspección y advierte una especialidad distinta", async () => {
   server.use(http.get("*/api/crews", () => HttpResponse.json({ data: [
     { id: "other", name: "Otra zona", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-2", specialty: "TREES" },
     { id: "local", name: "Zona elegida", crewType: "MUNICIPAL", leaderUserId: null, defaultShift: "MORNING", active: true, effectiveZoneId: "zone-1", specialty: "INSPECTION" },
@@ -1102,7 +1102,7 @@ it("prioriza la cuadrilla de la zona de inspección y advierte una especialidad 
 });
 
 
-it("un 409 de zona durante la inspección abre la justificación sin repetir el alta de inspección", { timeout: 15000 }, async () => {
+it("un 409 de zona durante la inspección abre la justificación sin repetir el alta de inspección", async () => {
   compatibleInspectionCrew();
   server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla trabaja en otra zona; hace falta overrideNote", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
   const user = userEvent.setup();
@@ -1125,7 +1125,7 @@ it("un 409 de zona durante la inspección abre la justificación sin repetir el 
   expect(await within(detail).findByText(/^Servicio:/)).toBeVisible();
 });
 
-it("un 409 que no pide justificación durante la inspección muestra su error y no abre la justificación", { timeout: 15000 }, async () => {
+it("un 409 que no pide justificación durante la inspección muestra su error y no abre la justificación", async () => {
   compatibleInspectionCrew();
   server.use(http.post("*/api/services", () => HttpResponse.json({ statusCode: 409, message: "La cuadrilla está inactiva.", error: "Conflict", timestamp: new Date().toISOString(), path: "/api/services" }, { status: 409 }), { once: true }));
   const user = userEvent.setup();
@@ -1204,6 +1204,50 @@ describe("confirmación de Iniciar revisión y Cerrar expediente (#910)", () => 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: /^Cerrar expediente/ })).not.toBeInTheDocument());
     expect(calls).toHaveLength(0);
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("Cerrar expediente ofrece un motivo opcional limitado a 500 caracteres y, sin escribirlo, no manda cuerpo", async () => {
+    const bodies: string[] = [];
+    server.use(http.post("*/api/environmental-reports/:id/close", async ({ request }) => { bodies.push(await request.clone().text()); }));
+    const user = userEvent.setup();
+    const detail = await openReport(user, "ER-1004");
+    await user.click(within(detail).getByRole("button", { name: "Cerrar expediente" }));
+    const dialog = await screen.findByRole("dialog", { name: /^Cerrar expediente/ });
+    const reason = within(dialog).getByRole("textbox", { name: "Motivo (opcional)" });
+    expect(reason).toHaveAttribute("maxlength", "500");
+    expect(reason).toHaveValue("");
+    expect(within(dialog).getByText("Queda en el historial. Hasta 500 caracteres.")).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Cerrar expediente" }));
+    await waitFor(() => expect(bodies).toEqual([""]));
+  });
+
+  it.each([
+    ["el motivo recortado", "  Regularizado por el vecino.  ", JSON.stringify({ reason: "Regularizado por el vecino." })],
+    ["un motivo solo de espacios como si no hubiera", "   ", ""],
+  ])("Cerrar expediente envía %s", async (_label, typed, expectedBody) => {
+    const bodies: string[] = [];
+    server.use(http.post("*/api/environmental-reports/:id/close", async ({ request }) => { bodies.push(await request.clone().text()); }));
+    const user = userEvent.setup();
+    const detail = await openReport(user, "ER-1004");
+    await user.click(within(detail).getByRole("button", { name: "Cerrar expediente" }));
+    const dialog = await screen.findByRole("dialog", { name: /^Cerrar expediente/ });
+    await user.type(within(dialog).getByRole("textbox", { name: "Motivo (opcional)" }), typed);
+    await user.click(within(dialog).getByRole("button", { name: "Cerrar expediente" }));
+    await waitFor(() => expect(bodies).toEqual([expectedBody]));
+    expect(await within(detail).findByText("Cerrado")).toBeVisible();
+  });
+
+  it("Cerrar expediente no arrastra el motivo de una confirmación cancelada", async () => {
+    const user = userEvent.setup();
+    const detail = await openReport(user, "ER-1004");
+    await user.click(within(detail).getByRole("button", { name: "Cerrar expediente" }));
+    let dialog = await screen.findByRole("dialog", { name: /^Cerrar expediente/ });
+    await user.type(within(dialog).getByRole("textbox", { name: "Motivo (opcional)" }), "Borrador");
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /^Cerrar expediente/ })).not.toBeInTheDocument());
+    await user.click(within(detail).getByRole("button", { name: "Cerrar expediente" }));
+    dialog = await screen.findByRole("dialog", { name: /^Cerrar expediente/ });
+    expect(within(dialog).getByRole("textbox", { name: "Motivo (opcional)" })).toHaveValue("");
   });
 
   it("Cerrar expediente deja el diálogo abierto con el error si falla", async () => {

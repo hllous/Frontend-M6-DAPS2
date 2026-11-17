@@ -3,9 +3,10 @@ import { z } from "zod";
 import { externalIdInput } from "@/lib/input-limits";
 import { authenticatedFetch, NetworkFailureError } from "./authenticated-fetch";
 import { recordTelemetryEvent } from "./telemetry";
+import { appendSortParams, type CatalogSortQuery } from "./catalog-sort";
 import { tolerantRecords } from "./tolerant-records";
 
-export type RouteQuery = {
+export type RouteQuery = CatalogSortQuery<"routes"> & {
   active?: boolean;
   zoneId?: string;
   search?: string;
@@ -143,6 +144,7 @@ function buildRoutesQueryString(query: RouteQuery): string {
   if (query.search) params.set("search", query.search);
   if (query.page !== undefined) params.set("page", String(query.page));
   if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  appendSortParams(params, query);
 
   const queryString = params.toString();
   return queryString ? `?${queryString}` : "";

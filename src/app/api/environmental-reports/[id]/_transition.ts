@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { fetchBackend, pathId } from "@/lib/bff-backend";
 import { getEnvironmentalReportFixture, transitionEnvironmentalReportFixture } from "@/lib/environmental-report-fixtures";
-import { reportDecisionInputSchema, type ReportDecisionInput } from "@/lib/environmental-reports";
+import { closeReportInputSchema, reportDecisionInputSchema, type ReportDecisionInput } from "@/lib/environmental-reports";
 import { getScenario } from "@/lib/scenarios";
 import { AuthUnavailableError, ForbiddenSessionError, getRequiredSession, InvalidSessionError } from "@/lib/session";
 
@@ -19,14 +19,18 @@ export async function transitionReport(request: Request, id: string, action: "st
     authorize(session, { capability: action === "close" ? "environmentalReport:close" : "environmentalReport:review", throwOnError: true });
     if (scenario.actor.kind !== "OFFICE") return errorResponse(403, "Solo Oficina puede revisar expedientes ambientales.", path);
 
-    // forward and dismiss take a required reason (backend ReportStatusChangeDto); start-review and close take no body.
+    // forward and dismiss take a required reason (backend ReportStatusChangeDto); close takes an optional one
+    // (CloseReportDto, #653); start-review takes no body.
     let decision: ReportDecisionInput | undefined;
-    if (action === "forward" || action === "dismiss") {
+    if (action === "forward" || action === "dismiss" || action === "close") {
       let body: unknown;
-      try { body = await request.json(); } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
-      const parsed = reportDecisionInputSchema.safeParse(body);
+      try {
+        const text = await request.text();
+        body = action === "close" && !text.trim() ? {} : JSON.parse(text);
+      } catch { return errorResponse(400, "El cuerpo de la solicitud no es un JSON válido.", path); }
+      const parsed = (action === "close" ? closeReportInputSchema : reportDecisionInputSchema).safeParse(body);
       if (!parsed.success) return errorResponse(400, parsed.error.issues.map((issue) => issue.message).join(" "), path);
-      decision = parsed.data;
+      decision = parsed.data.reason === undefined ? undefined : { reason: parsed.data.reason };
     }
 
     if (backendMode(session)) {

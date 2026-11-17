@@ -43,7 +43,7 @@ describe("authorized scenario BFF route", () => {
     process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
     const backendFetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
       Response.json({ userId: "42", subType: "EMPLEADO", m1Role: "RESPONSABLE_AREA", roles: ["M6_ADMIN"] }));
-    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
+    const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature" });
     const response = await GET(new Request("http://localhost/api/mock/scenarios/office-duty-queue", { headers: { cookie } }), {
       params: Promise.resolve({ scenarioId: "office-duty-queue" }),
     });
@@ -60,7 +60,7 @@ describe("authorized scenario BFF route", () => {
   describe("backend failures while validating the session (#240)", () => {
     async function getWithBackend(respond: () => Promise<Response>) {
       process.env.M6_BACKEND_ORIGIN = "https://backend.internal";
-      const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDB9.signature" });
+      const cookie = await loginAs("office-duty-queue", { mode: "real-m1", accessToken: "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature" });
       vi.spyOn(globalThis, "fetch").mockImplementation(respond);
       return GET(new Request("http://localhost/api/mock/scenarios/office-duty-queue", { headers: { cookie } }), {
         params: Promise.resolve({ scenarioId: "office-duty-queue" }),

@@ -9,7 +9,7 @@ import { POST } from "./route";
 import { createSessionCookie, loginAs } from "@/test/session";
 
 const backendOrigin = "https://backend.internal";
-const backendDevJwt = "header.eyJleHAiOjQxMDAwMDAwMDB9.signature";
+const backendDevJwt = "header.eyJleHAiOjQxMDAwMDAwMDAsInBhZCI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIn0.signature";
 const backendCrew = {
   id: "11111111-1111-4111-8111-111111111111",
   name: "Cuadrilla Belgrano — Recolección",

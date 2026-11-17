@@ -22,10 +22,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { errorMessage } from "@/lib/error-message";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Check, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { useCatalogSort, withCatalogSorting } from "@/components/catalog/use-catalog-sort";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -185,6 +186,8 @@ export function GreenPointCatalogPanel({
     return () => media.removeEventListener("change", updateSide);
   }, []);
 
+  // Sin paginador (una sola página de 100): cambiar el orden no mueve de página.
+  const { sortQuery, tableOptions } = useCatalogSort("green-points", () => undefined);
   const query = useMemo<GreenPointQuery>(
     () => ({
       active: activeFilter === "all" ? undefined : activeFilter === "true",
@@ -192,8 +195,9 @@ export function GreenPointCatalogPanel({
       wasteType: wasteTypeFilter === "all" ? undefined : wasteTypeFilter,
       search: search.trim() || undefined,
       pageSize: 100,
+      ...sortQuery,
     }),
-    [activeFilter, search, wasteTypeFilter, zoneFilter],
+    [activeFilter, search, wasteTypeFilter, zoneFilter, sortQuery],
   );
 
   useEffect(() => {
@@ -265,18 +269,33 @@ export function GreenPointCatalogPanel({
     setFormOpen(true);
   };
 
+  // Only the latest detail request may write state: a response that arrives
+  // after the sheet was closed (or reopened for another row) would otherwise
+  // reopen it on top of the next dialog (#946).
+  const detailRequestRef = useRef(0);
+
+  const closeDetail = () => {
+    detailRequestRef.current += 1;
+    setDetailPoint(null);
+    setDetailLoading(false);
+  };
+
   const openDetail = async (point: GreenPoint) => {
+    const request = ++detailRequestRef.current;
     setDetailPoint(point);
     setDetailError(null);
     setDetailLoading(true);
     try {
-      setDetailPoint(await greenPointsAdapter.get(point.id));
+      const detail = await greenPointsAdapter.get(point.id);
+      if (request === detailRequestRef.current) setDetailPoint(detail);
     } catch (caught) {
-      setDetailError(
-        errorMessage(caught, "No se pudo cargar el detalle del punto verde."),
-      );
+      if (request === detailRequestRef.current) {
+        setDetailError(
+          errorMessage(caught, "No se pudo cargar el detalle del punto verde."),
+        );
+      }
     } finally {
-      setDetailLoading(false);
+      if (request === detailRequestRef.current) setDetailLoading(false);
     }
   };
 
@@ -383,19 +402,19 @@ export function GreenPointCatalogPanel({
     }
   };
 
-  const pointColumns: DataTableColumn<GreenPoint>[] = [
-    { id: "code", header: "Código", accessorFn: (p) => p.code, enableSorting: false, meta: { rowHeader: true, headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => { const point = row.original; return (
+  const pointColumns: DataTableColumn<GreenPoint>[] = withCatalogSorting("green-points", [
+    { id: "code", header: "Código", accessorFn: (p) => p.code, meta: { rowHeader: true, headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => { const point = row.original; return (
       <Button type="button" variant="ghost" size="sm" aria-label={`Ver detalle de ${point.code}`} onClick={() => void openDetail(point)} className="min-w-0 justify-start px-0 font-semibold text-foreground hover:bg-transparent hover:text-foreground after:absolute after:inset-0 after:z-10 after:cursor-pointer focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[var(--color-focus)] active:not-aria-[haspopup]:translate-none">
         {point.code}
       </Button>); } },
-    { id: "name", header: "Nombre", accessorFn: (p) => p.name, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => row.original.name },
-    { id: "zone", header: "Zona", accessorFn: (p) => p.zoneId, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
-    { id: "waste", header: "Residuos aceptados", accessorFn: (p) => p.wasteTypes.join(","), enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => row.original.wasteTypes.map((type) => WASTE_TYPE_LABELS[type]).join(", ") },
-    { id: "address", header: "Ubicación", accessorFn: (p) => p.address, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: `${POINT_CELL} max-w-[220px]` }, cell: ({ row }) => row.original.address ?? "Sin dirección registrada" },
-    { id: "status", header: "Estado", accessorFn: (p) => p.active, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => { const point = row.original; return <span className="inline-flex items-center gap-1.5">{point.active ? <Check className="size-4 text-[var(--color-success)]" aria-hidden /> : null}{point.active ? "Activo" : "Inactivo"}</span>; } },
-    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, enableSorting: false, meta: { headClassName: POINT_HEAD, cellClassName: `${styles.rowChevron} ${POINT_CELL} px-4 py-3` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
-  ];
-  const pointTable = useDataTable({ data: state.status === "ready" ? state.items : NO_POINTS, columns: pointColumns, getRowId: (p) => p.id });
+    { id: "name", header: "Nombre", accessorFn: (p) => p.name, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => row.original.name },
+    { id: "zone", header: "Zona", accessorFn: (p) => p.zoneId, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => zoneLabel(zones, row.original.zoneId, zonesLoaded) },
+    { id: "waste", header: "Residuos aceptados", accessorFn: (p) => p.wasteTypes.join(","), meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => row.original.wasteTypes.map((type) => WASTE_TYPE_LABELS[type]).join(", ") },
+    { id: "address", header: "Ubicación", accessorFn: (p) => p.address, meta: { headClassName: POINT_HEAD, cellClassName: `${POINT_CELL} max-w-[220px]` }, cell: ({ row }) => row.original.address ?? "Sin dirección registrada" },
+    { id: "status", header: "Estado", accessorFn: (p) => p.active, meta: { headClassName: POINT_HEAD, cellClassName: POINT_CELL }, cell: ({ row }) => { const point = row.original; return <span className="inline-flex items-center gap-1.5">{point.active ? <Check className="size-4 text-[var(--color-success)]" aria-hidden /> : null}{point.active ? "Activo" : "Inactivo"}</span>; } },
+    { id: "detail", header: () => <span className="sr-only">Abrir detalle</span>, meta: { headClassName: POINT_HEAD, cellClassName: `${styles.rowChevron} ${POINT_CELL} px-4 py-3` }, cell: () => <span aria-hidden="true"><ChevronRight className="ml-auto size-4 text-muted-foreground" /></span> },
+  ]);
+  const pointTable = useDataTable({ data: state.status === "ready" ? state.items : NO_POINTS, columns: pointColumns, getRowId: (p) => p.id, ...tableOptions });
 
   return (
     <section
@@ -915,7 +934,7 @@ export function GreenPointCatalogPanel({
 
       <Sheet
         open={Boolean(detailPoint)}
-        onOpenChange={(open) => !open && setDetailPoint(null)}
+        onOpenChange={(open) => !open && closeDetail()}
       >
         <SheetContent
           side={detailSheetSide}
@@ -1012,7 +1031,7 @@ export function GreenPointCatalogPanel({
                   className="w-full justify-start"
                   onClick={() => {
                     const target = detailPoint;
-                    setDetailPoint(null);
+                    closeDetail();
                     if (target) openEdit(target);
                   }}
                 >
@@ -1032,7 +1051,7 @@ export function GreenPointCatalogPanel({
                   className="w-full justify-start"
                   onClick={() => {
                     const target = detailPoint;
-                    setDetailPoint(null);
+                    closeDetail();
                     void deactivate(target);
                   }}
                 >

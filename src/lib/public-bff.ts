@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ZodType } from "zod";
 
+import { BACKEND_TIMEOUT_MS } from "./bff-backend";
 import { errorResponse } from "./bff-route";
 import { getAuthMode } from "./session";
 
@@ -9,7 +10,6 @@ import { getAuthMode } from "./session";
  * `Authorization` puede salir de acá. Las rutas de `/api/public/` lo comparten.
  */
 
-const PUBLIC_BACKEND_TIMEOUT_MS = 15_000;
 const UNAVAILABLE_MESSAGE = "El servicio no responde en este momento.";
 
 export function publicMockMode(): boolean {
@@ -55,7 +55,7 @@ export async function fetchPublicBackend(request: Request, resourcePath: string)
       method: "GET",
       headers,
       cache: "no-store",
-      signal: AbortSignal.timeout(PUBLIC_BACKEND_TIMEOUT_MS),
+      signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS),
     });
   } catch {
     return publicError(503, UNAVAILABLE_MESSAGE, new URL(request.url).pathname);

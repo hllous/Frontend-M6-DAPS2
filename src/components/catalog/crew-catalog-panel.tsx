@@ -29,6 +29,7 @@ import {
 
 import { CatalogPager } from "@/components/catalog/catalog-pager";
 import { CatalogPageHeader } from "@/components/catalog/catalog-page-header";
+import { useCatalogSort, withCatalogSorting } from "@/components/catalog/use-catalog-sort";
 import { CatalogDeactivationDialog } from "@/components/catalog/catalog-deactivation-dialog";
 import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -189,6 +190,7 @@ export function CrewCatalogPanel({
   const [relocating, setRelocating] = useState<Crew | null>(null);
   const [sheetSide, setSheetSide] = useState<"right" | "bottom">("right");
 
+  const { sortQuery, tableOptions } = useCatalogSort("crews", () => setPage(1));
   const query = useMemo<CrewQuery>(
     () => ({
       active: activeFilter === "all" ? undefined : activeFilter === "true",
@@ -196,8 +198,9 @@ export function CrewCatalogPanel({
       defaultShift: shiftFilter === "all" ? undefined : shiftFilter,
       zoneId: zoneFilter === "all" ? undefined : zoneFilter,
       specialty: specialtyFilter === "all" ? undefined : specialtyFilter,
+      ...sortQuery,
     }),
-    [activeFilter, typeFilter, shiftFilter, zoneFilter, specialtyFilter],
+    [activeFilter, typeFilter, shiftFilter, zoneFilter, specialtyFilter, sortQuery],
   );
 
   useEffect(() => {
@@ -434,11 +437,10 @@ export function CrewCatalogPanel({
     }
   }
 
-  const columns: DataTableColumn<Crew>[] = [
+  const columns: DataTableColumn<Crew>[] = withCatalogSorting("crews", [
     {
       id: "name",
       header: "Nombre",
-      enableSorting: false,
       meta: {
         label: "Nombre",
         rowHeader: true,
@@ -465,7 +467,6 @@ export function CrewCatalogPanel({
     {
       id: "type",
       header: "Tipo",
-      enableSorting: false,
       meta: {
         label: "Tipo",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -479,7 +480,6 @@ export function CrewCatalogPanel({
     {
       id: "specialty",
       header: "Especialidad",
-      enableSorting: false,
       meta: {
         label: "Especialidad",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -490,7 +490,6 @@ export function CrewCatalogPanel({
     {
       id: "zone",
       header: "Zona",
-      enableSorting: false,
       meta: {
         label: "Zona",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -516,7 +515,6 @@ export function CrewCatalogPanel({
     {
       id: "leader",
       header: "Responsable",
-      enableSorting: false,
       meta: {
         label: "Responsable",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -530,7 +528,6 @@ export function CrewCatalogPanel({
     {
       id: "organization",
       header: "Organización",
-      enableSorting: false,
       meta: {
         label: "Organización",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -544,7 +541,6 @@ export function CrewCatalogPanel({
     {
       id: "shift",
       header: "Turno",
-      enableSorting: false,
       meta: {
         label: "Turno",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -558,7 +554,6 @@ export function CrewCatalogPanel({
     {
       id: "status",
       header: "Estado",
-      enableSorting: false,
       meta: {
         label: "Estado",
         headClassName: "h-auto whitespace-normal text-inherit font-bold",
@@ -579,7 +574,6 @@ export function CrewCatalogPanel({
     {
       id: "detail",
       header: () => <span className="sr-only">Ver detalle</span>,
-      enableSorting: false,
       meta: {
         label: "",
         ariaHidden: true,
@@ -594,12 +588,13 @@ export function CrewCatalogPanel({
         );
       },
     },
-  ];
+  ]);
 
   const table = useDataTable({
     data: state.status === "ready" ? state.crews : NO_CREWS,
     columns,
     getRowId: (item) => item.id,
+    ...tableOptions,
   });
 
   return (

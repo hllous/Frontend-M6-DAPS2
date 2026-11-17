@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 
 import { M1AccountBlockedError, M1CredentialsRejectedError, M1InvalidResponseError, M1LoginTimeoutError, M1ServiceUnavailableError, loginWithM1 } from "@/lib/m1-auth";
+import { clientIp } from "@/lib/client-ip";
+import { loginRateLimiter, normalizeLoginAccount } from "@/lib/login-rate-limit";
 import { fetchMeWithToken, sessionFromMe } from "@/lib/me";
 import { getSessionMutationRejection } from "@/lib/session-request";
 import { getScenario, isScenarioId } from "@/lib/scenarios";
@@ -30,11 +32,11 @@ let concurrentLoginAttempts = 0;
 
 class LoginBodyTooLargeError extends Error {}
 
-function loginFailure(status: 400 | 401 | 403 | 413 | 415 | 429 | 500 | 502 | 503 | 504, message: string) {
+function loginFailure(status: 400 | 401 | 403 | 413 | 415 | 429 | 500 | 502 | 503 | 504, message: string, retryAfterSeconds = 5) {
   recordTelemetryEvent({ name: "auth_login_failed", status });
   const response = NextResponse.json({ message }, { status });
   response.headers.set("cache-control", "no-store");
-  if (status === 429) response.headers.set("retry-after", "5");
+  if (status === 429) response.headers.set("retry-after", String(retryAfterSeconds));
   return response;
 }
 
@@ -92,6 +94,14 @@ async function handleLoginRequest(request: Request, body: Record<string, unknown
       return loginFailure(400, "Ingrese un correo y una contraseña válidos.");
     }
 
+    // Fuerza bruta: se corta antes de consultar a M1. Misma respuesta exista o no la cuenta (no permite enumerar usuarios).
+    const ip = clientIp(request);
+    const account = normalizeLoginAccount(email);
+    const limit = loginRateLimiter.check(ip, account);
+    if (!limit.allowed) {
+      return loginFailure(429, "Demasiados intentos de ingreso fallidos. Intente nuevamente más tarde.", limit.retryAfterSeconds);
+    }
+
     try {
       const backendOrigin = process.env.M6_BACKEND_ORIGIN;
       if (backendOrigin) wakeBackend(backendOrigin);
@@ -110,9 +120,13 @@ async function handleLoginRequest(request: Request, body: Record<string, unknown
         identity: { userId: result.claims.subject, subType: "EMPLEADO", m1Role: me.m1Role },
         roles: me.roles,
       });
+      loginRateLimiter.recordSuccess(account);
       return sessionResponse(request, sessionFromMe(created, me));
     } catch (error) {
-      if (error instanceof M1CredentialsRejectedError) return loginFailure(401, "El correo o la contraseña no son correctos.");
+      if (error instanceof M1CredentialsRejectedError) {
+        loginRateLimiter.recordFailure(ip, account);
+        return loginFailure(401, "El correo o la contraseña no son correctos.");
+      }
       if (error instanceof M1AccountBlockedError) return loginFailure(403, "La cuenta no puede iniciar sesión. Comuníquese con el administrador del sistema.");
       if (error instanceof CitizenForbiddenError) return loginFailure(403, "Esta cuenta no tiene acceso a Ambiente e Higiene.");
       if (error instanceof InvalidSessionError) return loginFailure(401, "No se pudo validar el ingreso con Ambiente. Intente nuevamente.");

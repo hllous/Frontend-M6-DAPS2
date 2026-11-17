@@ -180,7 +180,7 @@ function SignalCard({ signal, status, onRetry, onDetail, series, bucket }: { sig
         <CardDescription aria-hidden="true" className={cn("text-xs", worse && "text-[var(--color-text-secondary)]")}>{signal.context}</CardDescription>
         {hasSeries ? <div className="sr-only">
           <p>Evolución por {bucket === "month" ? "mes" : "semana"}</p>
-          <Table><TableCaption>Valores de {signal.label} por {bucket === "month" ? "mes" : "semana"}</TableCaption><TableHeader><TableRow><TableHead>Desde</TableHead><TableHead>Cantidad</TableHead></TableRow></TableHeader><TableBody>{series.map((point) => <TableRow key={point.from}><TableCell>{formatArgentinaCalendarDate(point.from)}</TableCell><TableCell>{point.value === null ? "Sin datos" : plainNumber(point.value)}</TableCell></TableRow>)}</TableBody></Table>
+          <Table container={false}><TableCaption>Valores de {signal.label} por {bucket === "month" ? "mes" : "semana"}</TableCaption><TableHeader><TableRow><TableHead>Desde</TableHead><TableHead>Cantidad</TableHead></TableRow></TableHeader><TableBody>{series.map((point) => <TableRow key={point.from}><TableCell>{formatArgentinaCalendarDate(point.from)}</TableCell><TableCell>{point.value === null ? "Sin datos" : plainNumber(point.value)}</TableCell></TableRow>)}</TableBody></Table>
         </div> : null}
         <span className="sr-only" id={descriptionId}>{`${plainNumber(signal.value)}. ${comparison} ${signal.context}.`}</span>
       </CardContent>
