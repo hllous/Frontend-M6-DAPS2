@@ -5,6 +5,9 @@
   "ignores": [
     // Read-only mirror of Backend docs: fix Backend and re-copy, never edit or lint here.
     "docs/backend-context/**",
+    // Read-only mirrors of Backend docs (manual and product docs): their style is checked at the source.
+    "docs/manual-de-usuario/**",
+    "docs/producto/**",
     // Vendored skills and tool output are not project documentation.
     "node_modules/**"
   ],

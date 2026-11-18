@@ -19,6 +19,7 @@ Los documentos centrales están en la raíz. En particular, el dominio sigue la 
 - [agents/README.md](agents/README.md): índice de guías de trabajo del repositorio.
 - [backend-context/](backend-context/README.md): espejo de contexto y API del backend. Es de solo lectura; ante una diferencia, corregir la fuente del backend y volver a copiarlo.
 - [manual-de-usuario/](manual-de-usuario/manual-de-usuario.md): espejo del manual de usuario del Backend, organizado por tareas, con capturas. Solo lectura; se edita en el Backend.
+- [producto/](producto/README.md): espejo de la documentación de producto del Backend (BRD, documentación funcional y documento de diseño de la 4.ª entrega). Solo lectura; se edita en el Backend.
 - [design/examples/](design/examples/README.md): ejemplos verificables del estándar de [DESIGN](../DESIGN.md).
 - [operations/deploy.md](operations/deploy.md): estado y procedimiento de despliegue.
 - [operations/external-contracts.md](operations/external-contracts.md): contratos externos, evidencia y estado de GA.
@@ -45,7 +46,7 @@ El job `docs` de CI corre en cada PR y falla si la documentación se rompe:
 - `markdownlint-cli2` revisa estilo y estructura. Las reglas están en [`.markdownlint-cli2.jsonc`](../.markdownlint-cli2.jsonc).
 - `lychee`, sin red, comprueba que los enlaces relativos y las anclas (`#seccion`) entre nuestros Markdown existan. Las reglas están en [`lychee.toml`](../lychee.toml). No revisa URLs externas.
 
-Ambos excluyen `docs/backend-context/`: es un espejo de solo lectura y parcial, y sus enlaces se validan en el Backend.
+`lychee` excluye `docs/backend-context/`: es un espejo de solo lectura y parcial, y sus enlaces se validan en el Backend. `markdownlint` excluye ese espejo y también `docs/manual-de-usuario/` y `docs/producto/`: son copias de solo lectura, cuyo estilo se revisa en el Backend. `lychee` sí revisa los enlaces de estas dos últimas.
 
 Para correrlos en local:
 
