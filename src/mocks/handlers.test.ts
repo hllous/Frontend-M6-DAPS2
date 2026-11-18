@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { Blob as NodeBlob } from "node:buffer";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";

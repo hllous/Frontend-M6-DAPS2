@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { File as NodeFile } from "node:buffer";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
 import { HttpResponse, http } from "msw";
 
@@ -336,6 +337,17 @@ describe("servicesAdapter.uploadEvidence", () => {
     uploadedAt: "2026-09-30T10:00:00Z",
   };
 
+  // jsdom reemplaza FormData y File, pero fetch sigue siendo el de Node (undici), que no reconoce el
+  // File de jsdom: el multipart salía con filename "blob" y contenido "undefined", y en Node 24
+  // request.formData() falla. Como en el navegador, FormData, File y fetch tienen que ser del mismo
+  // entorno: acá, los de Node.
+  beforeEach(async () => {
+    const urlencoded = { headers: { "content-type": "application/x-www-form-urlencoded" } };
+    vi.stubGlobal("FormData", (await new Response("", urlencoded).formData()).constructor);
+    vi.stubGlobal("File", NodeFile);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
   it("sends the file with its owner and the caller's idempotency key, and adds serviceId only for a ZONE_RESULT", async () => {
     const seen: Array<{ key: string | null; form: FormData }> = [];
     server.use(
@@ -361,6 +373,10 @@ describe("servicesAdapter.uploadEvidence", () => {
     expect(seen[0].form.get("ownerId")).toBe("ZR-1");
     expect(seen[0].form.get("serviceId")).toBe("SVC-77");
     expect(seen[0].form.get("fileName")).toBe("foto.png");
+    const sent = seen[0].form.get("file") as File;
+    expect(sent.name).toBe("foto.png");
+    expect(sent.type).toBe("image/png");
+    expect(await sent.text()).toBe("x");
     expect(seen[1].form.has("serviceId")).toBe(false);
     expect(seen[1].key).toBeTruthy();
     expect(seen[1].key).not.toBe("clave-fija");
